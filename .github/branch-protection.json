@@ -1,0 +1,32 @@
+{
+  "branches": [
+    {
+      "pattern": "main",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "contexts": [
+            "build",
+            "deploy"
+          ]
+        },
+        "required_pull_request_reviews": {
+          "dismiss_stale_reviews": true,
+          "require_code_owner_reviews": false,
+          "required_approving_review_count": 0
+        },
+        "enforce_admins": false,
+        "restrictions": null
+      }
+    },
+    {
+      "pattern": "develop",
+      "protection": {
+        "required_status_checks": {
+          "strict": false,
+          "contexts": ["build"]
+        }
+      }
+    }
+  ]
+}

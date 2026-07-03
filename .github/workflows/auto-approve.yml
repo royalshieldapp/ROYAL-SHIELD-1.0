@@ -1,0 +1,104 @@
+name: Auto-Approve & Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  auto-approve:
+    name: Auto-Approve Safe PRs
+    runs-on: ubuntu-latest
+    
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Approve if safe changes only
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            // Auto-approve conditions
+            const isBot = pr.user.login === 'dependabot[bot]' || pr.user.login === 'renovate[bot]';
+            const isDeps = pr.title.includes('deps') || pr.title.includes('dependencies');
+            const isBump = pr.title.includes('bump') || pr.title.includes('upgrade');
+            
+            if (isBot && (isDeps || isBump)) {
+              // Check if it's only package.json/lock files
+              const { data: files } = await github.rest.pulls.listFiles({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+
+              const changedFiles = files.map(f => f.filename);
+              const isSafeChanges = changedFiles.every(f => 
+                f.includes('package.json') || 
+                f.includes('package-lock.json') ||
+                f.includes('.md')
+              );
+
+              if (isSafeChanges) {
+                console.log('✅ Auto-approving safe dependency PR');
+                
+                // Approve
+                await github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  event: 'APPROVE',
+                  body: 'Auto-approved: Safe dependency update'
+                });
+
+                // Auto-merge
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  merge_method: 'squash',
+                  commit_title: pr.title,
+                  commit_message: pr.body
+                }).catch(() => console.log('⏳ Waiting for status checks...'));
+              }
+            }
+
+      - name: Approve manual PRs with passing checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            // For PRs with author in approved list
+            const approvedAuthors = ['YOUR_USERNAME']; // Add trusted usernames
+            
+            if (approvedAuthors.includes(pr.user.login)) {
+              // Check combined status
+              const { data: status } = await github.rest.repos.getCombinedStatusForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+
+              if (status.state === 'success') {
+                await github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  event: 'APPROVE',
+                  body: 'Auto-approved: All checks passed'
+                });
+              }
+            }

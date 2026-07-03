@@ -1,0 +1,96 @@
+name: CI/CD - Build & Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run linter (if configured)
+        working-directory: ./backend
+        run: npm run lint --if-present
+
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test --if-present
+
+      - name: Build Docker image
+        working-directory: ./backend
+        run: docker build -t royal-shield-backend:${{ github.sha }} -t royal-shield-backend:latest .
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Push Docker image to Hub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ./backend
+        run: |
+          docker tag royal-shield-backend:latest ${{ secrets.DOCKER_HUB_USERNAME }}/royal-shield-backend:latest
+          docker tag royal-shield-backend:${{ github.sha }} ${{ secrets.DOCKER_HUB_USERNAME }}/royal-shield-backend:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/royal-shield-backend:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/royal-shield-backend:${{ github.sha }}
+
+  auto-approve:
+    name: Auto Approve
+    needs: build
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'dependabot[bot]'
+    
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Approve PR
+        uses: hmarti/auto-approve-action@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge Dependabot PR
+        if: always()
+        uses: fastify/github-action-merge-dependabot@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    name: Deploy to Render
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Render deployment
+        run: |
+          curl -X POST https://api.render.com/deploy/${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}
+        continue-on-error: true
+
+      - name: Notify deployment
+        run: echo "Deployment triggered on Render"
