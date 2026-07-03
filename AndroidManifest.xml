@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Internet Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Location permissions for real GPS on SOS button -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Vibration permission for feedback when pressing SOS button -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Permission to access camera -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Permission to record audio -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Permission to scan other apps (VirusTotal) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <!-- Permission to read external files (for scanning) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <!-- Declare that the app uses the camera, but it is not mandatory -->
+    <!-- Permission to start foreground services (Critical for Android 9+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Royal_shield">
+
+        <!-- Background Service -->
+        <service
+            android:name=".services.RoyalShieldService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- VPN Service -->
+        <service
+            android:name=".vpn.RoyalVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBGWM1UTH4fj4OrF0aSpCnUUcpMQthUhR4" />
+
+
+        <!-- Main Activity (LAUNCHER) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Registration Activity -->
+        <activity
+            android:name=".RegisterActivity"
+            android:exported="true"
+            android:label="Create Account"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Google Login Activity -->
+        <activity
+            android:name=".GoogleSignInActivity"
+            android:exported="false"
+            android:label="Login with Google"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- Security Activity -->
+        <activity
+            android:name=".SecurityActivity"
+            android:exported="false"
+            android:label="Security Center"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- SOS Event History Activity -->
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false"
+            android:label="SOS History"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- Settings Activity -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Settings"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- Live Location Activity -->
+        <activity
+            android:name=".LocationActivity"
+            android:exported="false"
+            android:label="Live Location"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- Cyber Threat Map Activity -->
+        <activity
+            android:name=".CyberThreatMapActivity"
+            android:exported="false"
+            android:label="Cyber Threat Map"
+            android:parentActivityName=".SecurityActivity"
+            android:hardwareAccelerated="true" />
+
+
+
+        <!-- File Scan Activity -->
+        <activity
+            android:name=".FileScanActivity"
+            android:exported="false"
+            android:label="Scan File"
+            android:parentActivityName=".MainActivity" />
+
+    </application>
+
+</manifest>
