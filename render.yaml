@@ -1,9 +1,10 @@
 services:
   - type: web
     name: server-beckend
-    runtime: node
+    env: node
     region: ohio
     plan: free
+    rootDir: backend
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
