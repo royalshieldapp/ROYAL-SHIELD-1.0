@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.School
@@ -60,7 +59,6 @@ import com.royalshield.app.ui.components.*
 import com.royalshield.app.ui.components.CyberButtonRound
 import com.royalshield.app.ui.components.CyberButtonRect
 import com.royalshield.app.ui.theme.*
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 
 @Composable
@@ -74,17 +72,16 @@ fun CyberHomeScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    
+
     // Vulnerability Analysis State
     val vulnerabilities by VulnerabilityManager.vulnerabilities.collectAsState()
     var showVulnerabilityAlert by remember { mutableStateOf(false) }
     var showUpdatesDialog by remember { mutableStateOf(false) }
-    var showQrPaymentDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         VulnerabilityManager.scan(context)
     }
-    
+
     /*
     LaunchedEffect(vulnerabilities) {
         if (vulnerabilities.isNotEmpty()) {
@@ -101,9 +98,9 @@ fun CyberHomeScreen(
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
-        
+
         // HolographicWaveBackground() // Disabled in favor of static image as requested
-        
+
         // Additional Dark Overlay for better text readability on top of animation
         Box(
             modifier = Modifier
@@ -118,7 +115,7 @@ fun CyberHomeScreen(
                     )
                 )
         )
-        
+
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -157,18 +154,18 @@ fun CyberHomeScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     Text(
                         text = "Threat Briefing",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    
+
                     Spacer(modifier = Modifier.width(16.dp))
-                    
+
                     // Threat Briefing Icon
                     Image(
                         painter = painterResource(id = com.royalshield.app.R.drawable.ic_threat_briefing_update),
@@ -179,28 +176,6 @@ fun CyberHomeScreen(
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
-
-                    // QR Security Scan (Paid Feature)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        IconButton(
-                            onClick = { 
-                                // Direct access for demo/testing
-                                context.startActivity(Intent(context, com.royalshield.app.QrScannerActivity::class.java))
-                            },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .border(1.dp, RoyalGold, CircleShape)
-                                .background(Color(0xFF1E1E1E), CircleShape)
-                        ) {
-                             Icon(
-                                 Icons.Default.QrCodeScanner,
-                                 contentDescription = "QR Scan",
-                                 tint = RoyalGold,
-                                 modifier = Modifier.size(20.dp)
-                             )
-                        }
-                        Text("QR Unlock", color = RoyalGold, fontSize = 9.sp)
-                    }
                 }
 
                 // Armed Status Section
@@ -225,7 +200,7 @@ fun CyberHomeScreen(
                 ) {
                      ArmedStatusIndicator(
                          isArmed = isSystemArmed,
-                         onToggle = { 
+                         onToggle = {
                              val targetState = !isSystemArmed
                              PreferencesManager.setSystemArmed(targetState)
                              isSystemArmed = targetState
@@ -242,12 +217,12 @@ fun CyberHomeScreen(
                 ) {
                     CyberActionItem(
                         icon = Icons.Default.Link,
-                        label = "File Scan", 
+                        label = "File Scan",
                         modifier = Modifier.weight(1f)
                     ) {
                         context.startActivity(Intent(context, SecurityActivity::class.java))
                     }
-                    
+
                     CyberActionItem(
                         icon = Icons.Default.Call,
                         label = "Check Num",
@@ -256,7 +231,7 @@ fun CyberHomeScreen(
                         // Launch Real Number Check
                         context.startActivity(Intent(context, com.royalshield.app.PhoneNumberCheckActivity::class.java))
                     }
-                    
+
                     CyberActionItem(
                         icon = Icons.Default.School,
                         label = "Learn",
@@ -325,7 +300,7 @@ fun CyberHomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween // Space them evenly
                 ) {
                     CyberMetricCard("Attacks", String.format("%,d", attacksCount), NeonRed)
-                    CyberMetricCard("Target", "Banking", CyberCyan) 
+                    CyberMetricCard("Target", "Banking", CyberCyan)
                     CyberMetricCard("Botnets", botnetsCount.toString(), RoyalGold)
                 }
 
@@ -344,53 +319,23 @@ fun CyberHomeScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // LIVE RADAR & THREAT MAP
-                val dashboardViewModel: com.royalshield.app.ui.dashboard.DashboardViewModel = viewModel()
-                val dashboardState by dashboardViewModel.state.collectAsState()
-
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Live Radar Integration
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Color(0xFF0D0D12))
-                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
-                    ) {
-                        com.royalshield.app.ui.dashboard.components.RadarChart(
-                            threats = dashboardState.threatEvents,
-                            selectedThreatId = dashboardState.selectedThreatId,
-                            onThreatClick = { dashboardViewModel.onThreatSelected(it.id) },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Text(
-                            "LIVE RADAR",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(12.dp).align(Alignment.TopStart)
-                        )
-                    }
-
-                    com.royalshield.app.ui.dashboard.components.GlobalThreatMapCard(
-                        modifier = Modifier.weight(1f).height(180.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // System Threat Status (moved from Dashboard)
-                com.royalshield.app.ui.dashboard.components.SystemThreatStatusCard(
-                    activeThreats = 14,
-                    graphData = listOf(0.2f, 0.5f, 0.4f, 0.8f, 0.6f, 0.9f, 0.7f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                )
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CyberEmbedCard(
+                        title = "THREAT EDUCATION",
+                        assetPath = "file:///android_asset/threat_education_embed.html",
+                        modifier = Modifier.weight(1f).height(190.dp)
+                    )
+                    CyberEmbedCard(
+                        title = "ROYAL TERMS",
+                        assetPath = "file:///android_asset/terms_embed.html",
+                        modifier = Modifier.weight(1f).height(190.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -417,14 +362,14 @@ fun CyberHomeScreen(
                     neonColors = listOf(CyberCyan, Color.Blue, CyberCyan),
                     containerColor = Color.Black
                 ) {
-                        // Map Background Image
+                        // Privacy Advisor background image
                         Image(
-                            painter = painterResource(id = com.royalshield.app.R.drawable.cyber_bg),
-                            contentDescription = "Real-time Threat Map",
+                            painter = painterResource(id = com.royalshield.app.R.drawable.privacy_advisor_bg),
+                            contentDescription = "Privacy Advisor",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop
                         )
-                        
+
                         // Dark Gradient Overlay
                         Box(
                              modifier = Modifier
@@ -432,7 +377,7 @@ fun CyberHomeScreen(
                                  .background(
                                      Brush.verticalGradient(
                                          colors = listOf(
-                                             Color.Transparent, 
+                                             Color.Transparent,
                                              Color.Black.copy(alpha = 0.8f)
                                          )
                                      )
@@ -440,8 +385,11 @@ fun CyberHomeScreen(
                         )
 
                         // Content
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.fillMaxSize()) {
                              Column(
+                                 modifier = Modifier
+                                     .align(Alignment.Center)
+                                     .padding(bottom = 48.dp),
                                  horizontalAlignment = Alignment.CenterHorizontally,
                                  verticalArrangement = Arrangement.Center
                              ) {
@@ -451,9 +399,9 @@ fun CyberHomeScreen(
                                     tint = CyberCyan.copy(alpha = 0.9f),
                                     modifier = Modifier.size(48.dp)
                                 )
-                                
+
                                 Spacer(modifier = Modifier.height(12.dp))
-                                
+
                                 Text(
                                     "PRIVACY ADVISOR",
                                     color = Color.White,
@@ -461,7 +409,7 @@ fun CyberHomeScreen(
                                     fontSize = 24.sp,
                                     letterSpacing = 2.sp
                                 )
-                                
+
                                 Text(
                                     "App Permission Analysis",
                                     color = CyberCyan,
@@ -469,18 +417,18 @@ fun CyberHomeScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            
                             // Gold Cyber Button
                             CyberButtonRect(
                                 text = "START SCAN",
                                 color = RoyalGold,
-                                onClick = { 
+                                onClick = {
                                      val intent = Intent(context, com.royalshield.app.PrivacyAdvisorActivity::class.java)
                                      context.startActivity(intent)
                                 },
-                                modifier = Modifier.width(200.dp)
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 18.dp)
+                                    .width(200.dp)
                             )
                         }
                     }
@@ -488,7 +436,7 @@ fun CyberHomeScreen(
 
 
             } // End Column
-            
+
             // DIALOGS
             if (showVulnerabilityAlert) {
                 VulnerabilityAlertDialog(
@@ -500,11 +448,50 @@ fun CyberHomeScreen(
                 UpdatesDialog { showUpdatesDialog = false }
             }
 
-            if (showQrPaymentDialog) {
-                QrPaymentDialog { showQrPaymentDialog = false }
-            }
         } // End Box (Main)
     }
+
+@Composable
+private fun CyberEmbedCard(
+    title: String,
+    assetPath: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFF0D0D12))
+            .border(1.dp, CyberCyan.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
+    ) {
+        androidx.compose.ui.viewinterop.AndroidView(
+            factory = { ctx ->
+                android.webkit.WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    webViewClient = android.webkit.WebViewClient()
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    loadUrl(assetPath)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.62f))
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .align(Alignment.TopStart)
+        ) {
+            Text(
+                title,
+                color = CyberCyan,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp
+            )
+        }
+    }
+}
 
 
 @Composable
@@ -514,7 +501,7 @@ fun VulnerabilityAlertDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { 
+        title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Warning, null, tint = NeonRed)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -575,55 +562,6 @@ fun UpdatesDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-fun QrPaymentDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.QrCodeScanner, null, tint = NeonRed)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Premium Feature", color = NeonRed, fontWeight = FontWeight.Bold)
-            }
-        },
-        text = {
-            Column {
-                 Text("The QR Scan Security module is a premium feature.", color = Color.White)
-                 Spacer(modifier = Modifier.height(16.dp))
-                 Text("Unlock now for:", color = Color.Gray)
-                 Text("$0.99", color = RoyalGold, fontSize = 24.sp, fontWeight = FontWeight.Black)
-            }
-        },
-        containerColor = Color(0xFF1E1E1E),
-        confirmButton = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .clickable { onDismiss() },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = com.royalshield.app.R.drawable.btn_unlock_premium),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.FillBounds
-                )
-                Text(
-                    text = "UNLOCK NOW",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 14.sp
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("CANCEL", color = Color.Gray) }
-        }
-    )
-}
-
-@Composable
 fun CyberActionItem(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -636,7 +574,7 @@ fun CyberActionItem(icon: ImageVector, label: String, modifier: Modifier = Modif
             contentDescription = label,
             onClick = onClick
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = label,
@@ -662,9 +600,9 @@ fun AlertRow(item: AlertItem) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    item.icon, 
-                    contentDescription = null, 
-                    tint = Color.White.copy(alpha = 0.6f), 
+                    item.icon,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -717,7 +655,7 @@ fun CyberMetricCard(title: String, value: String, accentColor: Color) {
                     )
                 )
         )
-        
+
         // Card Background (Dark & Semi-transparent)
         Box(
             modifier = Modifier
@@ -735,7 +673,7 @@ fun CyberMetricCard(title: String, value: String, accentColor: Color) {
                     shape = RoundedCornerShape(12.dp)
                 )
         )
-        
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -744,7 +682,7 @@ fun CyberMetricCard(title: String, value: String, accentColor: Color) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = title.uppercase(), 
+                text = title.uppercase(),
                 color = RoyalGold,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
@@ -804,7 +742,7 @@ fun ArmedStatusIndicator(
     val color = if (isArmed) Color(0xFF00E676) else Color(0xFFFF3B30) // Green vs Red
     val statusText = if (isArmed) "SYSTEM ARMED" else "SYSTEM DISARMED"
     val ringColor = if (isArmed) Color(0xFF00E676) else Color(0xFFFF3B30)
-    
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
@@ -825,7 +763,7 @@ fun ArmedStatusIndicator(
                     radius = size.minDimension / 2
                 )
             }
-            
+
             // Neon Ring
             CircularProgressIndicator(
                 progress = { 1f },
@@ -834,7 +772,7 @@ fun ArmedStatusIndicator(
                 strokeWidth = 4.dp,
                 trackColor = ringColor.copy(alpha = 0.2f),
             )
-            
+
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = if (isArmed) Icons.Default.Shield else Icons.Default.Warning,
@@ -852,9 +790,9 @@ fun ArmedStatusIndicator(
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Status Details
         AnimatedVisibility(
             visible = isArmed,

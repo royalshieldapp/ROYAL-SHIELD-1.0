@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
@@ -66,9 +67,9 @@ import com.royalshield.app.ui.components.CyberButtonRect
 import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.ui.theme.RoyalIcons
 import com.royalshield.app.ui.theme.RoyalImages
-import com.royalshield.app.ui.dashboard.components.SystemThreatStatusCard
-import com.royalshield.app.ui.dashboard.components.GlobalThreatMapCard
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.royalshield.app.ui.dashboard.models.ActionItem
+import com.royalshield.app.ui.dashboard.models.Severity
 import com.royalshield.app.ui.dashboard.DashboardViewModel
 
 
@@ -111,9 +112,8 @@ fun DashboardScreen(
     val scrollState = rememberScrollState()
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     var showVoiceAssistant by remember { mutableStateOf(false) }
-    var showQrUnlockDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    
+
     // Neural Dashboard ViewModel
     val dashboardViewModel: DashboardViewModel = viewModel()
     val dashboardState by dashboardViewModel.state.collectAsState()
@@ -137,7 +137,7 @@ fun DashboardScreen(
             repeatMode = RepeatMode.Reverse
         ), label = "pulseAlpha"
     )
-    
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Background - Pure Canvas gradient (no PNG = no HWUI overload)
         Image(
@@ -159,7 +159,7 @@ fun DashboardScreen(
                 )
             )
         }
-        
+
         // Use transparent container so gradient shows through
         RoyalGradientBackground(containerColor = Color.Transparent) {
             Column(
@@ -171,7 +171,7 @@ fun DashboardScreen(
                         // Subtle Cyber Grid
                         val gridSize = 40.dp.toPx()
                         val gridColor = Color.White.copy(alpha = 0.03f)
-                        
+
                         for (x in 0..(size.width / gridSize).toInt()) {
                             drawLine(gridColor, Offset(x * gridSize, 0f), Offset(x * gridSize, size.height), 1f)
                         }
@@ -182,26 +182,28 @@ fun DashboardScreen(
             ) {
 
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 // Header
                 // Header removed as per request
-                
-                Spacer(modifier = Modifier.height(48.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
                 // TOP BAR
                 val topBarContentColor = if (isLight) Color.Gray else Color.White
                 val topBarSurfaceColor = if (isLight) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.1f)
                 val topBarBorderColor = if (isLight) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.2f)
-                
+                val showLegacyDashboardStatusStrip = false
+
                 // Premium Status
                 val hasPremium by billingManager.hasPremiumAccess.collectAsState()
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+
+                if (showLegacyDashboardStatusStrip) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     // Gold Lux Frame for Elite Status
                     com.royalshield.app.ui.components.GoldLuxFrame(
                         modifier = Modifier.clickable { onNavigateToPremium() }
@@ -245,15 +247,16 @@ fun DashboardScreen(
                             Icon(androidx.compose.material.icons.Icons.Default.Person, null, tint = RoyalGold)
                         }
                     }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // CAROUSEL / ALERT CARD - DYNAMICALLY CONNECTED TO BACKGROUND SERVICES & PROMOTIONS (SPLIT LAYOUT)
                 val isSoundEnabled = remember { PreferencesManager.isSoundEnabled() }
                 val isLocationEnabled = remember { PreferencesManager.isLocationEnabled() }
                 val isBgCameraEnabled = remember { PreferencesManager.isBackgroundCameraEnabled() }
-                
+
                 val statusItems = remember(isSoundEnabled, isLocationEnabled, isBgCameraEnabled) {
                     val items = mutableListOf<CarouselItem>()
                     // 1. Audio Shield
@@ -338,7 +341,7 @@ fun DashboardScreen(
 
                 var currentStatusIndex by remember { mutableIntStateOf(0) }
                 var currentPromoIndex by remember { mutableIntStateOf(0) }
-                
+
                 LaunchedEffect(Unit) {
                     while(true) {
                         delay(3500) // Staggered delays for a dynamic, reactive flow
@@ -352,12 +355,13 @@ fun DashboardScreen(
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                if (showLegacyDashboardStatusStrip) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     // LEFT CAROUSEL: STATUS (Height: 90.dp)
                     Box(modifier = Modifier.weight(1f)) {
                         AnimatedContent(
@@ -516,9 +520,10 @@ fun DashboardScreen(
                         }
                     }
                 }
+                }
 
 
-                
+
                 var isArmed by remember { mutableStateOf(PreferencesManager.isSystemArmed()) }
                 DisposableEffect(Unit) {
                     val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -545,20 +550,20 @@ fun DashboardScreen(
                     )
                     AlertDialog(
                         onDismissRequest = { showArmedDialog = false },
-                        title = { 
+                        title = {
                             Text(
-                                if (isArmed) "System Armed" else "System Disarmed", 
+                                if (isArmed) "System Armed" else "System Disarmed",
                                 color = statusColor,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
-                            ) 
+                            )
                         },
-                        text = { 
+                        text = {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = if (isArmed) 
-                                        "Your device is protected by Royal Shield active monitoring:" 
-                                    else 
+                                    text = if (isArmed)
+                                        "Your device is protected by Royal Shield active monitoring:"
+                                    else
                                         "Active monitoring is disabled. Enable it to secure your device:",
                                     color = if (isLight) Color.Black.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.7f),
                                     fontSize = 13.sp
@@ -590,14 +595,14 @@ fun DashboardScreen(
                             }
                         },
                         confirmButton = {
-                            TextButton(onClick = { 
+                            TextButton(onClick = {
                                 val targetState = !isArmed
                                 PreferencesManager.setSystemArmed(targetState)
                                 isArmed = targetState
-                                showArmedDialog = false 
+                                showArmedDialog = false
                             }) {
                                 Text(
-                                    if (isArmed) "DISARM" else "ARM", 
+                                    if (isArmed) "DISARM" else "ARM",
                                     color = if (isArmed) Color(0xFFFF3B30) else Color(0xFF00FF94),
                                     fontWeight = FontWeight.Bold
                                 )
@@ -627,7 +632,7 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     val rotatingColor = if (isArmed) Color(0xFF00FF94) else Color.Red
-                    
+
                     val rotationTransition = rememberInfiniteTransition(label = "lock_rotation")
                     val angle by rotationTransition.animateFloat(
                         initialValue = 0f,
@@ -785,7 +790,7 @@ fun DashboardScreen(
                         )
                     }
                 }
-                
+
                 // Quick Actions
                 Row(
                     modifier = Modifier
@@ -800,7 +805,7 @@ fun DashboardScreen(
                         vectorIcon = Icons.Default.Home,
                         onClick = onNavigateToSystemStatus
                     )
-                    
+
                     // 2. MAP
                     QuickActionButton(
                         iconRes = 0,
@@ -808,7 +813,7 @@ fun DashboardScreen(
                         vectorIcon = Icons.Default.LocationOn,
                         onClick = onNavigateToMap
                     )
-                    
+
                     // 3. SECURITY
                     QuickActionButton(
                         iconRes = 0,
@@ -816,27 +821,19 @@ fun DashboardScreen(
                         vectorIcon = Icons.Default.Fingerprint, // Escudo con huella
                         onClick = onNavigateToFileScan
                     )
-                    
-                    // 4. GALLERY (SOS Gallery)
+
+                    // 4. AUTOMATION
                     QuickActionButton(
                         iconRes = 0,
-                        label = "Gallery",
-                        vectorIcon = Icons.Default.PhotoLibrary,
-                        onClick = onNavigateToGallery
-                    )
-                    
-                    // 5. SETTINGS
-                    QuickActionButton(
-                        iconRes = 0,
-                        label = "Settings",
-                        vectorIcon = Icons.Default.Settings,
-                        onClick = onNavigateToSettings
+                        label = "Automation",
+                        vectorIcon = Icons.Default.SettingsSuggest,
+                        onClick = onNavigateToAutomation
                     )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                
-                // EMERGENCY SOS BUTTON — Compact Transparent Red Pill
+
+                // EMERGENCY SOS BUTTON â€” Compact Transparent Red Pill
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -877,7 +874,7 @@ fun DashboardScreen(
                         )
                     }
 
-                    // Floating Mic Button — separated, aligned to end with offset
+                    // Floating Mic Button â€” separated, aligned to end with offset
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
@@ -885,13 +882,7 @@ fun DashboardScreen(
                             .size(44.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFFFD700)) // Gold
-                            .clickable {
-                                if (com.royalshield.app.managers.PreferencesManager.isVoiceUnlocked()) {
-                                    showVoiceAssistant = true
-                                } else {
-                                    showQrUnlockDialog = true
-                                }
-                            },
+                            .clickable { showVoiceAssistant = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -902,7 +893,7 @@ fun DashboardScreen(
                         )
                     }
                 }
-                
+
                 if (showVoiceAssistant) {
                     com.royalshield.app.ui.components.DidAgentDialog(
                         onDismiss = { showVoiceAssistant = false },
@@ -947,6 +938,10 @@ fun DashboardScreen(
                                 "ai chatbot", "artificial intelligence", "asistente", "ia", "asistente de ia",
                                 "chat con ia", "inteligencia artificial", "hub de ia"
                             )
+                            val solutionEngineKeywords = listOf(
+                                "solution engine", "resolution engine", "resolucion", "solucion",
+                                "motor de solucion", "motor de resolucion", "resolver", "fix issues"
+                            )
                             val securityCameraKeywords = listOf(
                                 "security cam", "camera", "security camera", "cam", "video surveillance",
                                 "surveillance", "camara", "camara de seguridad", "vigilancia", "camara de vigilancia"
@@ -983,6 +978,8 @@ fun DashboardScreen(
                                 onNavigateToAutomation()
                             } else if (aiHubKeywords.any { normalized.contains(it) }) {
                                 onNavigateToAiHub()
+                            } else if (solutionEngineKeywords.any { normalized.contains(it) }) {
+                                onNavigateToSolutionEngine()
                             } else if (securityCameraKeywords.any { normalized.contains(it) }) {
                                 onNavigateToSecurityCamera()
                             } else if (soundDetectionKeywords.any { normalized.contains(it) }) {
@@ -998,46 +995,21 @@ fun DashboardScreen(
                     )
                 }
 
-                if (showQrUnlockDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showQrUnlockDialog = false },
-                        title = { Text("Voice Commands Locked", color = Color.White, fontWeight = FontWeight.Bold) },
-                        text = { Text("To use the AI Voice Assistant, you must scan the authorization QR code first.", color = Color.White.copy(alpha = 0.8f)) },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    showQrUnlockDialog = false
-                                    context.startActivity(Intent(context, com.royalshield.app.QrScannerActivity::class.java))
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = RoyalGold)
-                            ) {
-                                Text("SCAN QR", color = Color.Black, fontWeight = FontWeight.Bold)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showQrUnlockDialog = false }) {
-                                Text("CANCEL", color = Color.Gray)
-                            }
-                        },
-                        containerColor = Color(0xFF1E1E1E)
-                    )
-                }
-                
                 // Spacer(modifier = Modifier.height(24.dp))
                 // Elite Card Removed
-                
+
                 Spacer(modifier = Modifier.height(32.dp))
-                
+
                 // FEATURE GRID - 2x2 Layout matching design reference
                 Text(
-                    text = "SECURITY HUB", 
-                    color = RoyalGold, 
-                    fontSize = 14.sp, 
-                    fontWeight = FontWeight.Bold, 
+                    text = "SECURITY HUB",
+                    color = RoyalGold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
                     modifier = Modifier.padding(horizontal = 6.dp)
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // DASHBOARD GRID - Custom 2-1-2 Layout (Based on Image Reference)
@@ -1045,32 +1017,32 @@ fun DashboardScreen(
                     modifier = Modifier.padding(horizontal = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // ROW 1: Academy & Secure Vault (File Scan)
+                    // ROW 1: Learn & Secure Vault
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         FeatureCard(
-                            title = "Academy",
+                            title = "Learn",
                             icon = Icons.Filled.School,
-                            imageRes = com.royalshield.app.R.drawable.graduation_cap_icon, // Fallback, will show solid color/gradient
-                            neonColor = com.royalshield.app.ui.theme.NeonOrange, 
+                            imageRes = com.royalshield.app.R.drawable.screen_dasboard_education_tecnology,
+                            neonColor = com.royalshield.app.ui.theme.NeonOrange,
                             onClick = onNavigateToCourses,
                             modifier = Modifier.weight(1f).height(125.dp),
                             borderAnimation = true
                         )
                         FeatureCard(
-                            title = "File Scan",
+                            title = "Secure Vault",
                             icon = Icons.Filled.FolderOpen,
                             imageRes = RoyalIcons.FileScan,
                             neonColor = com.royalshield.app.ui.theme.NeonOrange,
                             onClick = onNavigateToFileScan,
                             modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true 
+                            borderAnimation = true
                         )
                     }
 
-                    // ROW 2: AI Neural Hub & System Threat Status
+                    // ROW 2: AI Neural Hub & Smart Home
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1079,13 +1051,20 @@ fun DashboardScreen(
                             title = "AI Neural Hub",
                             icon = Icons.Filled.SmartToy,
                             imageRes = RoyalIcons.AiNeuralHub,
-                            neonColor = com.royalshield.app.ui.theme.NeonPink, 
+                            neonColor = com.royalshield.app.ui.theme.NeonPink,
                             onClick = onNavigateToAiHub,
                             modifier = Modifier.weight(1f).height(125.dp),
                             borderAnimation = true
                         )
-                        // System Threat Status moved to CyberHomeScreen
-                        Box(modifier = Modifier.weight(1f))
+                        FeatureCard(
+                            title = "Smart Home",
+                            icon = Icons.Filled.SettingsSuggest,
+                            imageRes = RoyalIcons.SmartHome,
+                            neonColor = com.royalshield.app.ui.theme.NeonAqua,
+                            onClick = onNavigateToAutomation,
+                            modifier = Modifier.weight(1f).height(125.dp),
+                            borderAnimation = true
+                        )
                     }
 
                     // ROW 3: SMS Phishing & Royal VPN
@@ -1106,14 +1085,14 @@ fun DashboardScreen(
                             title = "Royal VPN",
                             icon = Icons.Filled.VpnLock,
                             imageRes = RoyalIcons.RoyalVpn,
-                            neonColor = com.royalshield.app.ui.theme.NeonGreen, 
+                            neonColor = com.royalshield.app.ui.theme.NeonGreen,
                             onClick = onNavigateToVpn,
                             modifier = Modifier.weight(1f).height(125.dp),
                             borderAnimation = true
                         )
                     }
 
-                    // ROW 4: Malware Scanner & Tracking Shield
+                    // ROW 4: Malware Scanner & Surveillance
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1128,6 +1107,22 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f).height(125.dp)
                         )
                         FeatureCard(
+                            title = "Surveillance",
+                            icon = Icons.Filled.Videocam,
+                            imageRes = com.royalshield.app.R.drawable.dashboard_card_surveillance,
+                            neonColor = com.royalshield.app.ui.theme.NeonOrange,
+                            onClick = onNavigateToSecurityCamera,
+                            modifier = Modifier.weight(1f).height(125.dp),
+                            borderAnimation = true
+                        )
+                    }
+
+                    // ROW 5: Tracking Shield
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        FeatureCard(
                             title = "Tracking Shield",
                             icon = Icons.Filled.LocationOn,
                             imageRes = RoyalIcons.TrackingChild,
@@ -1135,22 +1130,6 @@ fun DashboardScreen(
                             onClick = onNavigateToTrackingShield,
                             modifier = Modifier.weight(1f).height(125.dp),
                             borderAnimation = true
-                        )
-                    }
-
-                    // ROW 5: Smart Home
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        FeatureCard(
-                            title = "Smart Home",
-                            icon = Icons.Filled.SettingsSuggest,
-                            imageRes = RoyalIcons.SmartHome,
-                            neonColor = com.royalshield.app.ui.theme.NeonAqua, 
-                            onClick = onNavigateToAutomation,
-                            modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true 
                         )
                         Box(modifier = Modifier.weight(1f))
                     }
@@ -1200,35 +1179,174 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // RECENT ACTIVITY / ACTION ITEMS
-                Text(
-                    text = "COMMAND LOG", 
-                    color = RoyalGold, 
-                    fontSize = 14.sp, 
-                    fontWeight = FontWeight.Bold, 
-                    letterSpacing = 1.sp,
+                CommandLogStatusPanel(
+                    items = dashboardState.actionItems,
                     modifier = Modifier.padding(horizontal = 6.dp)
                 )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp)
-                        .height(400.dp) // Fixed height for the scrollable panel
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
-                ) {
-                    com.royalshield.app.ui.dashboard.components.ActionItemsPanel(
-                        items = dashboardState.actionItems,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
 
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun CommandLogStatusPanel(
+    items: List<ActionItem>,
+    modifier: Modifier = Modifier
+) {
+    val openItems = items.filterNot { it.status.equals("Resolved", ignoreCase = true) }
+    val resolvedItems = items.size - openItems.size
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "COMMAND LOG",
+                color = RoyalGold,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CommandArrowBadge(
+                    iconRes = R.drawable.arrow_up,
+                    tint = Color(0xFF00FF94),
+                    label = resolvedItems.coerceAtLeast(0).toString()
+                )
+                CommandArrowBadge(
+                    iconRes = R.drawable.arrow_down,
+                    tint = Color(0xFFFF3B30),
+                    label = openItems.size.toString()
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color.Black.copy(alpha = 0.68f))
+                .border(1.dp, RoyalGold.copy(alpha = 0.25f), RoundedCornerShape(22.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (items.isEmpty()) {
+                CommandLogRow(
+                    title = "Royal Shield active",
+                    description = "No critical command events pending",
+                    severity = Severity.LOW,
+                    status = "Resolved"
+                )
+            } else {
+                items.take(4).forEach { item ->
+                    CommandLogRow(
+                        title = item.title,
+                        description = item.description,
+                        severity = item.severity,
+                        status = item.status
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommandArrowBadge(
+    iconRes: Int,
+    tint: Color,
+    label: String
+) {
+    Row(
+        modifier = Modifier
+            .height(34.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(tint.copy(alpha = 0.12f))
+            .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(tint),
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = label,
+            color = tint,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun CommandLogRow(
+    title: String,
+    description: String,
+    severity: Severity,
+    status: String
+) {
+    val isResolved = status.equals("Resolved", ignoreCase = true)
+    val accent = if (isResolved) Color(0xFF00FF94) else when (severity) {
+        Severity.LOW -> Color(0xFF00FF94)
+        Severity.MEDIUM -> RoyalGold
+        Severity.HIGH, Severity.CRITICAL -> Color(0xFFFF3B30)
+    }
+    val arrowRes = if (isResolved || severity == Severity.LOW) R.drawable.arrow_up else R.drawable.arrow_down
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.045f))
+            .border(1.dp, accent.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = arrowRes),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(accent),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = description,
+                color = Color.White.copy(alpha = 0.62f),
+                fontSize = 11.sp,
+                maxLines = 2
+            )
+        }
+        Image(
+            painter = painterResource(id = if (isResolved) R.drawable.ic_action_checkmark_green else R.drawable.ic_action_checkmark_gold),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -1265,14 +1383,14 @@ fun VideoFeatureCard(
                 videoResId = videoResId,
                 modifier = Modifier.fillMaxSize()
             )
-            
+
             // Overlay for text readability
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.3f))
             )
-            
+
             // Title Overlay
             Box(
                 modifier = Modifier
@@ -1312,7 +1430,7 @@ fun FeatureCard(
     modifier: Modifier = Modifier,
     borderAnimation: Boolean = false
 ) {
-    // DEFERRED image loading — images only load AFTER first frame renders
+    // DEFERRED image loading â€” images only load AFTER first frame renders
     // This prevents HWUI from decoding all PNGs at once (black screen fix)
     var imageVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -1532,7 +1650,7 @@ fun BadgeItem(
                    )
                }
             }
-            
+
             Image(
                 painter = painterResource(id = resId),
                 contentDescription = label,
@@ -1540,9 +1658,9 @@ fun BadgeItem(
                 contentScale = ContentScale.Fit
             )
         }
-        
+
         Spacer(modifier = Modifier.height(4.dp))
-        
+
         Text(
             text = label.uppercase(),
             color = if (isElite) RoyalGold else Color.Gray,
@@ -1570,7 +1688,7 @@ fun MalwareScannerCard(
     )
 
     val silverColor = Color.White
-    
+
     Card(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
@@ -1592,7 +1710,7 @@ fun MalwareScannerCard(
                 0x0049: ANOMALY = FALSE;
                 [ SYSTEM STEALTH MODE ]
             """.trimIndent()
-            
+
             Text(
                 text = matrixText,
                 color = Color(0xFF00FF00).copy(alpha = 0.5f),
@@ -1626,7 +1744,7 @@ fun MalwareScannerCard(
                      }
                  }
             )
-            
+
             // Icon & Title over everything
             Column(
                 modifier = Modifier
@@ -1652,7 +1770,6 @@ fun MalwareScannerCard(
         }
     }
 }
-
 
 
 

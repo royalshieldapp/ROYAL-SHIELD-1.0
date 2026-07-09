@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Threat Intelligence Signals</title>
+    <style>
+        :root {
+            --bg-color: #050a15;
+            --grid-color: rgba(30, 60, 120, 0.2);
+            --text-main: #e0f2fe;
+            --text-muted: #7dd3fc;
+            --accent-glow: #38bdf8;
+            --alert-high: #ef4444;
+            --alert-medium: #f59e0b;
+            --alert-low: #3b82f6;
+            --alert-critical: #991b1b;
+            --panel-bg: rgba(10, 20, 40, 0.6);
+            --panel-border: rgba(56, 189, 248, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Background Grid */
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        /* Map Container */
+        #map-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* HUD Panels */
+        .hud-panel {
+            position: absolute;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 16px;
+            z-index: 10;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(56, 189, 248, 0.05);
+        }
+
+        .hud-header {
+            top: 20px;
+            left: 20px;
+            min-width: 300px;
+        }
+
+        .hud-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-glow);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hud-title::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-glow);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-glow);
+            animation: pulse 2s infinite;
+        }
+
+        .hud-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .hud-stats {
+            bottom: 60px;
+            left: 20px;
+            display: flex;
+            gap: 24px;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        .hud-log {
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            height: 300px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(125, 211, 252, 0.2);
+        }
+
+        .log-entries {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .log-entries::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .log-entries::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.5);
+            border-radius: 4px;
+        }
+
+        .log-entry {
+            font-size: 0.75rem;
+            line-height: 1.4;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 2px solid var(--accent-glow);
+            border-radius: 0 4px 4px 0;
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        .log-entry.severity-high { border-left-color: var(--alert-high); }
+        .log-entry.severity-critical { border-left-color: var(--alert-critical); }
+        .log-entry.severity-medium { border-left-color: var(--alert-medium); }
+
+        .log-meta {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-size: 0.65rem;
+        }
+
+        .log-route {
+            color: white;
+            font-family: monospace;
+        }
+
+        /* Ticker */
+        .ticker-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border-top: 1px solid var(--panel-border);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .ticker-label {
+            background: var(--panel-border);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 0 16px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            z-index: 2;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+        }
+
+        .ticker-content {
+            white-space: nowrap;
+            animation: ticker 30s linear infinite;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding-left: 20px;
+        }
+
+        .ticker-item {
+            display: inline-block;
+            margin-right: 40px;
+        }
+
+        .ticker-item span {
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Connection Status */
+        .status-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--alert-medium);
+            padding: 20px 40px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 0 30px rgba(245, 158, 11, 0.2);
+        }
+
+        .status-overlay.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .status-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .status-text {
+            color: var(--alert-medium);
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes ticker {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -40%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <div id="map-container">
+        <canvas id="world-map"></canvas>
+    </div>
+
+    <!-- Main Title -->
+    <div class="hud-panel hud-header">
+        <div class="hud-title">Live Threat Intelligence Signals</div>
+        <div class="hud-subtitle">ROYAL SHIELD SECURITY NETWORK</div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="hud-panel hud-stats">
+        <div class="stat-box">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Signals Detected</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="stat-high" style="color: var(--alert-high)">0</div>
+            <div class="stat-label">High Risk</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="stat-active" style="color: var(--accent-glow)">0</div>
+            <div class="stat-label">Active Nodes</div>
+        </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="hud-panel hud-log">
+        <div class="log-title">Live Threat Log</div>
+        <div class="log-entries" id="event-log">
+            <!-- Entries injected via JS -->
+        </div>
+    </div>
+
+    <!-- Bottom Ticker -->
+    <div class="ticker-container">
+        <div class="ticker-label">SYS_STATUS</div>
+        <div class="ticker-content" id="ticker-text">
+            Connecting to Royal Shield Intelligence Network...
+        </div>
+    </div>
+
+    <!-- Disconnected Status -->
+    <div class="status-overlay" id="connection-status">
+        <div class="status-icon">⚠️</div>
+        <div class="status-text">Threat feed unavailable · Waiting for Royal Shield backend</div>
+    </div>
+
+    <script>
+        // Configuration
+        const THREAT_FEED_URL = "https://TU-BACKEND-RAILWAY.up.railway.app/api/threat-map/events"; // Replace with your Railway URL
+        const POLL_INTERVAL = 3000; // ms
+
+        // State
+        let events = [];
+        let activeAnimations = [];
+        let seenEventIds = new Set();
+        let stats = { total: 0, high: 0 };
+
+        // Canvas Setup
+        const canvas = document.getElementById('world-map');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawBaseMap();
+        }
+        window.addEventListener('resize', resize);
+
+        // Map Projection (Simple Equirectangular)
+        function project(lat, lng) {
+            const x = (lng + 180) * (canvas.width / 360);
+            const y = (90 - lat) * (canvas.height / 180);
+            return { x, y };
+        }
+
+        // Colors based on severity
+        const colors = {
+            'low': '#3b82f6',
+            'medium': '#f59e0b',
+            'high': '#ef4444',
+            'critical': '#991b1b'
+        };
+
+        // Draw basic world map background (dots)
+        function drawBaseMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(30, 60, 120, 0.15)';
+
+            // Draw a dot grid approximation of continents
+            // For a production widget, you'd use a GeoJSON path or an SVG image background
+            for(let i=0; i<360; i+=5) {
+                for(let j=-80; j<80; j+=5) {
+                    // Simple heuristic to draw dots roughly where land is
+                    const isLand = Math.sin(i*0.1) * Math.cos(j*0.1) > 0.3;
+                    if(isLand) {
+                        const {x, y} = project(j, i-180);
+                        ctx.beginPath();
+                        ctx.arc(x, y, 1, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // Animate a signal arc between two points
+        function createArc(event) {
+            const start = project(event.sourceLat, event.sourceLng);
+            const end = project(event.targetLat, event.targetLng);
+
+            // Calculate control point for quadratic bezier curve (arc effect)
+            const midX = (start.x + end.x) / 2;
+            const midY = (start.y + end.y) / 2 - Math.min(Math.abs(start.x - end.x) * 0.3, 200);
+
+            activeAnimations.push({
+                start, end, control: {x: midX, y: midY},
+                progress: 0,
+                color: colors[event.severity.toLowerCase()] || colors.medium,
+                event: event
+            });
+        }
+
+        // Main animation loop
+        function animate() {
+            drawBaseMap();
+
+            for (let i = activeAnimations.length - 1; i >= 0; i--) {
+                let anim = activeAnimations[i];
+                anim.progress += 0.015; // Speed
+
+                if (anim.progress >= 1) {
+                    // Draw impact ripple
+                    ctx.beginPath();
+                    ctx.arc(anim.end.x, anim.end.y, 10, 0, Math.PI*2);
+                    ctx.fillStyle = anim.color;
+                    ctx.globalAlpha = 0.5;
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+
+                    activeAnimations.splice(i, 1);
+                    continue;
+                }
+
+                // Calculate current point on bezier curve
+                const t = anim.progress;
+                const currentX = Math.pow(1-t, 2)*anim.start.x + 2*(1-t)*t*anim.control.x + Math.pow(t, 2)*anim.end.x;
+                const currentY = Math.pow(1-t, 2)*anim.start.y + 2*(1-t)*t*anim.control.y + Math.pow(t, 2)*anim.end.y;
+
+                // Draw arc trail
+                ctx.beginPath();
+                ctx.moveTo(anim.start.x, anim.start.y);
+                ctx.quadraticCurveTo(anim.control.x, anim.control.y, currentX, currentY);
+                ctx.strokeStyle = anim.color;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 0.6;
+                ctx.stroke();
+
+                // Draw head particle
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, 3, 0, Math.PI*2);
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 1.0;
+                ctx.fill();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = anim.color;
+            }
+
+            ctx.shadowBlur = 0; // Reset shadow
+            requestAnimationFrame(animate);
+        }
+
+        // Update UI components
+        function addLogEntry(event) {
+            const logContainer = document.getElementById('event-log');
+            const el = document.createElement('div');
+            el.className = `log-entry severity-${event.severity.toLowerCase()}`;
+
+            const time = new Date(event.observedAt).toLocaleTimeString();
+
+            el.innerHTML = `
+                <div class="log-meta">
+                    <span>[${time}] ${event.threatType.toUpperCase()}</span>
+                    <span>SRC: ${event.sourceModule}</span>
+                </div>
+                <div class="log-route">
+                    ${event.sourceCity} &rarr; ${event.targetCity}
+                </div>
+            `;
+
+            logContainer.prepend(el);
+
+            // Keep max 50 logs
+            if(logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        function updateStats(newEvents) {
+            stats.total += newEvents.length;
+            stats.high += newEvents.filter(e => ['high', 'critical'].includes(e.severity.toLowerCase())).length;
+
+            document.getElementById('stat-total').innerText = stats.total.toLocaleString();
+            document.getElementById('stat-high').innerText = stats.high.toLocaleString();
+            document.getElementById('stat-active').innerText = Math.floor(Math.random() * 50) + 120; // Simulated active nodes
+
+            // Update Ticker
+            if(newEvents.length > 0) {
+                const latest = newEvents[0];
+                const tickerStr = `<div class="ticker-item">LATEST: <span>${latest.threatType}</span> detected from ${latest.sourceCity}</div>
+                                   <div class="ticker-item">STATUS: <span>MONITORING ACTIVE</span></div>
+                                   <div class="ticker-item">NETWORK: <span>SECURE</span></div>`;
+                document.getElementById('ticker-text').innerHTML = tickerStr + tickerStr; // Duplicate for seamless scrolling
+            }
+        }
+
+        function setConnectionStatus(connected) {
+            const overlay = document.getElementById('connection-status');
+            if(connected) {
+                overlay.classList.remove('visible');
+            } else {
+                overlay.classList.add('visible');
+            }
+        }
+
+        // Fetch data from backend
+        async function fetchThreatEvents() {
+            try {
+                // If URL is placeholder, show simulated connection error or wait
+                if(THREAT_FEED_URL.includes("TU-BACKEND-RAILWAY")) {
+                    setConnectionStatus(false);
+                    return;
+                }
+
+                const response = await fetch(THREAT_FEED_URL);
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                setConnectionStatus(true);
+
+                // Filter out already seen events
+                // Using observedAt + sourceCity as a simple unique key if no ID exists
+                const newEvents = data.filter(e => {
+                    const key = `${e.observedAt}-${e.sourceCity}-${e.targetCity}`;
+                    if(seenEventIds.has(key)) return false;
+                    seenEventIds.add(key);
+                    return true;
+                });
+
+                if (newEvents.length > 0) {
+                    updateStats(newEvents);
+                    newEvents.forEach(e => {
+                        addLogEntry(e);
+                        createArc(e);
+                    });
+                }
+
+                // Keep seenEventIds bounded
+                if(seenEventIds.size > 1000) {
+                    seenEventIds = new Set(Array.from(seenEventIds).slice(-500));
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch threat signals:", error);
+                setConnectionStatus(false);
+            }
+        }
+
+        // Initialization
+        resize();
+        animate();
+
+        // Initial fetch
+        fetchThreatEvents();
+        // Poll backend
+        setInterval(fetchThreatEvents, POLL_INTERVAL);
+
+    </script>
+</body>
+</html>

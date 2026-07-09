@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<div class="rsx-terms">
+  <style>
+    /* ===== Royal Shield Embed Theme ===== */
+    .rsx-terms{
+      --bg0:#050505;
+      --bg1:#0b0b0b;
+      --card:#0e0e0e;
+      --gold:#FFD700;
+      --gold2:#B8860B;
+      --neon:#00eaff;
+      --text:#f5f7ff;
+      --muted:#b7bdc9;
+      --line:rgba(255,215,0,.18);
+      --shadow:0 18px 60px rgba(0,0,0,.55);
+      --radius:18px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
+
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 18px;
+      font-family: var(--font);
+      color: var(--text);
+    }
+
+    /* Optional: futuristic font import (safe if blocked) */
+    .rsx-terms .rsx-font{
+      font-family: "Orbitron", "Oxanium", "Rajdhani", var(--font);
+      letter-spacing: .2px;
+    }
+
+    .rsx-terms .rsx-shell{
+      position: relative;
+      border-radius: calc(var(--radius) + 6px);
+      padding: 18px;
+      background: radial-gradient(1200px 700px at 15% 10%, rgba(0,234,255,.10), transparent 55%),
+                  radial-gradient(900px 500px at 90% 20%, rgba(255,215,0,.10), transparent 55%),
+                  linear-gradient(180deg, rgba(15,15,15,.92), rgba(6,6,6,.92));
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,215,0,.16);
+      overflow: hidden;
+      isolation: isolate;
+      animation: rsx-float 6s ease-in-out infinite;
+    }
+
+    /* Animated shimmer border */
+    .rsx-terms .rsx-shell::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      border-radius: calc(var(--radius) + 8px);
+      background: conic-gradient(from 180deg,
+        rgba(255,215,0,.0),
+        rgba(255,215,0,.35),
+        rgba(0,234,255,.25),
+        rgba(255,215,0,.0)
+      );
+      filter: blur(10px);
+      opacity: .55;
+      z-index: 0;
+      animation: rsx-spin 7s linear infinite;
+    }
+
+    /* Subtle moving grain */
+    .rsx-terms .rsx-shell::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,215,0,.10), transparent 40%),
+        radial-gradient(circle at 85% 35%, rgba(0,234,255,.10), transparent 45%),
+        linear-gradient(transparent, rgba(255,255,255,.02));
+      opacity: .85;
+      z-index: 0;
+      mix-blend-mode: screen;
+      animation: rsx-pan 10s ease-in-out infinite alternate;
+    }
+
+    .rsx-terms .rsx-card{
+      position: relative;
+      z-index: 1;
+      border-radius: var(--radius);
+      padding: 18px 18px 14px;
+      background: linear-gradient(180deg, rgba(20,20,20,.80), rgba(10,10,10,.80));
+      border: 1px solid rgba(255,215,0,.14);
+      backdrop-filter: blur(10px);
+    }
+
+    .rsx-terms .rsx-header{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255,215,0,.14);
+    }
+
+    .rsx-terms .rsx-title{
+      margin:0;
+      font-size: 24px;
+      line-height: 1.15;
+      font-weight: 800;
+      color: var(--gold);
+      text-shadow:
+        0 0 10px rgba(255,215,0,.35),
+        0 0 22px rgba(255,215,0,.20),
+        0 0 34px rgba(0,234,255,.15);
+    }
+
+    .rsx-terms .rsx-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: rgba(245,247,255,.92);
+      border: 1px solid rgba(0,234,255,.25);
+      background: linear-gradient(90deg, rgba(0,234,255,.10), rgba(255,215,0,.08));
+      box-shadow: 0 0 22px rgba(0,234,255,.10);
+      white-space: nowrap;
+      animation: rsx-pulse 2.8s ease-in-out infinite;
+    }
+
+    .rsx-terms .rsx-badge i{
+      width:10px; height:10px;
+      border-radius:99px;
+      background: var(--neon);
+      box-shadow: 0 0 14px rgba(0,234,255,.55);
+      display:inline-block;
+    }
+
+    .rsx-terms h3{
+      margin: 16px 0 6px;
+      font-size: 15px;
+      color: rgba(255,215,0,.92);
+      text-shadow: 0 0 14px rgba(255,215,0,.18);
+    }
+
+    .rsx-terms p{
+      margin: 0 0 10px;
+      font-size: 14px;
+      line-height: 1.75;
+      color: rgba(245,247,255,.92);
+    }
+
+    .rsx-terms .rsx-muted{
+      color: var(--muted);
+    }
+
+    .rsx-terms .rsx-hr{
+      height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,215,0,.22), transparent);
+      margin: 14px 0;
+    }
+
+    .rsx-terms .rsx-contact{
+      margin-top: 14px;
+      display:flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,215,0,.14);
+      background: linear-gradient(90deg, rgba(255,215,0,.06), rgba(0,234,255,.06));
+    }
+
+    .rsx-terms .rsx-mail{
+      color: var(--neon);
+      font-weight: 700;
+      text-decoration: none;
+      text-shadow: 0 0 18px rgba(0,234,255,.25);
+    }
+    .rsx-terms .rsx-mail:hover{
+      text-decoration: underline;
+    }
+
+    .rsx-terms .rsx-mini{
+      font-size: 12px;
+      color: rgba(183,189,201,.92);
+    }
+
+    /* ===== Animations ===== */
+    @keyframes rsx-spin { to { transform: rotate(360deg); } }
+    @keyframes rsx-pan {
+      0% { transform: translate3d(0,0,0) scale(1); }
+      100% { transform: translate3d(-10px, -6px, 0) scale(1.02); }
+    }
+    @keyframes rsx-float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    @keyframes rsx-pulse{
+      0%,100% { filter: brightness(1); transform: translateY(0); }
+      50% { filter: brightness(1.12); transform: translateY(-1px); }
+    }
+
+    /* Mobile */
+    @media (max-width: 560px){
+      .rsx-terms{ padding: 12px; }
+      .rsx-terms .rsx-title{ font-size: 20px; }
+      .rsx-terms .rsx-header{ gap:10px; }
+    }
+  </style>
+
+  <!-- Optional font imports (safe to ignore if blocked by platform) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+
+  <div class="rsx-shell">
+    <div class="rsx-card">
+      <div class="rsx-header">
+        <div>
+          <h2 class="rsx-title rsx-font">Terms and Conditions of Use</h2>
+          <div class="rsx-mini rsx-muted">Royal Shield • Secure Experience • Updated Terms</div>
+        </div>
+        <div class="rsx-badge rsx-font"><i></i> ACTIVE POLICY</div>
+      </div>
+
+      <h3 class="rsx-font">1. Acceptance of Terms</h3>
+      <p>By downloading, accessing, or using our mobile application (<strong>Royal Shield</strong>), you agree to comply with and be bound by these Terms and Conditions. If you do not agree, you must not use the application.</p>
+
+      <h3 class="rsx-font">2. Use of the Application</h3>
+      <p>Our app is designed to provide users with a secure environment to manage, protect, and monitor their digital and personal assets with advanced encryption and privacy technologies. Users agree to use it solely for lawful purposes and in accordance with these terms.</p>
+
+      <h3 class="rsx-font">3. Intellectual Property</h3>
+      <p>All intellectual property rights related to the content, functionalities, and design of the application belong to <strong>Pin Royal Shield</strong>. You may not copy, modify, distribute, or reproduce any content without prior written authorization.</p>
+
+      <h3 class="rsx-font">4. License of Use</h3>
+      <p>We grant you a limited, non-exclusive, and non-transferable license to use the application solely for your personal, non-commercial purposes, in accordance with these terms.</p>
+
+      <h3 class="rsx-font">5. Account Registration and Security</h3>
+      <p>Some features may require you to create an account. You are responsible for maintaining the confidentiality of your password and for all activities that occur under your account.</p>
+
+      <h3 class="rsx-font">6. Updates</h3>
+      <p><strong>Pin Royal Shield</strong> reserves the right to update or modify the application at any time to improve functionality, fix errors, or comply with legal requirements.</p>
+
+      <h3 class="rsx-font">7. Limitation of Liability</h3>
+      <p><strong>Pin Royal Shield</strong> does not guarantee that the application will be free of errors or interruptions. Under no circumstances shall we be liable for indirect, incidental, or consequential damages arising from the use or inability to use the application.</p>
+
+      <h3 class="rsx-font">8. Personal Data Protection</h3>
+      <p>The use of our app is also governed by our <strong>Privacy Policy</strong>, which explains how we collect, use, and protect your personal data.</p>
+
+      <h3 class="rsx-font">9. Termination of Services</h3>
+      <p><strong>Pin Royal Shield</strong> reserves the right to suspend or terminate your access to the app in the event of a breach of these terms or if we believe your use could be harmful to us or other users.</p>
+
+      <h3 class="rsx-font">10. Modifications to the Terms</h3>
+      <p><strong>Pin Royal Shield</strong> reserves the right to modify these Terms and Conditions at any time. Modifications will become effective once published within the app.</p>
+
+      <h3 class="rsx-font">11. Governing Law</h3>
+      <p>These terms are governed by the laws of <strong>the United States</strong>, without regard to conflict of law principles.</p>
+
+      <div class="rsx-hr"></div>
+
+      <h3 class="rsx-font">12. Contact</h3>
+      <div class="rsx-contact">
+        <div class="rsx-mini rsx-muted">Questions about these Terms & Conditions?</div>
+        <a class="rsx-mail rsx-font" href="mailto:support@royalshield.app">support@royalshield.app</a>
+      </div>
+
+      <div class="rsx-mini rsx-muted" style="margin-top:10px;">
+      <center>
+        © 2026 Royal Shield. All Rights Reserved.
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

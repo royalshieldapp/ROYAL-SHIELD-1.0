@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Store
 
 /**
  * Simple representation of a bottom navigation item.
@@ -19,6 +20,7 @@ data class BottomNavItem(
 ) {
     companion object {
         val Home = BottomNavItem("home", Icons.Default.Home, "Home")
+        val Marketplace = BottomNavItem("marketplace", Icons.Default.Store, "Store")
         val GlobalMap = BottomNavItem("global_map", Icons.Default.Map, "Map")
         val CyberMap = BottomNavItem("cyber_map", Icons.Default.Public, "Cyber")
         val Automation = BottomNavItem("automation", Icons.Default.Build, "Automation")

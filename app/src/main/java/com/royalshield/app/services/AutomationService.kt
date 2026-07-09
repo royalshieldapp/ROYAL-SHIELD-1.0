@@ -23,22 +23,22 @@ import com.google.android.gms.location.Priority
  * Similar to Fing's automation system
  */
 class AutomationService : Service() {
-    
+
     private lateinit var lawManager: AutomationLawManager
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var currentLocation: Location? = null
-    
+
     // Receivers
     private var batteryReceiver: BroadcastReceiver? = null
     private var wifiReceiver: BroadcastReceiver? = null
-    
+
     // Timers
     private var timeCheckTimer: Timer? = null
-    
+
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "automation_laws_channel"
-        
+
         fun start(context: Context) {
             val intent = Intent(context, AutomationService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -47,35 +47,35 @@ class AutomationService : Service() {
                 context.startService(intent)
             }
         }
-        
+
         fun stop(context: Context) {
             val intent = Intent(context, AutomationService::class.java)
             context.stopService(intent)
         }
     }
-    
+
     override fun onCreate() {
         super.onCreate()
         lawManager = AutomationLawManager(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        
+
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
-        
+
         setupMonitoring()
     }
-    
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return START_STICKY
     }
-    
+
     override fun onBind(intent: Intent?): IBinder? = null
-    
+
     override fun onDestroy() {
         super.onDestroy()
         cleanupMonitoring()
     }
-    
+
     /**
      * Sets up event monitoring
      */
@@ -85,7 +85,7 @@ class AutomationService : Service() {
         setupLocationMonitoring()
         setupTimeMonitoring()
     }
-    
+
     /**
      * Battery monitoring
      */
@@ -96,16 +96,16 @@ class AutomationService : Service() {
                     val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                     val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
                     val batteryPct = (level / scale.toFloat() * 100).toInt()
-                    
+
                     checkLawsForTrigger(TriggerData.BatteryData(batteryPct))
                 }
             }
         }
-        
+
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(batteryReceiver, filter)
     }
-    
+
     /**
      * WiFi monitoring
      */
@@ -114,7 +114,7 @@ class AutomationService : Service() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 val wifiInfo = wifiManager?.connectionInfo
-                
+
                 wifiInfo?.let {
                     // Connected devices could be detected here
                     // For now, we only detect network changes
@@ -123,11 +123,11 @@ class AutomationService : Service() {
                 }
             }
         }
-        
+
         val filter = IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION)
         registerReceiver(wifiReceiver, filter)
     }
-    
+
     /**
      * Location monitoring
      */
@@ -136,7 +136,7 @@ class AutomationService : Service() {
             val locationRequest = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60000)
                 .setMinUpdateIntervalMillis(30000)
                 .build()
-            
+
             val locationCallback = object : LocationCallback() {
                 override fun onLocationResult(locationResult: LocationResult) {
                     locationResult.lastLocation?.let { location ->
@@ -147,7 +147,7 @@ class AutomationService : Service() {
                     }
                 }
             }
-            
+
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
                 locationCallback,
@@ -157,7 +157,7 @@ class AutomationService : Service() {
             // Location permissions missing
         }
     }
-    
+
     /**
      * Time monitoring
      */
@@ -168,25 +168,25 @@ class AutomationService : Service() {
                 val calendar = Calendar.getInstance()
                 val hour = calendar.get(Calendar.HOUR_OF_DAY)
                 val minute = calendar.get(Calendar.MINUTE)
-                
+
                 checkLawsForTrigger(TriggerData.TimeData(hour, minute))
             }
         }, 0, 60000) // Check every minute
     }
-    
+
     /**
      * Checks and executes laws based on a trigger
      */
     private fun checkLawsForTrigger(triggerData: TriggerData) {
         val activeLaws = lawManager.getActiveLaws()
-        
+
         activeLaws.forEach { law ->
             if (lawManager.shouldExecuteLaw(law, triggerData)) {
                 executeLawAction(law.action, law.name)
             }
         }
     }
-    
+
     /**
      * Executes a law's action
      */
@@ -226,24 +226,24 @@ class AutomationService : Service() {
             }
         }
     }
-    
+
     /**
      * Sends a notification to the user
      */
     private fun sendNotification(title: String, message: String, isUrgent: Boolean = false) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(message)
-            .setSmallIcon(R.drawable.icon_shield_gold)
+            .setSmallIcon(R.drawable.img_icon_shield_gold)
             .setPriority(if (isUrgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
-        
+
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
-    
+
     /**
      * Cleans up receivers and timers
      */
@@ -252,7 +252,7 @@ class AutomationService : Service() {
         wifiReceiver?.let { unregisterReceiver(it) }
         timeCheckTimer?.cancel()
     }
-    
+
     /**
      * Creates the notification channel
      */
@@ -265,12 +265,12 @@ class AutomationService : Service() {
             ).apply {
                 description = "Royal Shield automation notifications"
             }
-            
+
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
         }
     }
-    
+
     /**
      * Creates the foreground service notification
      */
@@ -278,7 +278,7 @@ class AutomationService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("⚡ Automation Laws Active")
             .setContentText("Monitoring events and executing automatic rules")
-            .setSmallIcon(R.drawable.icon_shield_gold)
+            .setSmallIcon(R.drawable.img_icon_shield_gold)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }

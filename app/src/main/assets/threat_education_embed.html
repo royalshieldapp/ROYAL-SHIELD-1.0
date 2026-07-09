@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: transparent;
+      overflow: hidden;
+      font-family: "Orbitron", system-ui, sans-serif;
+    }
+
+    .rs-threat-widget {
+      width: 100%;
+      min-height: 185px;
+      padding: 18px;
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(233, 211, 163, 0.34);
+      background:
+        radial-gradient(circle at top left, rgba(255, 48, 48, .14), transparent 36%),
+        radial-gradient(circle at bottom right, rgba(233, 211, 163, .11), transparent 42%),
+        linear-gradient(135deg, rgba(0,0,0,.94), rgba(12,14,22,.98));
+      box-shadow:
+        0 0 24px rgba(233,211,163,.10),
+        inset 0 0 18px rgba(255,48,48,.05);
+    }
+
+    .rs-threat-widget::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(233,211,163,.13),
+        transparent
+      );
+      transform: translateX(-120%);
+      animation: rsSweep 4.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .rs-threat-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .rs-red-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff3030;
+      box-shadow:
+        0 0 8px rgba(255,48,48,.95),
+        0 0 18px rgba(255,48,48,.45);
+      animation: rsPulse 1.4s ease-in-out infinite;
+    }
+
+    .rs-title {
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.72rem, 2vw, 0.95rem);
+      font-weight: 900;
+      letter-spacing: 2.4px;
+      color: rgba(255, 48, 48, .96);
+      text-transform: uppercase;
+      text-shadow:
+        0 0 8px rgba(255,48,48,.45),
+        0 0 18px rgba(255,48,48,.22);
+    }
+
+    .rs-card {
+      position: relative;
+      z-index: 2;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(233,211,163,.24);
+      background: rgba(0,0,0,.42);
+      box-shadow: inset 0 0 14px rgba(233,211,163,.04);
+      transition: opacity .45s ease, transform .45s ease;
+    }
+
+    .rs-card.fade-out {
+      opacity: 0;
+      transform: translateY(10px) scale(.98);
+    }
+
+    .rs-card.fade-in {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .rs-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .rs-category {
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.56rem, 1.6vw, 0.72rem);
+      font-weight: 800;
+      letter-spacing: 1.4px;
+      color: #E9D3A3;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(233,211,163,.32);
+      background: rgba(233,211,163,.08);
+      text-transform: uppercase;
+    }
+
+    .rs-severity {
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.54rem, 1.5vw, 0.68rem);
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: #ff3030;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,48,48,.34);
+      background: rgba(255,48,48,.08);
+      text-transform: uppercase;
+    }
+
+    .rs-threat-name {
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.86rem, 2.4vw, 1.12rem);
+      font-weight: 900;
+      letter-spacing: 1.8px;
+      color: rgba(255,255,255,.94);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(233,211,163,.12);
+    }
+
+    .rs-description {
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.66rem, 1.9vw, 0.84rem);
+      font-weight: 500;
+      letter-spacing: .45px;
+      line-height: 1.65;
+      color: rgba(255,255,255,.78);
+      margin-bottom: 10px;
+    }
+
+    .rs-tip {
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.60rem, 1.8vw, 0.78rem);
+      font-weight: 700;
+      letter-spacing: .45px;
+      color: rgba(233,211,163,.92);
+      line-height: 1.55;
+    }
+
+    .rs-tip strong {
+      color: #ff4a4a;
+    }
+
+    .rs-footer {
+      margin-top: 12px;
+      text-align: center;
+      font-family: "Orbitron", system-ui, sans-serif;
+      font-size: clamp(0.52rem, 1.5vw, 0.68rem);
+      letter-spacing: 1.2px;
+      color: rgba(255,255,255,.46);
+      position: relative;
+      z-index: 2;
+      text-transform: uppercase;
+    }
+
+    @keyframes rsSweep {
+      0% { transform: translateX(-120%); opacity: 0; }
+      35% { opacity: 1; }
+      75% { transform: translateX(120%); opacity: 0; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+
+    @keyframes rsPulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: .72;
+      }
+      50% {
+        transform: scale(1.55);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .rs-threat-widget {
+        min-height: 230px;
+        padding: 14px;
+      }
+
+      .rs-card {
+        padding: 14px;
+      }
+
+      .rs-threat-header {
+        margin-bottom: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="rs-threat-widget">
+    <div class="rs-threat-header">
+      <span class="rs-red-dot"></span>
+      <span class="rs-title">ROYAL THREAT ALERT</span>
+    </div>
+
+    <div id="threatCard" class="rs-card fade-in">
+      <div class="rs-row">
+        <span id="category" class="rs-category">Malware</span>
+        <span id="severity" class="rs-severity">Critical Risk</span>
+      </div>
+
+      <div id="threatName" class="rs-threat-name">Ransomware</div>
+
+      <div id="description" class="rs-description">
+        Locks your files and demands payment to recover them.
+      </div>
+
+      <div id="tip" class="rs-tip">
+        <strong>Tip:</strong> Keep backups and never open suspicious attachments.
+      </div>
+    </div>
+
+    <div class="rs-footer">
+      Learn the threat. Protect your data. Stay Royal.
+    </div>
+  </div>
+
+  <script>
+    const threats = [
+      {
+        category: "Malware",
+        severity: "Critical Risk",
+        name: "Ransomware",
+        description: "Locks your files and demands payment to recover them.",
+        tip: "Keep backups and never open suspicious attachments."
+      },
+      {
+        category: "Malware",
+        severity: "High Risk",
+        name: "Trojan Horse",
+        description: "Pretends to be safe software but hides malicious behavior.",
+        tip: "Install apps only from trusted sources."
+      },
+      {
+        category: "Malware",
+        severity: "High Risk",
+        name: "Spyware",
+        description: "Secretly monitors your activity, messages, passwords, or browsing.",
+        tip: "Review app permissions and remove suspicious apps."
+      },
+      {
+        category: "Malware",
+        severity: "High Risk",
+        name: "Keylogger",
+        description: "Records what you type, including usernames and passwords.",
+        tip: "Use two-factor authentication and avoid unknown downloads."
+      },
+      {
+        category: "Malware",
+        severity: "Medium Risk",
+        name: "Adware",
+        description: "Shows unwanted ads and may track your behavior.",
+        tip: "Remove suspicious apps and browser extensions."
+      },
+      {
+        category: "Malware",
+        severity: "Critical Risk",
+        name: "Worm",
+        description: "Spreads automatically from device to device without user action.",
+        tip: "Keep your system updated and avoid unsafe networks."
+      },
+      {
+        category: "Botnet",
+        severity: "Critical Risk",
+        name: "Mirai",
+        description: "A botnet known for infecting cameras, routers, and smart devices.",
+        tip: "Change default passwords on routers and smart devices."
+      },
+      {
+        category: "Banking Malware",
+        severity: "Critical Risk",
+        name: "Zeus",
+        description: "A malware family known for stealing banking information.",
+        tip: "Never enter banking credentials from links in messages."
+      },
+      {
+        category: "Malware",
+        severity: "Critical Risk",
+        name: "Emotet",
+        description: "A dangerous malware family often spread through malicious email attachments.",
+        tip: "Be careful with invoices, ZIP files, and Office documents."
+      },
+      {
+        category: "Ransomware",
+        severity: "Critical Risk",
+        name: "WannaCry",
+        description: "A ransomware outbreak that spread rapidly through vulnerable computers.",
+        tip: "Install security updates as soon as they are available."
+      },
+      {
+        category: "Phishing",
+        severity: "High Risk",
+        name: "Email Phishing",
+        description: "Fake emails try to trick you into clicking links or entering passwords.",
+        tip: "Check the sender, domain, spelling, and link destination."
+      },
+      {
+        category: "Phishing",
+        severity: "High Risk",
+        name: "Spear Phishing",
+        description: "A targeted phishing attack personalized for one person or company.",
+        tip: "Verify unexpected requests through a second trusted channel."
+      },
+      {
+        category: "Phishing",
+        severity: "High Risk",
+        name: "Smishing",
+        description: "Phishing by SMS using fake delivery, bank, or account alerts.",
+        tip: "Do not tap links from unknown text messages."
+      },
+      {
+        category: "Phishing",
+        severity: "High Risk",
+        name: "Vishing",
+        description: "Phone-call phishing where attackers pretend to be banks, support, or agencies.",
+        tip: "Hang up and call the official number yourself."
+      },
+      {
+        category: "Phishing",
+        severity: "Medium Risk",
+        name: "Clone Phishing",
+        description: "A real-looking message is copied and modified with a malicious link.",
+        tip: "Do not trust repeated emails with changed links or attachments."
+      },
+      {
+        category: "Phishing",
+        severity: "High Risk",
+        name: "QR Phishing",
+        description: "Fake QR codes send users to malicious websites.",
+        tip: "Preview the URL before opening a scanned QR code."
+      },
+      {
+        category: "Credential Theft",
+        severity: "Critical Risk",
+        name: "Fake Login Page",
+        description: "A website imitates a trusted login page to steal your password.",
+        tip: "Check the URL carefully before signing in."
+      },
+      {
+        category: "Social Engineering",
+        severity: "High Risk",
+        name: "Tech Support Scam",
+        description: "Attackers pretend to be support agents and ask for remote access or payment.",
+        tip: "Never give remote access to unknown callers."
+      }
+    ];
+
+    const card = document.getElementById("threatCard");
+    const category = document.getElementById("category");
+    const severity = document.getElementById("severity");
+    const threatName = document.getElementById("threatName");
+    const description = document.getElementById("description");
+    const tip = document.getElementById("tip");
+
+    let index = 0;
+
+    function updateThreat() {
+      card.classList.remove("fade-in");
+      card.classList.add("fade-out");
+
+      setTimeout(() => {
+        index = (index + 1) % threats.length;
+        const item = threats[index];
+
+        category.textContent = item.category;
+        severity.textContent = item.severity;
+        threatName.textContent = item.name;
+        description.textContent = item.description;
+        tip.innerHTML = "<strong>Tip:</strong> " + item.tip;
+
+        card.classList.remove("fade-out");
+        card.classList.add("fade-in");
+      }, 450);
+    }
+
+    setInterval(updateThreat, 4200);
+  </script>
+</body>
+</html>
