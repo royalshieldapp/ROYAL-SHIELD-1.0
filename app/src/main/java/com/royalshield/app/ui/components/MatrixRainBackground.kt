@@ -13,8 +13,16 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlin.random.Random
+
+class MatrixColumn(
+    val x: Float,
+    var y: Float,
+    var speed: Float,
+    var screenHeight: Float,
+    var trailLength: Int,
+    var chars: CharArray
+)
 
 @Composable
 fun MatrixRainBackground(
@@ -24,78 +32,90 @@ fun MatrixRainBackground(
     columnWidthDp: Int = 18 // width of each column in dp
 ) {
     val density = LocalDensity.current
-    val columnWidthPx = with(density) { columnWidthDp.dp.toPx() }
-    
-    // Characters used in Matrix rain
-    val chars = remember {
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$#@%&"
-    }
-    
-    // State of columns
+    val columnWidthPx = remember(density, columnWidthDp) { with(density) { columnWidthDp.dp.toPx() } }
+
+    val charsStr = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$#@%&"
+    val columns = remember { mutableListOf<MatrixColumn>() }
     var columnsInitialized by remember { mutableStateOf(false) }
-    var columns by remember { mutableStateOf(emptyList<MatrixColumn>()) }
-    
-    // Animation loop using LaunchedEffect
-    LaunchedEffect(Unit) {
+
+    // Ticks every frame to drive the canvas drawing
+    val time by produceState(initialValue = 0L) {
         while (true) {
-            delay(40) // ~25 FPS is perfect for retro/stealth terminal feel and lightweight rendering
-            if (columnsInitialized) {
-                columns = columns.map { col ->
-                    val newY = col.y + col.speed
-                    if (newY > col.screenHeight + (col.trailLength * fontSize)) {
-                        // Reset to top
-                        col.copy(
-                            y = -Random.nextFloat() * 300f - 100f,
-                            speed = Random.nextFloat() * 15f + 10f,
-                            trailLength = Random.nextInt(8, 20),
-                            chars = List(col.trailLength) { chars[Random.nextInt(chars.length)] }
-                        )
-                    } else {
-                        // Flicker some chars in the column
-                        val updatedChars = col.chars.map { c ->
-                            if (Random.nextFloat() < 0.1f) chars[Random.nextInt(chars.length)] else c
-                        }
-                        col.copy(y = newY, chars = updatedChars)
-                    }
-                }
-            }
+            withFrameMillis { value = it }
         }
     }
-    
+
+    // Avoid recomposition loop by storing last update time in a primitive array
+    val lastUpdateTime = remember { longArrayOf(0L) }
+
+    val textPaint = remember(fontSize) {
+        Paint().apply {
+            isAntiAlias = true
+            textSize = fontSize
+            typeface = Typeface.MONOSPACE
+            textAlign = Paint.Align.CENTER
+        }
+    }
+
+    val baseColorArgb = color.toArgb()
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        // Read time to ensure recomposition of draw phase ONLY
+        val currentTime = time
         val width = size.width
         val height = size.height
-        
+
+        val delta = currentTime - lastUpdateTime[0]
+        val shouldUpdatePhysics = delta > 40L
+        if (shouldUpdatePhysics || lastUpdateTime[0] == 0L) {
+            lastUpdateTime[0] = currentTime
+        }
+
         if (!columnsInitialized && width > 0 && height > 0) {
             val totalColumns = (width / columnWidthPx).toInt() + 1
-            columns = List(totalColumns) { i ->
+            columns.clear()
+            for (i in 0 until totalColumns) {
                 val trailLen = Random.nextInt(8, 20)
-                MatrixColumn(
-                    x = i * columnWidthPx,
-                    y = Random.nextFloat() * height - height, // start at random heights
-                    speed = Random.nextFloat() * 15f + 10f,
-                    screenHeight = height,
-                    trailLength = trailLen,
-                    chars = List(trailLen) { chars[Random.nextInt(chars.length)] }
+                columns.add(
+                    MatrixColumn(
+                        x = i * columnWidthPx,
+                        y = Random.nextFloat() * height - height, // start at random heights
+                        speed = Random.nextFloat() * 15f + 10f,
+                        screenHeight = height,
+                        trailLength = trailLen,
+                        chars = CharArray(trailLen) { charsStr[Random.nextInt(charsStr.length)] }
+                    )
                 )
             }
             columnsInitialized = true
         }
-        
+
         if (columnsInitialized) {
             drawIntoCanvas { canvas ->
-                val paint = Paint().apply {
-                    isAntiAlias = true
-                    textSize = fontSize
-                    typeface = Typeface.MONOSPACE
-                    textAlign = Paint.Align.CENTER
-                }
-                
                 columns.forEach { col ->
+                    // Update physics only every ~40ms to keep the retro feel
+                    if (shouldUpdatePhysics) {
+                        col.y += col.speed
+                        if (col.y > height + (col.trailLength * fontSize)) {
+                            // Reset to top
+                            col.y = -Random.nextFloat() * 300f - 100f
+                            col.speed = Random.nextFloat() * 15f + 10f
+                            col.trailLength = Random.nextInt(8, 20)
+                            col.chars = CharArray(col.trailLength) { charsStr[Random.nextInt(charsStr.length)] }
+                        } else {
+                            // Flicker some chars in the column
+                            for (i in 0 until col.trailLength) {
+                                if (Random.nextFloat() < 0.1f) {
+                                    col.chars[i] = charsStr[Random.nextInt(charsStr.length)]
+                                }
+                            }
+                        }
+                    }
+
                     // Draw each character in the column's trail
                     for (i in 0 until col.trailLength) {
                         val charY = col.y - (i * fontSize)
@@ -103,19 +123,18 @@ fun MatrixRainBackground(
                             // Calculate fade/opacity for the trail (head is brightest, tail fades to zero)
                             val alpha = 1f - (i.toFloat() / col.trailLength)
                             val isHead = i == 0
-                            
-                            // Head is white or bright light green, trail is green
+
+                            // Head is white or bright light color, trail is base color
                             if (isHead) {
-                                paint.color = android.graphics.Color.WHITE
-                                paint.alpha = (alpha * 255).toInt().coerceIn(0, 255)
+                                textPaint.color = android.graphics.Color.WHITE
+                                textPaint.alpha = (alpha * 255).toInt().coerceIn(0, 255)
                             } else {
-                                // Dynamic color matching parameter
-                                paint.color = color.toArgb()
-                                paint.alpha = (alpha * 180).toInt().coerceIn(0, 255)
+                                textPaint.color = baseColorArgb
+                                textPaint.alpha = (alpha * 180).toInt().coerceIn(0, 255)
                             }
-                            
-                            val charStr = col.chars.getOrElse(i) { '0' }.toString()
-                            canvas.nativeCanvas.drawText(charStr, col.x, charY, paint)
+
+                            val charStr = if (i < col.chars.size) col.chars[i].toString() else "0"
+                            canvas.nativeCanvas.drawText(charStr, col.x, charY, textPaint)
                         }
                     }
                 }
@@ -123,12 +142,3 @@ fun MatrixRainBackground(
         }
     }
 }
-
-data class MatrixColumn(
-    val x: Float,
-    val y: Float,
-    val speed: Float,
-    val screenHeight: Float,
-    val trailLength: Int,
-    val chars: List<Char>
-)

@@ -31,6 +31,11 @@ render-mcp-server/
 *.txt
 *.log
 *.xml
+!app/src/main/res/**/*.png
+!app/src/main/res/**/*.jpg
+!app/src/main/res/**/*.jpeg
+!app/src/main/res/**/*.webp
+!app/src/main/assets/**/*.html
 !app/**/*.xml
 !gradle/**/*.xml
 !**/AndroidManifest.xml
@@ -44,7 +49,21 @@ render-mcp-server/
 keystore/
 backend/
 royal_shield_backend/
-royal_shield_backend_unified/
+!royal_shield_backend_unified/
+!royal_shield_backend_unified/**/
+!royal_shield_backend_unified/**/*.py
+!royal_shield_backend_unified/**/*.md
+!royal_shield_backend_unified/**/*.html
+!royal_shield_backend_unified/**/*.example
+!royal_shield_backend_unified/**/requirements*.txt
+!royal_shield_backend_unified/**/Dockerfile
+royal_shield_backend_unified/.env
+royal_shield_backend_unified/**/.env
+royal_shield_backend_unified/**/*.db
+royal_shield_backend_unified/**/*.log
+royal_shield_backend_unified/**/__pycache__/
+royal_shield_backend_unified/**/*.pyc
+royal_shield_backend_unified/logs/
 *.zip
 RS ACTUALIZATEC/
 Royalshieldv2.0/

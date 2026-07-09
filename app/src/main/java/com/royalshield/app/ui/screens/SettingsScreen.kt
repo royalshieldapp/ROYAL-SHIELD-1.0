@@ -51,16 +51,16 @@ fun SettingsScreen(
     onNavigateToReferral: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    // Ensure PreferencesManager is initialized (safe to call multiple times if handled safely, 
+    // Ensure PreferencesManager is initialized (safe to call multiple times if handled safely,
     // but better if global. Assuming it is safe or App-level init)
-    // Here accessing properties directly might crash if not init. 
+    // Here accessing properties directly might crash if not init.
     // PreferencesManager.init(context) was called in MainActivity.
 
     var vibrationEnabled by remember { mutableStateOf(PreferencesManager.isVibrationEnabled()) }
     var historyEnabled by remember { mutableStateOf(PreferencesManager.isHistoryEnabled()) }
-    
 
-    
+
+
     // Background Image
     Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.foundation.Image(
@@ -69,7 +69,7 @@ fun SettingsScreen(
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
-        
+
         // Dark Overlay for readability
         Box(
             modifier = Modifier
@@ -80,11 +80,11 @@ fun SettingsScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { 
+                    title = {
                         Text(
                             text = "Settings",
                             fontWeight = FontWeight.Bold
-                        ) 
+                        )
                     },
                     navigationIcon = {
                         IconButton(onClick = onBackPressed) {
@@ -96,8 +96,8 @@ fun SettingsScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent, 
-                        titleContentColor = Color.White, 
+                        containerColor = Color.Transparent,
+                        titleContentColor = Color.White,
                         navigationIconContentColor = Color.White
                     )
                 )
@@ -255,7 +255,7 @@ fun SettingsScreen(
                             onClick = onNavigateToAdvancedSettings
                         )
                     }
-                    
+
                     // From SOS Button Behavior section (preserving zero deletion)
                     Spacer(modifier = Modifier.height(12.dp))
                     SettingsSwitchItem(
@@ -268,7 +268,7 @@ fun SettingsScreen(
                             android.widget.Toast.makeText(context, if(enabled) "Vibration Activated" else "Vibration Deactivated", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     )
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
                     CyberButtonRect(
                         text = "Test SOS Configuration",
@@ -321,7 +321,7 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 androidx.compose.foundation.Image(
-                                    painter = androidx.compose.ui.res.painterResource(id = com.royalshield.app.R.drawable.icon_shield_gold),
+                                    painter = androidx.compose.ui.res.painterResource(id = com.royalshield.app.R.drawable.img_icon_shield_gold),
                                     contentDescription = null,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -339,7 +339,7 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    
+
                     // Card 3: Help Center (Moved from Resource Section)
                     CyberButtonRect(
                         text = "Help Center",
@@ -472,10 +472,10 @@ fun SettingsScreen(
                         }
                     }
                 }
-                
+
                 // 11. Security Note
                 SecurityNote()
-                
+
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
@@ -545,7 +545,7 @@ fun SettingsSwitchItem(
                     color = Color.White.copy(alpha = 0.7f)
                 )
             }
-            
+
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,

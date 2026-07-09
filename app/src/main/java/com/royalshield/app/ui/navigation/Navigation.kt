@@ -43,11 +43,15 @@ fun RoyalShieldNavGraph(
                 billingManager = billingManager
             )
         }
-        
+
+        composable("marketplace") {
+            MarketplaceScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(BottomNavItem.GlobalMap.route) {
             GlobalMapScreen(onBack = { navController.popBackStack() })
         }
-        
+
         composable(BottomNavItem.CyberMap.route) {
             CyberHomeScreen(
                 onBack = { navController.popBackStack() },
@@ -58,7 +62,7 @@ fun RoyalShieldNavGraph(
                 onNavigateToIntel = { navController.navigate("intel_hub") }
             )
         }
-        
+
 
 
         composable(BottomNavItem.Automation.route) {
@@ -67,7 +71,7 @@ fun RoyalShieldNavGraph(
                 onBusinessClick = { navController.navigate("business") }
             )
         }
-        
+
         composable(BottomNavItem.Settings.route) {
             SettingsScreen(
                 onNavigateToSubscription = { navController.navigate("subscription") },
@@ -80,34 +84,34 @@ fun RoyalShieldNavGraph(
             )
         }
 
-        composable("subscription") { 
+        composable("subscription") {
             val isPremium by billingManager.hasPremiumAccess.collectAsState()
             SubscriptionScreen(
-                isPremium = isPremium, 
+                isPremium = isPremium,
                 billingManager = billingManager,
                 onBack = { navController.popBackStack() }
             )
         }
-        
+
         composable("gallery") { SosGalleryScreen(onBack = { navController.popBackStack() }) }
 
         composable("loyalty") { LoyaltyProgramScreen(onBack = { navController.popBackStack() }) }
         composable("advanced_settings") { AdvancedSettingsScreen(onBackPressed = { navController.popBackStack() }) }
-        composable("file_scan") { 
+        composable("file_scan") {
             FileScanScreen(
                 onBack = { navController.popBackStack() },
                 billingManager = billingManager,
                 onNavigateToPremium = { navController.navigate("subscription") }
-            ) 
+            )
         }
         composable("phishing_detector") { PhishingDetectorScreen(onBack = { navController.popBackStack() }) }
-        composable("business") { 
+        composable("business") {
             BusinessScreen(
                 onBack = { navController.popBackStack() },
                 onAccessDashboard = { navController.navigate("business_dashboard") }
-            ) 
+            )
         }
-        
+
         composable("ai_hub") {
             AiHubScreen(
                 onBack = { navController.popBackStack() },
@@ -117,7 +121,7 @@ fun RoyalShieldNavGraph(
             )
         }
 
-        composable("ai_neural_hub") { 
+        composable("ai_neural_hub") {
             val context = androidx.compose.ui.platform.LocalContext.current
             AiNeuralHubScreen(
                 onBack = { navController.popBackStack() },
@@ -129,7 +133,7 @@ fun RoyalShieldNavGraph(
         }
         composable("ai_script_lab") { AiScriptLabScreen(onBack = { navController.popBackStack() }) }
         composable("courses") { CourseScreen(onBackPressed = { navController.popBackStack() }) }
-        
+
         // Business Tools Navigation
         composable("business_dashboard") {
             BusinessDashboardScreen(
@@ -150,11 +154,11 @@ fun RoyalShieldNavGraph(
         composable("xdr_dashboard") {
              XdrScreen(onBack = { navController.popBackStack() })
         }
-        
+
         composable("contacts") {
             ContactsScreen(onBack = { navController.popBackStack() })
         }
-        
+
         composable("vpn") {
             VpnScreen(
                 onBack = { navController.popBackStack() },
@@ -162,11 +166,11 @@ fun RoyalShieldNavGraph(
                 onNavigateToPremium = { navController.navigate("subscription") }
             )
         }
-        
+
         composable("tracking_shield") {
             TrackingShieldScreen(onBack = { navController.popBackStack() })
         }
-        
+
         composable("timeline") {
             LocationTimelineScreen(onBackPressed = { navController.popBackStack() })
         }
@@ -187,7 +191,7 @@ fun RoyalShieldNavGraph(
             SolutionEngineScreen(onBack = { navController.popBackStack() })
         }
 
-        // ── Previously missing routes ──────────────────────────────────────
+        // â”€â”€ Previously missing routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         composable("voice_scam") {
             VoiceScamScreen(onBack = { navController.popBackStack() })
         }
@@ -198,7 +202,7 @@ fun RoyalShieldNavGraph(
             ReferralScreen(onNavigateBack = { navController.popBackStack() })
         }
 
-        // ── PHASE 4: IR & Intel Hub ──────────────────────────────────────
+        // â”€â”€ PHASE 4: IR & Intel Hub â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         composable("ir_hub") {
             IrHubScreen(
                 onNavigateToDetail = { id -> navController.navigate("ir_incident_detail/$id") },

@@ -21,36 +21,36 @@ import kotlinx.coroutines.Dispatchers
  * Handles the $0.99 paywall for Security Screen
  */
 class BillingManager(private val context: Context) : PurchasesUpdatedListener {
-    
+
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
-    
-    // DEV MODE: Set to true to simulate purchases on emulator + FULL PREMIUM ACCESS
-    private val isDevMode = false
-    
+
+    // Normal tier testing: true keeps the app on forced Ultimate for testing.
+    private val isDevMode = true
+
     private var billingClient: BillingClient? = null
-    
+
     private val _purchaseState = MutableStateFlow<PurchaseState>(PurchaseState.Idle)
     val purchaseState: StateFlow<PurchaseState> = _purchaseState.asStateFlow()
-    
+
     private val _hasPremiumAccess = MutableStateFlow(false) // FREE MODE
     val hasPremiumAccess: StateFlow<Boolean> = _hasPremiumAccess.asStateFlow()
-    
+
     private val _currentProduct = MutableStateFlow<String?>(null)
     val currentProduct: StateFlow<String?> = _currentProduct.asStateFlow()
-    
+
     companion object {
         private const val TAG = "BillingManager"
-        
+
         // Product IDs (must match Google Play Console)
-        const val PRODUCT_SECURITY_ACCESS = "security_access_099" 
+        const val PRODUCT_SECURITY_ACCESS = "security_access_099"
         const val PRODUCT_STARTER = "lifetime_starter" // Unified ID
         const val PRODUCT_GOLD = "lifetime_gold"       // Unified ID
         const val PRODUCT_ULTIMATE = "lifetime_ultimate" // Unified ID
-        
+
         private const val COLLECTION_PURCHASES = "purchases"
     }
-    
+
     sealed class PurchaseState {
         object Idle : PurchaseState()
         object Loading : PurchaseState()
@@ -58,7 +58,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         data class Error(val message: String) : PurchaseState()
         object Cancelled : PurchaseState()
     }
-    
+
     /**
      * Initializes the billing client
      */
@@ -67,7 +67,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             .setListener(this)
             .enablePendingPurchases()
             .build()
-        
+
         billingClient?.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
@@ -79,14 +79,14 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                     Log.e(TAG, "Error connecting billing: ${billingResult.debugMessage}")
                 }
             }
-            
+
             override fun onBillingServiceDisconnected() {
                 Log.w(TAG, "Billing service disconnected")
                 // Retry connection
             }
         })
     }
-    
+
     /**
      * Checks if the user has premium access (purchase or Duo Shield)
      * DEV MODE: Always returns true for full access
@@ -96,26 +96,26 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             _hasPremiumAccess.value = true
             return true
         }
-        
+
         return try {
             val uid = auth.currentUser?.uid ?: return false
-            
+
             // Verify in Firestore if user has SOLO or DUO plan
             val userDoc = firestore.collection("users")
                 .document(uid)
                 .get()
                 .await()
-            
+
             if (userDoc.exists()) {
                 val planTier = userDoc.getString("planTier") ?: "FREE"
                 val premiumExpires = userDoc.getLong("premiumExpiresAt")
-                
+
                 val hasPlan = planTier == "SOLO" || planTier == "DUO" || planTier == "GOLD" || planTier == "ULTIMATE" || planTier == "STARTER"
-                
-                val hasPremiumTemp = premiumExpires?.let { 
-                    System.currentTimeMillis() < it 
+
+                val hasPremiumTemp = premiumExpires?.let {
+                    System.currentTimeMillis() < it
                 } ?: false
-                
+
                 val hasAccess = hasPlan || hasPremiumTemp
                 _hasPremiumAccess.value = hasAccess
                 // Also update local cache if we found a specific pack
@@ -125,7 +125,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                     "ULTIMATE" -> PRODUCT_ULTIMATE
                     else -> null
                 }
-                
+
                 if (productId != null) {
                    PreferencesManager.savePurchasedPack(productId)
                 }
@@ -137,14 +137,14 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                 _hasPremiumAccess.value = true
                 return true
             }
-            
+
             false
         } catch (e: Exception) {
             Log.e(TAG, "Error verifying premium access", e)
             false
         }
     }
-    
+
     /**
      * Queries available products
      */
@@ -173,13 +173,13 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                     .setProductType(BillingClient.ProductType.INAPP)
                     .build()
             )
-            
+
             val params = QueryProductDetailsParams.newBuilder()
                 .setProductList(productList)
                 .build()
-            
+
             val result = billingClient?.queryProductDetails(params)
-            
+
             if (result?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
                 result.productDetailsList?.map { detail ->
                     val offer = detail.oneTimePurchaseOfferDetails
@@ -200,7 +200,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             emptyList()
         }
     }
-    
+
     /**
      * Launches the purchase flow
      */
@@ -229,20 +229,20 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         }
 
         _purchaseState.value = PurchaseState.Loading
-        
+
         val productDetailsParamsList = listOf(
             BillingFlowParams.ProductDetailsParams.newBuilder()
                 .setProductDetails(productDetails)
                 .build()
         )
-        
+
         val billingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
             .build()
-        
+
         billingClient?.launchBillingFlow(activity, billingFlowParams)
     }
-    
+
     /**
      * Callback when a purchase is updated
      */
@@ -268,7 +268,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             }
         }
     }
-    
+
     /**
      * Processes a purchase
      */
@@ -277,21 +277,21 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             if (!purchase.isAcknowledged) {
                 acknowledgePurchase(purchase)
             }
-            
+
             // Identify product
             val productId = purchase.products.firstOrNull() ?: "unknown"
-            
+
             // Save locally
             PreferencesManager.savePurchasedPack(productId)
-            
+
             // Update user access in Firestore
             savePurchaseToFirestore(purchase)
-            
+
             _purchaseState.value = PurchaseState.Success(productId)
             _hasPremiumAccess.value = true
         }
     }
-    
+
     /**
      * Acknowledges the purchase in Google Play
      */
@@ -299,21 +299,21 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
             .setPurchaseToken(purchase.purchaseToken)
             .build()
-        
+
         billingClient?.acknowledgePurchase(acknowledgePurchaseParams) { billingResult ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                 Log.d(TAG, "Purchase acknowledged successfully")
             }
         }
     }
-    
+
     /**
      * Saves the purchase to Firestore
      */
     private fun savePurchaseToFirestore(purchase: Purchase) {
         val uid = auth.currentUser?.uid ?: return
         val productId = purchase.products.firstOrNull() ?: ""
-        
+
         val purchaseData = mapOf(
             "uid" to uid,
             "productId" to productId,
@@ -322,13 +322,13 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             "orderId" to (purchase.orderId ?: ""),
             "acknowledged" to purchase.isAcknowledged
         )
-        
+
         firestore.collection(COLLECTION_PURCHASES)
             .document("${uid}_${purchase.orderId}")
             .set(purchaseData)
             .addOnSuccessListener {
                 Log.d(TAG, "Purchase saved in Firestore")
-                
+
                 // Determine Tier from ID
                 val planTier = when(productId) {
                     PRODUCT_STARTER -> "STARTER"
@@ -336,13 +336,13 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                     PRODUCT_ULTIMATE -> "ULTIMATE"
                     else -> "SOLO"
                 }
-                
+
                 // Update user plan
                 val userUpdates = mapOf(
                     "planTier" to planTier,
                     "lastPurchaseAt" to System.currentTimeMillis()
                 )
-                
+
                 firestore.collection("users")
                     .document(uid)
                     .update(userUpdates)
@@ -354,7 +354,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                 Log.e(TAG, "Error saving purchase", e)
             }
     }
-    
+
     /**
      * Queries existing user purchases
      */
@@ -365,16 +365,16 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                 .build()
         ) { billingResult, purchases ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val hasActivePurchase = purchases.any { 
-                    it.purchaseState == Purchase.PurchaseState.PURCHASED 
+                val hasActivePurchase = purchases.any {
+                    it.purchaseState == Purchase.PurchaseState.PURCHASED
                 }
                 _hasPremiumAccess.value = if (isDevMode) true else hasActivePurchase
-                
+
                 Log.d(TAG, "Existing purchases: ${purchases.size}")
             }
         }
     }
-    
+
     /**
      * Releases resources
      */

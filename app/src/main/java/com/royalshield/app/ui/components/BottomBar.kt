@@ -26,17 +26,17 @@ import androidx.compose.ui.res.painterResource
 import com.royalshield.app.R
 
 sealed class BottomNavItem(
-    val route: String, 
-    val title: String, 
-    val icon: ImageVector? = null, 
+    val route: String,
+    val title: String,
+    val icon: ImageVector? = null,
     val iconResId: Int? = null,
     val color: Color
 ) {
-    object Home : BottomNavItem("home", "Home", null, com.royalshield.app.R.drawable.ic_home_gold, RoyalGold)
-    object GlobalMap : BottomNavItem("global_map", "Map", null, com.royalshield.app.R.drawable.quick_map_gold, NeonRed)
-    object CyberMap : BottomNavItem("cyber_map", "Cyber", null, com.royalshield.app.R.drawable.icon_shield_gold, CyberCyan)
-    object Automation : BottomNavItem("automation", "Auto", null, com.royalshield.app.R.drawable.ic_nav_automation, SafeGreen)
-    object Settings : BottomNavItem("settings", "Settings", null, com.royalshield.app.R.drawable.ic_settings_gold, Color.White)
+    object Home : BottomNavItem("home", "Home", null, com.royalshield.app.R.drawable.nav_home, RoyalGold)
+    object GlobalMap : BottomNavItem("global_map", "Map", null, com.royalshield.app.R.drawable.nav_location, NeonRed)
+    object CyberMap : BottomNavItem("cyber_map", "Cyber", null, com.royalshield.app.R.drawable.nav_shield, CyberCyan)
+    object Automation : BottomNavItem("automation", "Auto", null, com.royalshield.app.R.drawable.nav_automation, SafeGreen)
+    object Settings : BottomNavItem("settings", "Settings", null, com.royalshield.app.R.drawable.nav_settings, Color.White)
 }
 
 @Composable
@@ -58,7 +58,7 @@ fun RoyalShieldBottomBar(navController: NavController) {
 
         items.forEach { item ->
             NavigationBarItem(
-                icon = { 
+                icon = {
                     if (item.iconResId != null) {
                         Icon(
                             painter = painterResource(id = item.iconResId),
@@ -68,7 +68,7 @@ fun RoyalShieldBottomBar(navController: NavController) {
                         )
                     } else if (item.icon != null) {
                         Icon(
-                            imageVector = item.icon, 
+                            imageVector = item.icon,
                             contentDescription = item.title,
                             modifier = androidx.compose.ui.Modifier.size(40.dp) // Increased size
                         )

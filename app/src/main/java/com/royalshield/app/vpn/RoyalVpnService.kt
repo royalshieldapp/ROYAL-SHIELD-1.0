@@ -20,11 +20,11 @@ import java.nio.ByteBuffer
  * Handles VPN connection lifecycle (Base setup without fake tunnels)
  */
 class RoyalVpnService : VpnService() {
-    
+
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private var vpnInterface: android.os.ParcelFileDescriptor? = null
     private var packetLoopJob: Job? = null
-    
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_CONNECT -> {
@@ -53,17 +53,17 @@ class RoyalVpnService : VpnService() {
                 .addAddress("10.0.0.2", 32)
                 .addRoute("0.0.0.0", 0)
                 .addDnsServer("8.8.8.8")
-            
+
             vpnInterface = builder.establish()
-            
+
             if (vpnInterface != null) {
                 // Start Foreground notification
                 startForeground(NOTIFICATION_ID, createNotification())
-                
+
                 // Broadcast success
                 sendBroadcast(Intent(ACTION_VPN_CONNECTED))
                 Log.i(TAG, "VPN Interface established successfully")
-                
+
                 // Start packet loop (local loopback reader/sink)
                 startPacketLoop()
             } else {
@@ -85,7 +85,7 @@ class RoyalVpnService : VpnService() {
             val input = FileInputStream(fd)
             val output = FileOutputStream(fd)
             val buffer = ByteBuffer.allocate(32767)
-            
+
             try {
                 while (isActive) {
                     // Read packets from the tunnel interface
@@ -106,7 +106,7 @@ class RoyalVpnService : VpnService() {
             }
         }
     }
-    
+
     private fun disconnect() {
         Log.d(TAG, "Disconnecting VPN...")
         packetLoopJob?.cancel()
@@ -120,23 +120,23 @@ class RoyalVpnService : VpnService() {
         sendBroadcast(Intent(ACTION_VPN_DISCONNECTED))
         stopSelf()
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         disconnect()
         serviceScope.cancel()
     }
-    
+
     companion object {
         private const val TAG = "RoyalVpnService"
-        
+
         const val ACTION_CONNECT = "com.royalshield.vpn.CONNECT"
         const val ACTION_DISCONNECT = "com.royalshield.vpn.DISCONNECT"
         const val ACTION_VPN_CONNECTED = "com.royalshield.vpn.CONNECTED"
         const val ACTION_VPN_DISCONNECTED = "com.royalshield.vpn.DISCONNECTED"
         const val ACTION_VPN_ERROR = "com.royalshield.vpn.ERROR"
         const val ACTION_VPN_MISSING_CONFIG = "com.royalshield.vpn.MISSING_CONFIG"
-        
+
         const val EXTRA_CONFIG = "vpn_config"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "vpn_channel"
@@ -158,7 +158,7 @@ class RoyalVpnService : VpnService() {
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.icon_shield_gold)
+            .setSmallIcon(R.drawable.img_icon_shield_gold)
             .setContentTitle("Royal Shield VPN Active")
             .setContentText("Tu conexión está protegida y encriptada.")
             .setPriority(NotificationCompat.PRIORITY_LOW)

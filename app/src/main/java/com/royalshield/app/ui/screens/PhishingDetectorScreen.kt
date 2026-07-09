@@ -45,6 +45,9 @@ import androidx.compose.foundation.Image
 import com.royalshield.app.VirusTotalRepository
 import com.royalshield.app.UrlResult
 import com.royalshield.app.managers.PreferencesManager
+import com.royalshield.app.models.PhishingDetectionResult
+import com.royalshield.app.models.PhishingRiskLevel
+import com.royalshield.app.services.PhishingDetectionService
 
 @Composable
 fun PhishingDetectorScreen(onBack: () -> Unit) {
@@ -56,6 +59,7 @@ fun PhishingDetectorScreen(onBack: () -> Unit) {
 
     val context = LocalContext.current
     val vtRepository = remember { VirusTotalRepository() }
+    val phishingService = remember { PhishingDetectionService() }
     var showApiKeyWarning by remember { mutableStateOf(false) }
 
     RoyalGradientBackground {
@@ -145,26 +149,32 @@ fun PhishingDetectorScreen(onBack: () -> Unit) {
                             isAnalyzing = true
                             scope.launch {
                                 // 1. Run local heuristics first
-                                val localResult = analyzePhishing(messageText)
-                                result = localResult
-                                
+                                val detectionResult = phishingService.analyzeText(messageText)
+
+                                // Map new service model to old UI model (or adapt UI directly)
+                                var finalScore = when (detectionResult.riskLevel) {
+                                    PhishingRiskLevel.HIGH -> 85
+                                    PhishingRiskLevel.MEDIUM -> 50
+                                    PhishingRiskLevel.LOW -> 10
+                                }
+                                val combinedReasons = detectionResult.explanations.toMutableList()
+
+                                result = PhishingResult(finalScore, combinedReasons.toList())
+
                                 // 2. If a URL is found, attempt VirusTotal scan
-                                val urlStr = extractUrl(messageText)
-                                if (urlStr != null) {
+                                val urls = phishingService.extractUrls(messageText)
+                                if (urls.isNotEmpty()) {
+                                    val urlStr = urls.first()
                                     val vtResult = vtRepository.checkUrl(urlStr)
                                     if (vtResult.verdict == "unknown" && vtResult.reason.contains("API Key")) {
                                         showApiKeyWarning = true
                                     } else if (vtResult.verdict != "unknown") {
-                                        // Merge VT results with local results
-                                        val combinedReasons = localResult.reasons.toMutableList()
                                         combinedReasons.add("RESULTADO VIRUSTOTAL: ${vtResult.reason}")
-                                        
-                                        // Update score if VT is more certain
-                                        val finalScore = maxOf(localResult.score, vtResult.score)
-                                        result = PhishingResult(finalScore, combinedReasons)
+                                        finalScore = maxOf(finalScore, vtResult.score)
+                                        result = PhishingResult(finalScore, combinedReasons.toList())
                                     }
                                 }
-                                
+
                                 isAnalyzing = false
                                 delay(500) // Small breather
                             }
@@ -186,11 +196,11 @@ fun PhishingDetectorScreen(onBack: () -> Unit) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("ANALIZANDO...", color = Color.Black, fontWeight = FontWeight.Bold)
                     } else {
-                        // Text is part of image usually, but keeping it if needed, or removing if image has it. 
+                        // Text is part of image usually, but keeping it if needed, or removing if image has it.
                         // Assuming image has text "Analyze Risk" or similar based on name.
                         // If image has text, we might want to hide this text.
                         // User said "CAMBIA el BOTON DE ANALIZAR RIESGO POR el BOTON_GOLD"
-                        // I will keep text but make it invisible if needed? 
+                        // I will keep text but make it invisible if needed?
                         // Let's assume image is background.
                         Icon(Icons.Default.Analytics, null, tint = Color.Black)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -235,7 +245,7 @@ fun PhishingResultCard(result: PhishingResult) {
         result.score >= 40 -> RoyalGold
         else -> Color(0xFF00FF94) // Safe Green
     }
-    
+
     val riskLabel = when {
         result.score >= 70 -> "ALTO"
         result.score >= 40 -> "MEDIO"
@@ -274,14 +284,14 @@ fun PhishingResultCard(result: PhishingResult) {
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // Risk Graph
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text("Risk Analysis Graph", color = Color.Gray, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -312,7 +322,7 @@ fun PhishingResultCard(result: PhishingResult) {
 
             Text("Análisis de IA:", color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             result.reasons.forEach { reason ->
                 Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
                     Text("•", color = riskColor, fontWeight = FontWeight.Bold)
@@ -325,47 +335,3 @@ fun PhishingResultCard(result: PhishingResult) {
 }
 
 data class PhishingResult(val score: Int, val reasons: List<String>)
-
-fun extractUrl(text: String): String? {
-    val regex = "(https?://[\\w\\d.-]+\\.[\\w\\d]{2,}[/\\w\\d._?%&=-]*)".toRegex()
-    return regex.find(text)?.value
-}
-
-fun analyzePhishing(text: String): PhishingResult {
-    val t = text.lowercase()
-    var score = 0
-    val reasons = mutableListOf<String>()
-
-    // Heuristics
-    if (t.contains("http") && !t.contains("https")) {
-        score += 30
-        reasons.add("Uso de protocolo HTTP inseguro (no cifrado).")
-    }
-    if (t.contains("bit.ly") || t.contains("goo.gl") || t.contains("tinyurl") || t.contains("is.gd")) {
-        score += 25
-        reasons.add("Uso de acortador de URL (común para ocultar destinos).")
-    }
-    if (t.contains("urgente") || t.contains("inmediato") || t.contains("acción requerida") || t.contains("bloqueada") || t.contains("suspendida")) {
-        score += 30
-        reasons.add("Lenguaje de urgencia o amenaza para forzar acción rápida.")
-    }
-    if (t.contains("banco") || t.contains("verificar") || t.contains("contraseña") || t.contains("ganador") || t.contains("premio")) {
-        score += 20
-        reasons.add("Solicitud de verificación o promesa de premio sospechosa.")
-    }
-    if (t.contains("haga clic") || t.contains("click aquí") || t.contains("entra en")) {
-        score += 15
-        reasons.add("Incitación directa a hacer clic en enlaces.")
-    }
-    
-    // Normalize score
-    if (reasons.isEmpty()) {
-        score = 5
-        reasons.add("No se detectaron patrones obvios de phishing, pero siempre mantenga precaución.")
-    } else {
-        // Base risk for any unsolicited message with links
-        if (t.contains("http")) score += 10
-    }
-    
-    return PhishingResult(score.coerceIn(0, 100), reasons)
-}
