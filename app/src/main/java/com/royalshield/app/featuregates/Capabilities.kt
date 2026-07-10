@@ -1,18 +1,27 @@
 package com.royalshield.app.featuregates
 
+import com.royalshield.app.subscription.EntitlementStore
 import com.royalshield.app.subscription.SubscriptionTier
 
+/**
+ * Capability checks for all app features.
+ * When DEV_SUPERPOWERS is active, ALL capabilities return true.
+ */
 object Capabilities {
     
-    fun canUseFileScanner(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.STARTER)
-    fun canUseAppScan(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.STARTER)
-    fun canUsePermissionMonitor(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.STARTER)
+    // ── Starter Tier Features ──
+    fun canUseFileScanner(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.STARTER)
+    fun canUseAppScan(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.STARTER)
+    fun canUsePermissionMonitor(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.STARTER)
     
-    fun canUseScreenProtection(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.GOLD)
-    fun canUseClipboardProtection(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.GOLD)
-    fun canUseAutomation(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.GOLD)
+    // ── Gold Tier Features ──
+    fun canUseScreenProtection(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.GOLD)
+    fun canUseClipboardProtection(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.GOLD)
+    fun canUseAutomation(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.GOLD)
     
-    fun canUseAiAnalysis(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.ULTIMATE)
-    fun canUseLiveThreatMonitor(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.ULTIMATE)
-    fun canUseStealthMode(tier: SubscriptionTier) = tier.isAtLeast(SubscriptionTier.ULTIMATE)
+    // ── Ultimate Tier Features ──
+    fun canUseAiAnalysis(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.ULTIMATE)
+    fun canUseLiveThreatMonitor(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.ULTIMATE)
+    fun canUseStealthMode(tier: SubscriptionTier) = EntitlementStore.DEV_SUPERPOWERS || tier.isAtLeast(SubscriptionTier.ULTIMATE)
 }
+
