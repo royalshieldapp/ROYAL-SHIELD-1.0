@@ -34,7 +34,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     private val _purchaseState = MutableStateFlow<PurchaseState>(PurchaseState.Idle)
     val purchaseState: StateFlow<PurchaseState> = _purchaseState.asStateFlow()
 
-    private val _hasPremiumAccess = MutableStateFlow(false) // FREE MODE
+    private val _hasPremiumAccess = MutableStateFlow(EntitlementStore.DEV_SUPERPOWERS) // SUPERPOWERS: starts unlocked
     val hasPremiumAccess: StateFlow<Boolean> = _hasPremiumAccess.asStateFlow()
 
     private val _currentProduct = MutableStateFlow<String?>(null)
