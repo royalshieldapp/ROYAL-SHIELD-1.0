@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import com.royalshield.app.managers.PreferencesManager
+import com.royalshield.app.subscription.EntitlementStore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,8 +26,8 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val auth by lazy { FirebaseAuth.getInstance() }
 
-    // Normal tier testing: true keeps the app on forced Ultimate for testing.
-    private val isDevMode = true
+    // Linked to centralized SUPERPOWERS flag for single-switch control
+    private val isDevMode = EntitlementStore.DEV_SUPERPOWERS
 
     private var billingClient: BillingClient? = null
 
