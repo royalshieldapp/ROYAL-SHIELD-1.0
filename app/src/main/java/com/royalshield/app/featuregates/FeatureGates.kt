@@ -61,7 +61,7 @@ fun LockedUpsellCard(
             )
             
             Text(
-                text = "Feature Locke",
+                text = "Feature Locked",
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
