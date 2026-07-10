@@ -252,6 +252,13 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                CommandLogStatusPanel(
+                    items = dashboardState.actionItems,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // CAROUSEL / ALERT CARD - DYNAMICALLY CONNECTED TO BACKGROUND SERVICES & PROMOTIONS (SPLIT LAYOUT)
                 val isSoundEnabled = remember { PreferencesManager.isSoundEnabled() }
                 val isLocationEnabled = remember { PreferencesManager.isLocationEnabled() }
@@ -355,13 +362,12 @@ fun DashboardScreen(
                     }
                 }
 
-                if (showLegacyDashboardStatusStrip) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     // LEFT CAROUSEL: STATUS (Height: 90.dp)
                     Box(modifier = Modifier.weight(1f)) {
                         AnimatedContent(
@@ -519,7 +525,6 @@ fun DashboardScreen(
                             }
                         }
                     }
-                }
                 }
 
 
@@ -754,6 +759,34 @@ fun DashboardScreen(
                             }
                         }
 
+                        // Orbiting particles that follow the armed/disarmed status color.
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val particleCount = 18
+                            for (index in 0 until particleCount) {
+                                val orbitRadius = if (index % 2 == 0) {
+                                    size.minDimension * 0.43f
+                                } else {
+                                    size.minDimension * 0.36f
+                                }
+                                val particleAngle = Math.toRadians(
+                                    (angle + (index * 360f / particleCount) + (index % 3) * 18f).toDouble()
+                                )
+                                val x = center.x + kotlin.math.cos(particleAngle).toFloat() * orbitRadius
+                                val y = center.y + kotlin.math.sin(particleAngle).toFloat() * orbitRadius
+                                val pulse = when (index % 3) {
+                                    0 -> ring1Alpha
+                                    1 -> ring2Alpha
+                                    else -> ring3Alpha
+                                }
+                                drawCircle(
+                                    color = rotatingColor.copy(alpha = (pulse + 0.18f).coerceAtMost(0.7f)),
+                                    radius = (1.4.dp + (index % 3).dp).toPx(),
+                                    center = Offset(x, y)
+                                )
+                            }
+                        }
+
                         // Inner glow fill circle
                         Box(
                             modifier = Modifier
@@ -800,33 +833,29 @@ fun DashboardScreen(
                 ) {
                     // 1. HOME
                     QuickActionButton(
-                        iconRes = 0,
+                        iconRes = R.drawable.nav_home,
                         label = "Home",
-                        vectorIcon = Icons.Default.Home,
                         onClick = onNavigateToSystemStatus
                     )
 
                     // 2. MAP
                     QuickActionButton(
-                        iconRes = 0,
+                        iconRes = R.drawable.nav_location,
                         label = "Map",
-                        vectorIcon = Icons.Default.LocationOn,
                         onClick = onNavigateToMap
                     )
 
                     // 3. SECURITY
                     QuickActionButton(
-                        iconRes = 0,
-                        label = "Security",
-                        vectorIcon = Icons.Default.Fingerprint, // Escudo con huella
+                        iconRes = R.drawable.nav_shield,
+                        label = "Secure",
                         onClick = onNavigateToFileScan
                     )
 
                     // 4. AUTOMATION
                     QuickActionButton(
-                        iconRes = 0,
+                        iconRes = R.drawable.nav_automation,
                         label = "Automation",
-                        vectorIcon = Icons.Default.SettingsSuggest,
                         onClick = onNavigateToAutomation
                     )
                 }
@@ -859,10 +888,9 @@ fun DashboardScreen(
                             Color.Red.copy(alpha = pulseAlpha)
                         )
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_gold_shield),
                             contentDescription = null,
-                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1012,7 +1040,7 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // DASHBOARD GRID - Custom 2-1-2 Layout (Based on Image Reference)
+                // DASHBOARD GRID - 8 feature cards, then Tracking Shield full-width
                 Column(
                     modifier = Modifier.padding(horizontal = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1029,7 +1057,7 @@ fun DashboardScreen(
                             neonColor = com.royalshield.app.ui.theme.NeonOrange,
                             onClick = onNavigateToCourses,
                             modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true
+                            borderAnimation = false
                         )
                         FeatureCard(
                             title = "Secure Vault",
@@ -1038,7 +1066,7 @@ fun DashboardScreen(
                             neonColor = com.royalshield.app.ui.theme.NeonOrange,
                             onClick = onNavigateToFileScan,
                             modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true
+                            borderAnimation = false
                         )
                     }
 
@@ -1054,7 +1082,7 @@ fun DashboardScreen(
                             neonColor = com.royalshield.app.ui.theme.NeonPink,
                             onClick = onNavigateToAiHub,
                             modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true
+                            borderAnimation = false
                         )
                         FeatureCard(
                             title = "Smart Home",
@@ -1063,7 +1091,7 @@ fun DashboardScreen(
                             neonColor = com.royalshield.app.ui.theme.NeonAqua,
                             onClick = onNavigateToAutomation,
                             modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true
+                            borderAnimation = false
                         )
                     }
 
@@ -1088,7 +1116,7 @@ fun DashboardScreen(
                             neonColor = com.royalshield.app.ui.theme.NeonGreen,
                             onClick = onNavigateToVpn,
                             modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true
+                            borderAnimation = false
                         )
                     }
 
@@ -1117,72 +1145,19 @@ fun DashboardScreen(
                         )
                     }
 
-                    // ROW 5: Tracking Shield
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        FeatureCard(
-                            title = "Tracking Shield",
-                            icon = Icons.Filled.LocationOn,
-                            imageRes = RoyalIcons.TrackingChild,
-                            neonColor = com.royalshield.app.ui.theme.NeonGreen,
-                            onClick = onNavigateToTrackingShield,
-                            modifier = Modifier.weight(1f).height(125.dp),
-                            borderAnimation = true
-                        )
-                        Box(modifier = Modifier.weight(1f))
-                    }
-
-                    // ROW 6: Integrated Surveillance Card
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .border(1.dp, Color(0xFFD4AF37).copy(alpha=0.5f), RoundedCornerShape(24.dp)),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0F13).copy(alpha = 0.8f))
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalAlignment = Alignment.Start
-                        ) {
-                            Text(
-                                text = "MONITORING & SURVEILLANCE",
-                                color = Color.White.copy(alpha=0.7f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                CyberButtonRect(
-                                    text = "Audio Guard",
-                                    icon = Icons.Filled.Mic,
-                                    color = com.royalshield.app.ui.theme.NeonOrange,
-                                    onClick = onNavigateToSoundDetection,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                CyberButtonRect(
-                                    text = "Security Cam",
-                                    icon = Icons.Filled.Videocam,
-                                    color = Color(0xFFD4AF37),
-                                    onClick = onNavigateToSecurityCamera,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    }
+                    // ROW 5: Tracking Shield spans the full hub width
+                    FeatureCard(
+                        title = "Tracking Shield",
+                        icon = Icons.Filled.LocationOn,
+                        imageRes = RoyalIcons.TrackingChild,
+                        neonColor = com.royalshield.app.ui.theme.NeonGreen,
+                        onClick = onNavigateToTrackingShield,
+                        modifier = Modifier.fillMaxWidth().height(138.dp),
+                        borderAnimation = false
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
-
-                CommandLogStatusPanel(
-                    items = dashboardState.actionItems,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                )
 
                 Spacer(modifier = Modifier.height(48.dp))
             }
@@ -1197,6 +1172,11 @@ private fun CommandLogStatusPanel(
 ) {
     val openItems = items.filterNot { it.status.equals("Resolved", ignoreCase = true) }
     val resolvedItems = items.size - openItems.size
+    val hasOpenItems = openItems.isNotEmpty()
+    val statusColor = if (hasOpenItems) Color(0xFFFF3B30) else Color(0xFF00FF94)
+    val statusIcon = if (hasOpenItems) Icons.Default.Error else Icons.Default.CheckCircle
+    val statusText = if (hasOpenItems) "ATTENTION" else "CLEAR"
+    var commandLogAcknowledged by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -1204,14 +1184,103 @@ private fun CommandLogStatusPanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "COMMAND LOG",
-                color = RoyalGold,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(RoyalGold.copy(alpha = 0.12f))
+                        .border(1.dp, RoyalGold.copy(alpha = 0.45f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = RoyalGold,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "COMMAND LOG",
+                            color = RoyalGold,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (commandLogAcknowledged) Color(0xFF00FF94).copy(alpha = 0.12f)
+                                    else RoyalGold.copy(alpha = 0.12f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (commandLogAcknowledged) Color(0xFF00FF94).copy(alpha = 0.5f)
+                                    else RoyalGold.copy(alpha = 0.45f),
+                                    CircleShape
+                                )
+                                .clickable { commandLogAcknowledged = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(
+                                    id = if (commandLogAcknowledged) {
+                                        R.drawable.ic_action_checkmark_green
+                                    } else {
+                                        R.drawable.ic_action_checkmark_gold
+                                    }
+                                ),
+                                contentDescription = "Command log acknowledged",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Home command center",
+                        color = Color.White.copy(alpha = 0.58f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(statusColor.copy(alpha = 0.12f))
+                        .border(1.dp, statusColor.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = statusText,
+                        color = statusColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 CommandArrowBadge(
                     iconRes = R.drawable.arrow_up,
                     tint = Color(0xFF00FF94),
@@ -1584,36 +1653,33 @@ fun QuickActionButton(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(8.dp)
     ) {
-        // Use vector icon immediately (no PNG decode overhead)
-        // Falls back to CyberButtonRound with PNG only if no vector provided
-        if (vectorIcon != null) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(Color(0xFF1A2A3A), Color(0xFF0A1220))
-                        ),
-                        CircleShape
-                    )
-                    .border(1.5.dp, RoyalGold.copy(alpha = 0.7f), CircleShape)
-                    .clickable { onClick() },
-                contentAlignment = Alignment.Center
-            ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.frame_gold_circle),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+            if (vectorIcon != null) {
                 Icon(
                     imageVector = vectorIcon,
                     contentDescription = label,
                     tint = RoyalGold,
-                    modifier = Modifier.size(30.dp)
+                    modifier = Modifier.size(28.dp)
+                )
+            } else if (iconRes != 0) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(32.dp)
                 )
             }
-        } else {
-            CyberButtonRound(
-                size = 72.dp,
-                icon = iconRes,
-                contentDescription = label,
-                onClick = onClick
-            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -1770,7 +1836,3 @@ fun MalwareScannerCard(
         }
     }
 }
-
-
-
-

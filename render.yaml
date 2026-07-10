@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: server-beckend
+    name: royal-shield-unified-api
     runtime: python
     region: ohio
     plan: free
+    branch: royalshield-v1.0.2-unified
     rootDir: royal_shield_backend_unified
     buildCommand: pip install -r requirements-render.txt
     startCommand: python -m uvicorn api.main:app --host 0.0.0.0 --port $PORT

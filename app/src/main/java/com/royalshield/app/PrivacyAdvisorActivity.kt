@@ -12,9 +12,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
@@ -33,9 +35,12 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.res.painterResource
 import com.royalshield.app.managers.PrivacyAdvisorManager
 import com.royalshield.app.managers.PrivacyApp
 import com.royalshield.app.managers.RiskLevel
@@ -62,11 +67,16 @@ class PrivacyAdvisorActivity : ComponentActivity() {
 fun PrivacyAdvisorScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var apps by remember { mutableStateOf<List<PrivacyApp>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    var hasStartedScan by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
     var scanProgress by remember { mutableFloatStateOf(0f) }
-    var currentAppName by remember { mutableStateOf("Initializing privacy scan...") }
+    var currentAppName by remember { mutableStateOf("Ready to start privacy scan...") }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(hasStartedScan) {
+        if (!hasStartedScan) return@LaunchedEffect
+        isLoading = true
+        scanProgress = 0f
+        currentAppName = "Initializing privacy scan..."
         withContext(Dispatchers.IO) {
             apps = PrivacyAdvisorManager.scanApps(context) { progress, appName ->
                 withContext(Dispatchers.Main) {
@@ -103,7 +113,55 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
             containerColor = Color.Transparent
         ) { padding ->
             Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-                if (isLoading) {
+                if (!hasStartedScan) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(500.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.55f)),
+                            shape = RoundedCornerShape(24.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, RoyalGold.copy(alpha = 0.28f))
+                        ) {
+                            PrivacyAdvisorScanVisual(
+                                progress = 0f,
+                                statusText = "Ready for privacy inspection",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = { hasStartedScan = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = RoyalGold)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Start Scan",
+                                color = Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                } else if (isLoading) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -111,143 +169,12 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Premium pulsing/rotating scanning effect
-                        Box(
-                            modifier = Modifier.size(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val infiniteTransition = rememberInfiniteTransition(label = "scanner")
-                            val rotation by infiniteTransition.animateFloat(
-                                initialValue = 0f,
-                                targetValue = 360f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(2000, easing = LinearEasing),
-                                    repeatMode = RepeatMode.Restart
-                                ),
-                                label = "rotation"
-                            )
-                            val pulseScale by infiniteTransition.animateFloat(
-                                initialValue = 0.85f,
-                                targetValue = 1.05f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1500, easing = FastOutSlowInEasing),
-                                    repeatMode = RepeatMode.Reverse
-                                ),
-                                label = "pulseScale"
-                            )
-                            
-                            // Outer pulsing glow
-                            Box(
-                                modifier = Modifier
-                                    .size(160.dp)
-                                    .scale(pulseScale)
-                                    .background(
-                                        Brush.radialGradient(
-                                            colors = listOf(
-                                                RoyalGold.copy(alpha = 0.2f),
-                                                Color.Transparent
-                                            )
-                                        ),
-                                        shape = RoundedCornerShape(100.dp)
-                                    )
-                            )
-                            
-                            // Rotating radar sweep
-                            Canvas(modifier = Modifier.size(160.dp)) {
-                                drawCircle(
-                                    color = RoyalGold.copy(alpha = 0.1f),
-                                    style = Stroke(width = 2.dp.toPx())
-                                )
-                                drawArc(
-                                    brush = Brush.sweepGradient(
-                                        colors = listOf(
-                                            RoyalGold.copy(alpha = 0.8f),
-                                            RoyalGold.copy(alpha = 0.0f)
-                                        )
-                                    ),
-                                    startAngle = rotation,
-                                    sweepAngle = 90f,
-                                    useCenter = true
-                                )
-                            }
-                            
-                            // Center Icon & Text
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = RoyalGold,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "${scanProgress.toInt()}%",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 28.sp
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(32.dp))
-                        
-                        // Golden Segmented Progress Bar (matches Security Scan style)
-                        Box(
+                        PrivacyAdvisorScanVisual(
+                            progress = scanProgress,
+                            statusText = currentAppName,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(16.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF222222))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(scanProgress / 100f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(
-                                                Color(0xFF8B6914),
-                                                RoyalGold,
-                                                Color(0xFFFFD700),
-                                                RoyalGold
-                                            )
-                                        )
-                                    )
-                            )
-                            
-                            // Segment dividers
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                repeat(12) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(2.dp)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFF0A0A0A))
-                                    )
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Status info text
-                        Text(
-                            text = currentAppName,
-                            color = Color.LightGray,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Analyzing app permissions for privacy risks...",
-                            color = Color.Gray,
-                            fontSize = 12.sp
+                                .height(560.dp)
                         )
                     }
                 } else {
@@ -314,6 +241,204 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PrivacyAdvisorScanVisual(
+    progress: Float,
+    statusText: String,
+    modifier: Modifier = Modifier
+) {
+    val clampedProgress = progress.coerceIn(0f, 100f)
+    val infiniteTransition = rememberInfiniteTransition(label = "privacy_gold_visual")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(7000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "privacyRingRotation"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.34f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "privacyGlow"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFF070708))
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val points = listOf(
+                Offset(size.width * 0.12f, size.height * 0.15f),
+                Offset(size.width * 0.28f, size.height * 0.24f),
+                Offset(size.width * 0.22f, size.height * 0.37f),
+                Offset(size.width * 0.06f, size.height * 0.50f),
+                Offset(size.width * 0.74f, size.height * 0.08f),
+                Offset(size.width * 0.88f, size.height * 0.20f),
+                Offset(size.width * 0.80f, size.height * 0.36f),
+                Offset(size.width * 0.94f, size.height * 0.52f),
+                Offset(size.width * 0.62f, size.height * 0.68f),
+                Offset(size.width * 0.45f, size.height * 0.58f),
+                Offset(size.width * 0.30f, size.height * 0.74f),
+                Offset(size.width * 0.78f, size.height * 0.86f),
+                Offset(size.width * 0.92f, size.height * 0.78f)
+            )
+            val connections = listOf(
+                0 to 1, 1 to 2, 2 to 3, 4 to 5, 5 to 6, 6 to 7,
+                8 to 9, 9 to 10, 11 to 12, 4 to 6, 8 to 11
+            )
+            connections.forEach { (start, end) ->
+                drawLine(
+                    color = RoyalGold.copy(alpha = 0.12f),
+                    start = points[start],
+                    end = points[end],
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+            points.forEachIndexed { index, point ->
+                drawCircle(
+                    color = RoyalGold.copy(alpha = if (index % 3 == 0) 0.92f else 0.42f),
+                    radius = if (index % 3 == 0) 3.3.dp.toPx() else 2.dp.toPx(),
+                    center = point
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 26.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier.size(210.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                RoyalGold.copy(alpha = glowAlpha),
+                                RoyalGold.copy(alpha = 0.08f),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = size.minDimension * 0.48f
+                        )
+                    )
+                    drawCircle(
+                        color = RoyalGold.copy(alpha = 0.75f),
+                        radius = size.minDimension * 0.43f,
+                        style = Stroke(width = 1.4.dp.toPx())
+                    )
+                    drawCircle(
+                        color = RoyalGold.copy(alpha = 0.38f),
+                        radius = size.minDimension * 0.34f,
+                        style = Stroke(
+                            width = 1.8.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                floatArrayOf(14f, 14f),
+                                -rotation
+                            )
+                        )
+                    )
+                    drawArc(
+                        color = RoyalGold,
+                        startAngle = rotation,
+                        sweepAngle = 96f,
+                        useCenter = false,
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                    tint = RoyalGold,
+                    modifier = Modifier.size(92.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(x = 48.dp, y = 42.dp)
+                        .size(52.dp)
+                        .background(Color(0xFFFFD400), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = "R O Y A L   S H I E L D",
+                color = Color(0xFFFFD400),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                text = "C H E C K I N G   F I R E W A L L . . .",
+                color = Color.White.copy(alpha = 0.78f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth((clampedProgress / 100f).coerceAtLeast(0.08f))
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFFFEFA3), Color(0xFFFFD400), RoyalGold)
+                            )
+                        )
+                )
+            }
+            Spacer(modifier = Modifier.height(22.dp))
+            Text(
+                text = "SCANNING SYSTEM: ${clampedProgress.toInt()}%",
+                color = Color(0xFFFFD400),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = statusText,
+                color = Color.White.copy(alpha = 0.64f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
         }
     }
 }

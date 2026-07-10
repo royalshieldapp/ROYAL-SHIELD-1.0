@@ -11,6 +11,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +41,12 @@ import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.managers.PreferencesManager
 import android.widget.Toast
 import com.royalshield.app.SosManager
+
+private enum class SettingsContentWindow(val title: String) {
+    ContactSupport("Contact Support"),
+    PrivacyPolicy("Privacy Policy"),
+    TermsAndConditions("Terms & Conditions")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +67,7 @@ fun SettingsScreen(
 
     var vibrationEnabled by remember { mutableStateOf(PreferencesManager.isVibrationEnabled()) }
     var historyEnabled by remember { mutableStateOf(PreferencesManager.isHistoryEnabled()) }
+    var activeContentWindow by remember { mutableStateOf<SettingsContentWindow?>(null) }
 
 
 
@@ -380,7 +390,7 @@ fun SettingsScreen(
                             icon = Icons.Default.Security,
                             color = CyberCyan,
                             onClick = {
-                                Toast.makeText(context, "Opening Privacy Policy...", Toast.LENGTH_SHORT).show()
+                                activeContentWindow = SettingsContentWindow.PrivacyPolicy
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -389,7 +399,7 @@ fun SettingsScreen(
                             icon = Icons.Default.Description,
                             color = RoyalGold,
                             onClick = {
-                                Toast.makeText(context, "Opening Terms & Conditions...", Toast.LENGTH_SHORT).show()
+                                activeContentWindow = SettingsContentWindow.TermsAndConditions
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -406,7 +416,7 @@ fun SettingsScreen(
                         icon = Icons.Default.Email,
                         color = CyberCyan,
                         onClick = {
-                            Toast.makeText(context, "Opening Email Client...", Toast.LENGTH_SHORT).show()
+                            activeContentWindow = SettingsContentWindow.ContactSupport
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -421,9 +431,9 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        CyberButtonRect(
+                        SocialActionButton(
                             text = "Instagram",
-                            icon = Icons.Default.CameraAlt,
+                            iconRes = com.royalshield.app.R.drawable.ic_social_instagram,
                             color = Color(0xFFE1306C),
                             onClick = {
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://instagram.com/royalshieldapp"))
@@ -431,9 +441,9 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        CyberButtonRect(
+                        SocialActionButton(
                             text = "Facebook",
-                            icon = Icons.Default.ThumbUp,
+                            iconRes = com.royalshield.app.R.drawable.ic_social_facebook,
                             color = Color(0xFF1877F2),
                             onClick = {
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.facebook.com/profile.php?id=61573434707140"))
@@ -441,11 +451,14 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        CyberButtonRect(
+                        SocialActionButton(
                             text = "YouTube",
-                            icon = Icons.Default.PlayArrow,
+                            iconRes = com.royalshield.app.R.drawable.ic_social_youtube,
                             color = Color(0xFFFF0000),
-                            onClick = { Toast.makeText(context, "Opening YouTube...", Toast.LENGTH_SHORT).show() },
+                            onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://youtube.com/@royalshield"))
+                                context.startActivity(intent)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -479,8 +492,90 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+
+        activeContentWindow?.let { window ->
+            EmptySettingsContentDialog(
+                title = window.title,
+                onDismiss = { activeContentWindow = null }
+            )
+        }
     }
 }
+}
+
+@Composable
+private fun EmptySettingsContentDialog(
+    title: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = RoyalGold)
+            }
+        },
+        title = {
+            Text(
+                text = title,
+                color = RoyalGold,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .background(Color(0xFF101014), RoundedCornerShape(12.dp))
+            )
+        },
+        containerColor = Color(0xFF151515),
+        titleContentColor = RoyalGold,
+        textContentColor = Color.White
+    )
+}
+
+@Composable
+private fun SocialActionButton(
+    text: String,
+    iconRes: Int,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier
+            .height(56.dp)
+            .border(BorderStroke(1.dp, color.copy(alpha = 0.65f)), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = Color(0xFF151515).copy(alpha = 0.95f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = iconRes),
+                contentDescription = text,
+                modifier = Modifier.size(30.dp),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit
+            )
+            Text(
+                text = text.uppercase(),
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            )
+        }
+    }
 }
 
 

@@ -113,6 +113,87 @@ fun getIconForName(name: String): ImageVector? {
     }
 }
 
+@Composable
+private fun SubNodeIconGrid(node: EngineNode) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        node.subNodes.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowItems.forEach { subNode ->
+                    val isWarning = subNode.status.equals("WARNING", ignoreCase = true)
+                    val accent = if (isWarning) Color(0xFFFF5252) else CyberCyan
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 58.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.035f))
+                            .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(14.dp))
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(accent.copy(alpha = 0.12f), CircleShape)
+                                .border(1.dp, accent.copy(alpha = 0.45f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val icon = getIconForName(subNode.name)
+                            if (icon != null) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = subNode.name,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = subNode.name
+                                        .split(" ")
+                                        .mapNotNull { it.firstOrNull()?.toString() }
+                                        .joinToString("")
+                                        .take(2)
+                                        .uppercase(),
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = subNode.name,
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 12.sp,
+                                maxLines = 2
+                            )
+                            Text(
+                                text = subNode.status,
+                                color = accent,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.4.sp
+                            )
+                        }
+                    }
+                }
+                if (rowItems.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
 data class SubNode(
     val name: String,
     val description: String,
@@ -142,7 +223,7 @@ fun SolutionEngineScreen(
     var currentLog by remember { mutableStateOf("Ready for telemetry scanning...") }
     var showLegendDialog by remember { mutableStateOf(false) }
     var showSubFlowDialog by remember { mutableStateOf(false) }
-    var is3DMode by remember { mutableStateOf(false) }
+    var is3DMode by remember { mutableStateOf(true) }
     
     // Nodes state representation
     val nodes = remember {
@@ -780,6 +861,10 @@ fun SolutionEngineScreen(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        SubNodeIconGrid(node = selectedNode)
 
                         Spacer(modifier = Modifier.height(12.dp))
 
