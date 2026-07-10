@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.royalshield.app.subscription.EntitlementStore
 import com.royalshield.app.subscription.SubscriptionTier
 import com.royalshield.app.ui.theme.RoyalGold
 
@@ -24,7 +25,8 @@ fun RequireTier(
     onNavigateToPlans: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    if (currentTier.isAtLeast(requiredTier)) {
+    // SUPERPOWERS: Bypass all tier gates
+    if (EntitlementStore.DEV_SUPERPOWERS || currentTier.isAtLeast(requiredTier)) {
         content()
     } else {
         LockedUpsellCard(requiredTier, onNavigateToPlans)
