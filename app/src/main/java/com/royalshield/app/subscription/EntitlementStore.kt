@@ -28,6 +28,9 @@ class EntitlementStore(context: Context) {
     }
 
     private fun getSavedTier(): SubscriptionTier {
+        // SUPERPOWERS MODE: Force ULTIMATE tier for full access during development
+        if (DEV_SUPERPOWERS) return SubscriptionTier.ULTIMATE
+
         val tierName = prefs.getString(KEY_TIER, SubscriptionTier.FREE.name) ?: SubscriptionTier.FREE.name
         return try {
             SubscriptionTier.valueOf(tierName)
@@ -38,5 +41,12 @@ class EntitlementStore(context: Context) {
 
     companion object {
         private const val KEY_TIER = "subscription_tier_v1"
+        
+        /**
+         * SUPERPOWERS MODE: When true, forces ULTIMATE tier on startup.
+         * All features, skills, and capabilities are fully unlocked.
+         * Set to false before production release.
+         */
+        const val DEV_SUPERPOWERS = true
     }
 }
