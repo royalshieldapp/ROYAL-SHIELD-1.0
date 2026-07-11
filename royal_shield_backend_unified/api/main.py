@@ -37,17 +37,17 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    logger.info("🚀 Starting Royal Shield Unified Backend v2.0.0...")
+    logger.info("Starting Royal Shield Unified Backend v2.0.0...")
     logger.info(f"Environment: {settings.environment}")
     init_db()
-    logger.info("✅ Backend started successfully")
+    logger.info("Backend started successfully")
 
     yield
 
     # Shutdown
-    logger.info("🛑 Shutting down Royal Shield Backend...")
+    logger.info("Shutting down Royal Shield Backend...")
     close_db()
-    logger.info("✅ Backend shutdown complete")
+    logger.info("Backend shutdown complete")
 
 
 # Create FastAPI app

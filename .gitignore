@@ -48,6 +48,9 @@ render-mcp-server/
 *.bat
 keystore/
 backend/
+!backend/
+!backend/routes/
+!backend/routes/risk.js
 royal_shield_backend/
 !royal_shield_backend_unified/
 !royal_shield_backend_unified/**/

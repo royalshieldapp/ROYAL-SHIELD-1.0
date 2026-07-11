@@ -1,28 +1,18 @@
 services:
   - type: web
-    name: royal-shield-unified-api
-    runtime: python
+    name: server-beckend
+    runtime: node
     region: ohio
     plan: free
     branch: royalshield-v1.0.2-unified
-    rootDir: royal_shield_backend_unified
-    buildCommand: pip install -r requirements-render.txt
-    startCommand: python -m uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.13
-      - key: ENVIRONMENT
+      - key: NODE_ENV
         value: production
-      - key: LOG_LEVEL
-        value: INFO
-      - key: LOG_FILE
-        value: logs/royal_shield_backend.log
-      - key: DATABASE_URL
-        fromDatabase:
-          name: royal-shield-postgres
-          property: connectionString
       - key: API_INTERNAL_SECRET
         generateValue: true
       - key: JWT_SECRET
@@ -39,8 +29,3 @@ services:
         sync: false
       - key: DID_API_KEY
         sync: false
-
-databases:
-  - name: royal-shield-postgres
-    databaseName: royal_shield_risk_db
-    user: royal_shield
