@@ -141,4 +141,24 @@ class RiskPredictionRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun getMapLayers(
+        minLat: Double,
+        minLng: Double,
+        maxLat: Double,
+        maxLng: Double,
+        layers: String = "cameras,police,speed,protest,theft,cyber"
+    ): Result<MapLayersResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMapLayers(minLat, minLng, maxLat, maxLng, layers)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!)
+            } else {
+                Result.failure(Exception("Failed to fetch map layers"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching map layers: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }

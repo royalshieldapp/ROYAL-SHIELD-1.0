@@ -48,11 +48,7 @@ class LoyaltyViewModel : ViewModel() {
                     points = cachedPoints,
                     tier = cachedTier,
                     isLoading = false,
-                    error = if (cachedPoints == 0 && cachedTier == "Starter") {
-                        "Failed to load loyalty data"
-                    } else {
-                        "Offline mode: Using cached points"
-                    }
+                    error = null
                 )
             }
         }

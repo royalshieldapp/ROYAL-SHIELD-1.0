@@ -105,12 +105,12 @@ class XdrViewModel(application: Application) : AndroidViewModel(application) {
             val txDiffMb = accumulatedTxMb - previousTxMb
             val txSpeedMbps = txDiffMb / timeDiff
             
-            // Si la velocidad de subida supera los 15 MB/s de repente, disparamos alerta
+            // If upload speed suddenly exceeds 15 MB/s, trigger an alert.
             if (txSpeedMbps > 15f) {
                 com.royalshield.app.util.NotificationUtils.showSecurityAlert(
                     app,
-                    title = "ALERTA XDR: CONEXIÓN ANÓMALA",
-                    message = "Pico inusual de datos enviados detectado (${String.format("%.1f", txSpeedMbps)} MB/s). Posible exfiltración.",
+                    title = "XDR ALERT: ANOMALOUS CONNECTION",
+                    message = "Unusual outbound data spike detected (${String.format("%.1f", txSpeedMbps)} MB/s). Possible exfiltration.",
                     isCritical = true
                 )
             }
@@ -159,8 +159,8 @@ class XdrViewModel(application: Application) : AndroidViewModel(application) {
         if (isRooted && exposedCounter > 0) { // Check exposedCounter to just trace
              com.royalshield.app.util.NotificationUtils.showSecurityAlert(
                 app,
-                title = "ALERTA XDR: SO COMPROMETIDO",
-                message = "Se detectó acceso Root (Escalamiento de Privilegios). El dispositivo es vulnerable.",
+                title = "XDR ALERT: COMPROMISED OS",
+                message = "Root access detected (privilege escalation). The device is vulnerable.",
                 isCritical = true
              )
         }

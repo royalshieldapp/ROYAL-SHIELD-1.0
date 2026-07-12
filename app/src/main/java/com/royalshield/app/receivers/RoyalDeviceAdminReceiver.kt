@@ -20,8 +20,8 @@ class RoyalDeviceAdminReceiver : DeviceAdminReceiver() {
                 // Trigger formal BRUTE FORCE alert
                 NotificationUtils.showSecurityAlert(
                     context,
-                    title = "ALERTA: INTENTO DE FUERZA BRUTA",
-                    message = "Múltiples intentos fallidos para desbloquear el dispositivo ($failedAttempts).",
+                    title = "ALERT: BRUTE FORCE ATTEMPT",
+                    message = "Multiple failed attempts to unlock the device ($failedAttempts).",
                     isCritical = true
                 )
             }

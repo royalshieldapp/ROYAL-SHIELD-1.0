@@ -1,23 +1,32 @@
 services:
   - type: web
     name: server-beckend
-    runtime: node
+    runtime: python
     region: ohio
     plan: free
-    branch: royalshield-v1.0.2-unified
-    rootDir: backend
-    buildCommand: npm ci --omit=dev
-    startCommand: npm start
+    branch: main
+    buildCommand: pip install -r royal_shield_backend_unified/requirements-render.txt
+    startCommand: cd royal_shield_backend_unified && uvicorn api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
-      - key: NODE_ENV
+      - key: ENVIRONMENT
         value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FILE
+        value: logs/royal_shield_backend.log
+      - key: DATABASE_URL
+        sync: false
       - key: API_INTERNAL_SECRET
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      - key: CORS_ORIGINS
+        value: https://royalshield.app
       - key: VIRUSTOTAL_API_KEY
+        sync: false
+      - key: VT_API_KEY
         sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
@@ -25,7 +34,49 @@ services:
         sync: false
       - key: TWILIO_PHONE_NUMBER
         sync: false
+      - key: TWILIO_FROM
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
         sync: false
       - key: DID_API_KEY
         sync: false
+      - key: NUMVERIFY_API_KEY
+        sync: false
+      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: FBI_CRIME_API_KEY
+        sync: false
+      - key: MIAMI_DADE_APP_TOKEN
+        sync: false
+      - key: NASA_FIRMS_API_KEY
+        sync: false
+      - key: NOAA_CDO_TOKEN
+        sync: false
+      - key: OVERPASS_API_URL
+        value: https://overpass-api.de/api/interpreter
+      - key: NEWS_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_ENVIRONMENT
+        value: us-west1-gcp
+      - key: PINECONE_INDEX_NAME
+        value: royal-shield-zones
+      - key: USE_LOCAL_EMBEDDINGS
+        value: "true"
+      - key: ENABLE_CRIME_COLLECTION
+        value: "true"
+      - key: ENABLE_ENVIRONMENTAL_COLLECTION
+        value: "false"
+      - key: ENABLE_OSINT_COLLECTION
+        value: "false"
+      - key: ENABLE_CAMERA_INTEGRATION
+        value: "false"
+      - key: ENABLE_ML_PREDICTIONS
+        value: "true"
+      - key: ENABLE_VECTOR_SEARCH
+        value: "false"

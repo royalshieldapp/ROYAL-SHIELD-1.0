@@ -64,6 +64,12 @@
             </intent-filter>
         </service>
 
+        <service android:name="com.wireguard.android.backend.GoBackend$VpnService" android:permission="android.permission.BIND_VPN_SERVICE" android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService"/>
+            </intent-filter>
+        </service>
+
         <!-- Location Tracking Service -->
         <service android:name=".services.LocationTrackerService" android:enabled="true" android:exported="false" android:foregroundServiceType="location" />
 
@@ -71,7 +77,7 @@
 
         <!-- AdMob App ID (Test - Replace with real ID when you get it from AdMob Console) -->
         <!-- Real Advertiser ID: db201234-2403-4297-8158-10ca1ad1abe1 (needs to be registered in AdMob) -->
-        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${ADMOB_APP_ID}"/>
 
 
         <!-- Main Activity (LAUNCHER) -->

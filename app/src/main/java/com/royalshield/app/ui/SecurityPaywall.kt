@@ -244,7 +244,7 @@ fun SecurityPaywallScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(id = com.royalshield.app.R.drawable.btn_unlock_premium),
+                            painter = androidx.compose.ui.res.painterResource(id = com.royalshield.app.R.drawable.gold_pill_button),
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = androidx.compose.ui.layout.ContentScale.FillBounds

@@ -37,6 +37,7 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
         observeData()
         startLastUpdateTicker()
         loadHotspots()
+        loadMapLayers()
     }
 
     private fun checkRole() {
@@ -165,6 +166,20 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
             )
         )
         _uiState.value = _uiState.value.copy(hotspots = simulated)
+    }
+
+    fun loadMapLayers(
+        minLat: Double = 25.62,
+        minLng: Double = -80.33,
+        maxLat: Double = 25.90,
+        maxLng: Double = -80.10
+    ) {
+        viewModelScope.launch {
+            riskRepo.getMapLayers(minLat, minLng, maxLat, maxLng)
+                .onSuccess { response ->
+                    _uiState.value = _uiState.value.copy(mapLayers = response.layers)
+                }
+        }
     }
 
     /** Refreshes "last update: Xs ago" text every second */

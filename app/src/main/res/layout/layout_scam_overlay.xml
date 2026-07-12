@@ -12,8 +12,8 @@
 
     <TextView android:id="@+id/tv_scam_phone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="+1 (234) 567-8901" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" />
 
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Potencial Deepfake detectado. El audio puede ser sintético." android:textColor="#CCCCCC" android:textSize="12sp" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Potential deepfake detected. The audio may be synthetic." android:textColor="#CCCCCC" android:textSize="12sp" />
 
-    <Button android:id="@+id/btn_close_overlay" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:backgroundTint="#FFD700" android:text="CERRAR ALERTA" android:textColor="#000000" android:textStyle="bold" />
+    <Button android:id="@+id/btn_close_overlay" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:backgroundTint="#FFD700" android:text="CLOSE ALERT" android:textColor="#000000" android:textStyle="bold" />
 
 </LinearLayout>

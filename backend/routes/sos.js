@@ -12,6 +12,16 @@ function getTwilioClient() {
     return require('twilio')(accountSid, authToken);
 }
 
+function getTwilioSender() {
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    if (messagingServiceSid) {
+        return { messagingServiceSid };
+    }
+
+    const from = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM;
+    return from ? { from } : null;
+}
+
 /**
  * POST /api/sos/alert
  * Body: { location: { lat, lng }, type: "EMERGENCY"|"MEDICAL"|"FIRE", contacts: ["+1234567890", ...] }
@@ -36,11 +46,11 @@ router.post('/alert', async (req, res) => {
     console.log(`[SOS] Incident ${incidentId} | type=${type} | contacts=${contacts.length}`);
 
     const client = getTwilioClient();
-    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    const sender = getTwilioSender();
 
-    if (!client || !fromNumber) {
+    if (!client || !sender) {
         // Graceful degradation — acknowledge but warn
-        console.warn('[SOS] Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in .env');
+        console.warn('[SOS] Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER/TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID in .env');
         return res.json({
             success: true,
             incidentId,
@@ -54,7 +64,7 @@ router.post('/alert', async (req, res) => {
         contacts.map(to =>
             client.messages.create({
                 body: message,
-                from: fromNumber,
+                ...sender,
                 to
             })
         )

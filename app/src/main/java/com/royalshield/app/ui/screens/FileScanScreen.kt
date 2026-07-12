@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -17,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -83,6 +86,25 @@ fun FileScanScreen(
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_automation_bg),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color.Black.copy(alpha = 0.35f),
+                            0.65f to Color.Black.copy(alpha = 0.72f),
+                            1.0f to Color.Black.copy(alpha = 0.9f)
+                        )
+                    )
+            )
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -91,7 +113,7 @@ fun FileScanScreen(
                 when (val state = scanState) {
                     is ScanState.Idle -> {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_folder_scan_gold), 
+                            painter = painterResource(id = R.drawable.scan_files), 
                             contentDescription = null, 
                             modifier = Modifier.size(120.dp)
                         )

@@ -1,0 +1,27 @@
+# Android local configuration template.
+# Copy the keys you need into local.properties and keep real values out of git.
+
+sdk.dir=C:\\Users\\Anonymous\\AppData\\Local\\Android\\Sdk
+
+VIRUSTOTAL_API_KEY=
+GEMINI_API_KEY=
+MAPS_API_KEY=
+ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
+ALIENVAULT_API_KEY=
+DID_API_KEY=
+
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+
+LOYALTY_API_URL=https://server-beckend.onrender.com/api/loyalty
+API_BASE_URL=https://server-beckend.onrender.com
+
+FIREBASE_APP_DEBUG_TOKEN=
+
+RELEASE_KEYSTORE_PATH=../keystore/royal_shield.jks
+RELEASE_KEYSTORE_PASSWORD=
+RELEASE_KEY_ALIAS=
+RELEASE_KEY_PASSWORD=
+
+org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jbr

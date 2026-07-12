@@ -157,10 +157,11 @@ async def api_info():
 # ==============================================================================
 
 # Risk Prediction Engine routes (from original Python backend)
-from api.routes import risk_maps, hotspots, predictions
+from api.routes import risk_maps, hotspots, predictions, map_layers
 app.include_router(risk_maps.router)
 app.include_router(hotspots.router)
 app.include_router(predictions.router)
+app.include_router(map_layers.router)
 
 # App Service routes (ported from Node.js backend)
 from api.routes import phone, sos, scan, threats, loyalty, business, courses, system, threat_map, xr

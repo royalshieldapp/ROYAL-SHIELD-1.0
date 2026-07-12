@@ -1,4 +1,4 @@
-package com.royalshield.app.ui.components
+﻿package com.royalshield.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,7 +56,7 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
     LaunchedEffect(Unit) {
         if (messages.isEmpty()) {
             delay(500)
-            messages.add(AgentMessage(text = "🛡️ Royal Shield AI Online.\n\nHola. Hello. Olá. Bonjour.\n\nI speak all languages. How can I protect you today?", isUser = false))
+            messages.add(AgentMessage(text = "Royal Shield AI Online.\n\nI am ready to help protect you. How can I assist today?", isUser = false))
         }
     }
 
@@ -108,7 +108,7 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "Cerrar", tint = Color.Gray)
+                        Icon(Icons.Default.Close, "Close", tint = Color.Gray)
                     }
                 }
 
@@ -245,34 +245,12 @@ fun onSendMessage(text: String, messages: MutableList<AgentMessage>, scope: kotl
 
 fun getAgentResponse(query: String): String {
     val q = query.lowercase().trim()
-    
-    // LANGUAGE DETECTION LOGIC
-    val isSpanish = q.any { it in "áéíóúñ" } || q.contains("hola") || q.contains("gracias") || q.contains("como") || q.contains("seguridad")
-    val isPortuguese = q.contains("olá") || q.contains("obrigado") || q.contains("segurança") || q.contains("como estai")
-    val isFrench = q.contains("bonjour") || q.contains("merci") || q.contains("securite") || q.contains("comment")
-    
+
     return when {
-         // SPANISH RESPONSES
-         isSpanish && (q.contains("hola") || q.contains("buenos")) -> "Hola, Oficial. Sistemas listos."
-         isSpanish && (q.contains("scan") || q.contains("analisis") || q.contains("virus")) -> "Iniciando escaneo profundo... Sin amenazas detectadas en este momento."
-         isSpanish && (q.contains("sos") || q.contains("ayuda")) -> "Protocolo SOS en espera. Presione el botón ROJO en el panel para activar la baliza de emergencia."
-         isSpanish && (q.contains("quien eres") || q.contains("nombre")) -> "Soy Royal AI, su asistente de ciberseguridad personal."
-         isSpanish -> "Entendido. Procesando su solicitud en español: '$query'. Sistemas seguros."
-
-         // PORTUGUESE RESPONSES
-         isPortuguese && (q.contains("olá") || q.contains("oi")) -> "Olá! Sistemas de segurança ativos e prontos."
-         isPortuguese && (q.contains("sos") || q.contains("ajuda")) -> "SOS em espera. Pressione o botão VERMELHO para emergência."
-         isPortuguese -> "Entendido. Processando em Português: '$query'. Tudo seguro."
-
-         // FRENCH RESPONSES
-         isFrench && (q.contains("bonjour") || q.contains("salut")) -> "Bonjour. Systèmes de sécurité actifs."
-         isFrench -> "Bien reçu. Traitement en Français: '$query'."
-
-         // ENGLISH (DEFAULT)
-         q.contains("hi") || q.contains("hello") -> "Greetings. Security systems nominal."
-         q.contains("scan") || q.contains("check") -> "Running diagnostics... System integrity 100%."
-         q.contains("sos") || q.contains("help") -> "SOS Protocol standby. Press the RED button on the dashboard for immediate extraction."
-         q.contains("who are you") -> "I am Royal AI, your personal cybersecurity defense agent."
-         else -> "Command received: '$query'. \n\nI speak EN, ES, PT, FR. How can I assist?"
+        q.contains("hi") || q.contains("hello") -> "Greetings. Security systems nominal."
+        q.contains("scan") || q.contains("check") -> "Running diagnostics... System integrity 100%."
+        q.contains("sos") || q.contains("help") -> "SOS Protocol standby. Press the RED button on the dashboard for immediate extraction."
+        q.contains("who are you") -> "I am Royal AI, your personal cybersecurity defense agent."
+        else -> "Command received: '$query'.\n\nHow can I assist?"
     }
 }

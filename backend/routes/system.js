@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
+function getVirusTotalApiKey() {
+    return process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY;
+}
+
 /**
  * GET /api/system/status
  * Returns REAL service status — checks each service availability.
@@ -12,7 +16,8 @@ router.get('/status', async (req, res) => {
     const startTime = Date.now();
 
     // Check VirusTotal
-    checks.scanner = process.env.VIRUSTOTAL_API_KEY && process.env.VIRUSTOTAL_API_KEY !== 'your_virustotal_key_here'
+    const virusTotalApiKey = getVirusTotalApiKey();
+    checks.scanner = virusTotalApiKey && virusTotalApiKey !== 'your_virustotal_key_here'
         ? 'READY' : 'NOT_CONFIGURED';
 
     // Check Twilio

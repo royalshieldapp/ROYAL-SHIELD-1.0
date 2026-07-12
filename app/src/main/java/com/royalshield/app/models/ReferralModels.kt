@@ -29,7 +29,7 @@ enum class ActivationMode {
     
     fun getDescription(): String = when(this) {
         REGISTER -> "Al completar registro"
-        VERIFY -> "Al verificar email o teléfono"
+        VERIFY -> "After verifying email or phone"
         PAY -> "Al realizar primer pago"
     }
 }
@@ -129,12 +129,12 @@ data class DuoRequest(
 ) : Parcelable
 
 enum class DuoRequestStatus {
-    WAITING_ACTIVATION,    // Esperando cumplir condición
-    ACTIVATED;             // Duo activo
+    WAITING_ACTIVATION,    // Waiting for activation condition
+    ACTIVATED;             // Duo active
     
     fun getDisplayName(): String = when(this) {
-        WAITING_ACTIVATION -> "Esperando activación"
-        ACTIVATED -> "Duo activo"
+        WAITING_ACTIVATION -> "Waiting for activation"
+        ACTIVATED -> "Duo active"
     }
 }
 

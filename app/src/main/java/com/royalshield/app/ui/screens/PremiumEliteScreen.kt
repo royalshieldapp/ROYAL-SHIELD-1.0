@@ -237,7 +237,7 @@ fun PremiumEliteScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.btn_unlock_premium),
+                        painter = painterResource(id = R.drawable.gold_pill_button),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.FillBounds

@@ -91,7 +91,7 @@ class FileScanActivity : ComponentActivity() {
         ) {
             // Hero Image (Golden Folder)
             Image(
-                painter = painterResource(id = R.drawable.ic_folder_scan_gold),
+                painter = painterResource(id = R.drawable.scan_files),
                 contentDescription = "Scan Folder",
                 modifier = Modifier.size(120.dp)
             )

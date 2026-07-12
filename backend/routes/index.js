@@ -12,6 +12,7 @@ const scanRoutes = require('./scan');
 const businessRoutes = require('./business');
 const mockupRoutes = require('./mockups');
 const riskRoutes = require('./risk');
+const locationRoutes = require('./location');
 
 // ─── New Routes (v2.0) ──────────────────────────────────────────────
 const assistantRoutes = require('./assistant');
@@ -31,6 +32,7 @@ router.use('/scan', scanRoutes);
 router.use('/business', businessRoutes);
 router.use('/mockups', mockupRoutes);
 router.use('/v1', riskRoutes);
+router.use('/location', locationRoutes);
 
 // v2.0 endpoints
 router.use('/assistant', assistantRoutes);

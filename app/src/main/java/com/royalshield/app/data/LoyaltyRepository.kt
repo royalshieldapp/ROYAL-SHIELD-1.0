@@ -6,11 +6,16 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 object LoyaltyRepository {
     private const val TAG = "LoyaltyRepository"
     private val BASE_URL = com.royalshield.app.BuildConfig.LOYALTY_API_URL
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(35, TimeUnit.SECONDS)
+        .writeTimeout(12, TimeUnit.SECONDS)
+        .build()
     private val JSON = "application/json; charset=utf-8".toMediaTypeOrNull()
 
     fun syncPoints(points: Int, action: String = "app_activity", onResult: (Boolean, Int?) -> Unit) {
@@ -55,6 +60,7 @@ object LoyaltyRepository {
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                Log.e(TAG, "Status failed for $BASE_URL", e)
                 onResult(false, null, null)
             }
 
@@ -66,6 +72,7 @@ object LoyaltyRepository {
                     val tier = json.optString("tier", "Bronze")
                     onResult(true, points, tier)
                 } else {
+                    Log.e(TAG, "Status error: ${response.code}")
                     onResult(false, null, null)
                 }
                 response.close()

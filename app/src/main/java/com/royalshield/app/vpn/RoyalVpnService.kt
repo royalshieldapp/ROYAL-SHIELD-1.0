@@ -10,136 +10,122 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.royalshield.app.R
-import kotlinx.coroutines.*
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.nio.ByteBuffer
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.android.backend.Tunnel
+import com.wireguard.config.Config
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 
 /**
- * VPN Service
- * Handles VPN connection lifecycle (Base setup without fake tunnels)
+ * Orchestrates the real WireGuard userspace backend.
+ * No local packet sink or fake tunnel is used here.
  */
 class RoyalVpnService : VpnService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
-    private var vpnInterface: android.os.ParcelFileDescriptor? = null
-    private var packetLoopJob: Job? = null
+    private val backend by lazy { GoBackend(applicationContext) }
+    private val tunnel = object : Tunnel {
+        override fun getName(): String = "RoyalShieldVPN"
+
+        override fun onStateChange(newState: Tunnel.State) {
+            Log.i(TAG, "WireGuard tunnel state: $newState")
+        }
+    }
+    private var statsJob: Job? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_CONNECT -> {
                 val config = intent.getStringExtra(EXTRA_CONFIG)
-                if (config != null) {
-                    establishVpn(config)
-                } else {
-                    Log.e(TAG, "VPN config is null")
+                if (config.isNullOrBlank()) {
+                    Log.e(TAG, "VPN config is missing")
                     sendBroadcast(Intent(ACTION_VPN_MISSING_CONFIG))
                     stopSelf()
+                } else {
+                    establishVpn(config)
                 }
             }
-            ACTION_DISCONNECT -> {
-                disconnect()
-            }
+            ACTION_DISCONNECT -> disconnect()
         }
         return START_STICKY
     }
 
-    private fun establishVpn(config: String) {
-        Log.i(TAG, "Establishing VPN connection...")
-        try {
-            // Configure local loopback VPN builder
-            val builder = Builder()
-                .setSession("RoyalShieldVPN")
-                .addAddress("10.0.0.2", 32)
-                .addRoute("0.0.0.0", 0)
-                .addDnsServer("8.8.8.8")
+    private fun establishVpn(configText: String) {
+        serviceScope.launch {
+            try {
+                Log.i(TAG, "Starting WireGuard VPN connection...")
+                val config = Config.parse(ByteArrayInputStream(configText.toByteArray(Charsets.UTF_8)))
 
-            vpnInterface = builder.establish()
+                withContext(Dispatchers.Main) {
+                    startForeground(NOTIFICATION_ID, createNotification())
+                }
 
-            if (vpnInterface != null) {
-                // Start Foreground notification
-                startForeground(NOTIFICATION_ID, createNotification())
-
-                // Broadcast success
-                sendBroadcast(Intent(ACTION_VPN_CONNECTED))
-                Log.i(TAG, "VPN Interface established successfully")
-
-                // Start packet loop (local loopback reader/sink)
-                startPacketLoop()
-            } else {
-                throw IllegalStateException("Failed to establish parcel file descriptor")
+                val state = backend.setState(tunnel, Tunnel.State.UP, config)
+                if (state == Tunnel.State.UP) {
+                    sendBroadcast(Intent(ACTION_VPN_CONNECTED))
+                    startStatsLoop()
+                    Log.i(TAG, "WireGuard VPN started successfully")
+                } else {
+                    throw IllegalStateException("WireGuard backend returned state $state")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting WireGuard VPN", e)
+                sendBroadcast(Intent(ACTION_VPN_ERROR).apply {
+                    putExtra("error", e.message ?: "Failed to establish WireGuard VPN")
+                })
+                stopSelf()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting VPN", e)
-            val errorIntent = Intent(ACTION_VPN_ERROR).apply {
-                putExtra("error", e.message ?: "Failed to establish VPN")
-            }
-            sendBroadcast(errorIntent)
-            stopSelf()
         }
     }
 
-    private fun startPacketLoop() {
-        packetLoopJob = serviceScope.launch {
-            val fd = vpnInterface?.fileDescriptor ?: return@launch
-            val input = FileInputStream(fd)
-            val output = FileOutputStream(fd)
-            val buffer = ByteBuffer.allocate(32767)
-
-            try {
-                while (isActive) {
-                    // Read packets from the tunnel interface
-                    val readBytes = input.read(buffer.array())
-                    if (readBytes > 0) {
-                        // Simply consume local packets for safe sandbox analysis
-                        buffer.clear()
-                    }
-                    delay(10) // Small delay to avoid CPU overhead
+    private fun startStatsLoop() {
+        statsJob?.cancel()
+        statsJob = serviceScope.launch {
+            while (isActive) {
+                try {
+                    val stats = backend.getStatistics(tunnel)
+                    sendBroadcast(Intent(ACTION_VPN_STATS).apply {
+                        putExtra(EXTRA_BYTES_RECEIVED, stats.totalRx())
+                        putExtra(EXTRA_BYTES_SENT, stats.totalTx())
+                    })
+                } catch (e: Exception) {
+                    Log.w(TAG, "Unable to read VPN stats", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Packet loop error", e)
-            } finally {
-                withContext(NonCancellable) {
-                    try { input.close() } catch(e: Exception) {}
-                    try { output.close() } catch(e: Exception) {}
-                }
+                delay(1000)
             }
         }
     }
 
     private fun disconnect() {
-        Log.d(TAG, "Disconnecting VPN...")
-        packetLoopJob?.cancel()
-        packetLoopJob = null
-        try {
-            vpnInterface?.close()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error closing VPN interface", e)
+        serviceScope.launch {
+            Log.d(TAG, "Disconnecting WireGuard VPN...")
+            statsJob?.cancel()
+            statsJob = null
+            try {
+                backend.setState(tunnel, Tunnel.State.DOWN, null)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping WireGuard VPN", e)
+            } finally {
+                withContext(NonCancellable) {
+                    sendBroadcast(Intent(ACTION_VPN_DISCONNECTED))
+                    stopSelf()
+                }
+            }
         }
-        vpnInterface = null
-        sendBroadcast(Intent(ACTION_VPN_DISCONNECTED))
-        stopSelf()
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        disconnect()
+        statsJob?.cancel()
         serviceScope.cancel()
-    }
-
-    companion object {
-        private const val TAG = "RoyalVpnService"
-
-        const val ACTION_CONNECT = "com.royalshield.vpn.CONNECT"
-        const val ACTION_DISCONNECT = "com.royalshield.vpn.DISCONNECT"
-        const val ACTION_VPN_CONNECTED = "com.royalshield.vpn.CONNECTED"
-        const val ACTION_VPN_DISCONNECTED = "com.royalshield.vpn.DISCONNECTED"
-        const val ACTION_VPN_ERROR = "com.royalshield.vpn.ERROR"
-        const val ACTION_VPN_MISSING_CONFIG = "com.royalshield.vpn.MISSING_CONFIG"
-
-        const val EXTRA_CONFIG = "vpn_config"
-        private const val NOTIFICATION_ID = 1001
-        private const val CHANNEL_ID = "vpn_channel"
+        super.onDestroy()
     }
 
     private fun createNotification(): Notification {
@@ -160,10 +146,29 @@ class RoyalVpnService : VpnService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.img_icon_shield_gold)
             .setContentTitle("Royal Shield VPN Active")
-            .setContentText("Tu conexión está protegida y encriptada.")
+            .setContentText("Your WireGuard tunnel is active.")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
             .build()
+    }
+
+    companion object {
+        private const val TAG = "RoyalVpnService"
+
+        const val ACTION_CONNECT = "com.royalshield.vpn.CONNECT"
+        const val ACTION_DISCONNECT = "com.royalshield.vpn.DISCONNECT"
+        const val ACTION_VPN_CONNECTED = "com.royalshield.vpn.CONNECTED"
+        const val ACTION_VPN_DISCONNECTED = "com.royalshield.vpn.DISCONNECTED"
+        const val ACTION_VPN_ERROR = "com.royalshield.vpn.ERROR"
+        const val ACTION_VPN_MISSING_CONFIG = "com.royalshield.vpn.MISSING_CONFIG"
+        const val ACTION_VPN_STATS = "com.royalshield.vpn.STATS"
+
+        const val EXTRA_CONFIG = "vpn_config"
+        const val EXTRA_BYTES_RECEIVED = "bytes_received"
+        const val EXTRA_BYTES_SENT = "bytes_sent"
+
+        private const val NOTIFICATION_ID = 1001
+        private const val CHANNEL_ID = "vpn_channel"
     }
 }

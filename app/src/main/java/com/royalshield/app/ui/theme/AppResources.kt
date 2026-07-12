@@ -22,7 +22,7 @@ object RoyalIcons {
     val AiNeuralHub = R.drawable.ai_brain_hub
     val SmartHome = R.drawable.dashboard_card_smart_home
     val SmsPhishing = R.drawable.dashboard_card_sms_phishing
-    val RoyalVpn = R.drawable.dashboard_card_vpn
+    val RoyalVpn = R.drawable.img_icon_shield_gold
     val TrackingChild = R.drawable.card_tracking_child
 
     // Navigation / Action Icons
@@ -50,5 +50,5 @@ object RoyalImages {
     // Specific Hero/Card Backgrounds
     val MalwareSkull = R.drawable.img_malware_skull
     val CyberCity = R.drawable.cyber_city_bg
-    val GlobalShield = R.drawable.hero_royal_shield_hero
+    val GlobalShield = R.drawable.royal_shield_hero
 }

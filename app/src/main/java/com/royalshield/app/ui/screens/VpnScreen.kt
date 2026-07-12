@@ -1,4 +1,4 @@
-package com.royalshield.app.ui.screens
+﻿package com.royalshield.app.ui.screens
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,16 +32,28 @@ import com.royalshield.app.vpn.VpnManager
 import com.royalshield.app.vpn.VpnState
 import com.royalshield.app.vpn.VpnStats
 import com.royalshield.app.vpn.VpnProfileRepository
+import com.royalshield.app.vpn.VpnConfigurationException
+import com.royalshield.app.vpn.VpnServerProfile
 import kotlinx.coroutines.launch
 
 data class VpnServer(val name: String, val countryCode: String, val flag: String, val configId: String)
 
+private fun VpnServerProfile.toVpnServer(): VpnServer {
+    val code = countryCode.ifBlank { id.take(2).uppercase() }
+    return VpnServer(
+        name = name,
+        countryCode = code,
+        flag = code,
+        configId = id
+    )
+}
+
 val staticServers = listOf(
-    VpnServer("US East (New York)", "US", "🇺🇸", "US_EAST"),
-    VpnServer("US West (Los Angeles)", "US", "🇺🇸", "US_WEST"),
-    VpnServer("UK London", "UK", "🇬🇧", "UK_LON"),
-    VpnServer("Germany Frankfurt", "DE", "🇩🇪", "DE_FRA"),
-    VpnServer("Japan Tokyo", "JP", "🇯🇵", "JP_TOK")
+    VpnServer("US East (New York)", "US", "US", "US_EAST"),
+    VpnServer("US West (Los Angeles)", "US", "US", "US_WEST"),
+    VpnServer("UK London", "UK", "UK", "UK_LON"),
+    VpnServer("Germany Frankfurt", "DE", "DE", "DE_FRA"),
+    VpnServer("Japan Tokyo", "JP", "JP", "JP_TOK")
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,9 +82,22 @@ fun VpnScreen(
     val vpnProfileRepository = remember { VpnProfileRepository() }
     val scope = rememberCoroutineScope()
     var isFetchingConfig by remember { mutableStateOf(false) }
+    var vpnNotice by remember { mutableStateOf<String?>(null) }
+    var backendAvailable by remember { mutableStateOf<Boolean?>(null) }
+    var serverOptions by remember { mutableStateOf(staticServers) }
 
     var selectedServer by remember { mutableStateOf(staticServers.first()) }
     var showServerSelector by remember { mutableStateOf(false) }
+
+    fun handleVpnFailure(error: Throwable) {
+        val message = error.message ?: "VPN request failed"
+        vpnNotice = message
+        if (error is VpnConfigurationException && error.code.contains("NOT_CONFIGURED")) {
+            vpnManager.setMissingConfig()
+        } else {
+            vpnManager.setError(message)
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -84,9 +109,54 @@ fun VpnScreen(
                 isFetchingConfig = false
                 res.onSuccess { config ->
                     vpnManager.connect(config)
+                }.onFailure { error ->
+                    handleVpnFailure(error)
                 }
             }
         }
+    }
+
+    fun requestVpnConnection() {
+        scope.launch {
+            isFetchingConfig = true
+            val res = vpnProfileRepository.getVpnConfig(selectedServer.configId)
+            isFetchingConfig = false
+            res.onSuccess { config ->
+                vpnNotice = null
+                val intent = vpnManager.connect(config)
+                if (intent != null) permissionLauncher.launch(intent)
+            }.onFailure { error ->
+                handleVpnFailure(error)
+            }
+        }
+    }
+
+    LaunchedEffect(hasVpnAccess) {
+        if (!hasVpnAccess) return@LaunchedEffect
+
+        isFetchingConfig = true
+        vpnProfileRepository.getVpnStatus()
+            .onSuccess { status ->
+                backendAvailable = status.available
+                vpnNotice = if (status.available) null else status.message
+                if (!status.available) vpnManager.setMissingConfig()
+            }
+            .onFailure { error ->
+                backendAvailable = false
+                handleVpnFailure(error)
+            }
+
+        vpnProfileRepository.getVpnServers()
+            .onSuccess { servers ->
+                val mappedServers = servers.map { it.toVpnServer() }
+                if (mappedServers.isNotEmpty()) {
+                    serverOptions = mappedServers
+                    if (serverOptions.none { it.configId == selectedServer.configId }) {
+                        selectedServer = mappedServers.first()
+                    }
+                }
+            }
+        isFetchingConfig = false
     }
     
     // Colors
@@ -121,7 +191,7 @@ fun VpnScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("PANEL VPN", color = Color.White, fontWeight = FontWeight.Black) },
+                title = { Text("VPN PANEL", color = Color.White, fontWeight = FontWeight.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White) }
                 },
@@ -151,7 +221,7 @@ fun VpnScreen(
                     // Server Selector
                     ServerSelector(
                         selectedServer = selectedServer,
-                        enabled = vpnState is VpnState.Disconnected || vpnState is VpnState.Error,
+                        enabled = backendAvailable == true && (vpnState is VpnState.Disconnected || vpnState is VpnState.Error),
                         onClick = { showServerSelector = true },
                         surfaceColor = surfaceDark,
                         textColor = Color.White
@@ -161,14 +231,14 @@ fun VpnScreen(
                     
                     // Connection Status Text
                     val statusText = when(vpnState) {
-                        is VpnState.Disconnected -> "DESCONECTADO"
-                        is VpnState.Connecting -> "CONECTANDO..."
-                        is VpnState.Connected -> "CONECTADO"
-                        is VpnState.Disconnecting -> "DESCONECTANDO..."
-                        is VpnState.Error -> "ERROR DE CONEXIÓN"
-                        is VpnState.PermissionRequired -> "PERMISO REQUERIDO"
-                        is VpnState.MissingConfig -> "CONFIGURACIÓN FALTANTE"
-                        is VpnState.PremiumRequired -> "PREMIUM REQUERIDO"
+                        is VpnState.Disconnected -> "DISCONNECTED"
+                        is VpnState.Connecting -> "CONNECTING..."
+                        is VpnState.Connected -> "CONNECTED"
+                        is VpnState.Disconnecting -> "DISCONNECTING..."
+                        is VpnState.Error -> "CONNECTION ERROR"
+                        is VpnState.PermissionRequired -> "PERMISSION REQUIRED"
+                        is VpnState.MissingConfig -> "VPN NOT CONFIGURED"
+                        is VpnState.PremiumRequired -> "PREMIUM REQUIRED"
                     }
                     val statusColor = when(vpnState) {
                         is VpnState.Connected -> neonGreen
@@ -192,20 +262,13 @@ fun VpnScreen(
                         modifier = Modifier
                             .size(220.dp)
                             .clickable(
-                                enabled = vpnState !is VpnState.Connecting && vpnState !is VpnState.Disconnecting && !isFetchingConfig
+                                enabled = backendAvailable == true &&
+                                    vpnState !is VpnState.Connecting &&
+                                    vpnState !is VpnState.Disconnecting &&
+                                    !isFetchingConfig
                             ) {
                                 when(vpnState) {
-                                    is VpnState.Disconnected, is VpnState.Error, is VpnState.MissingConfig -> {
-                                        scope.launch {
-                                            isFetchingConfig = true
-                                            val res = vpnProfileRepository.getVpnConfig(selectedServer.configId)
-                                            isFetchingConfig = false
-                                            res.onSuccess { config ->
-                                                val intent = vpnManager.connect(config)
-                                                if (intent != null) permissionLauncher.launch(intent)
-                                            }
-                                        }
-                                    }
+                                    is VpnState.Disconnected, is VpnState.Error, is VpnState.MissingConfig -> requestVpnConnection()
                                     is VpnState.Connected -> vpnManager.disconnect()
                                     is VpnState.PermissionRequired -> {
                                         permissionLauncher.launch((vpnState as VpnState.PermissionRequired).intent)
@@ -252,6 +315,18 @@ fun VpnScreen(
                             )
                         }
                     }
+
+                    vpnNotice?.let { notice ->
+                        Spacer(modifier = Modifier.height(18.dp))
+                        Text(
+                            text = notice,
+                            color = if (vpnState is VpnState.MissingConfig) gold else redWarning,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    }
                     
                     Spacer(modifier = Modifier.height(48.dp))
                     
@@ -264,10 +339,10 @@ fun VpnScreen(
                         StatItem(icon = Icons.Default.NetworkCheck, label = "Ping", value = pingStr, color = neonGreen)
                         
                         val upStr = if (vpnState is VpnState.Connected) formatBytes(vpnStats.bytesSent) else "--"
-                        StatItem(icon = Icons.Default.KeyboardArrowUp, label = "Subida", value = upStr, color = gold)
+                        StatItem(icon = Icons.Default.KeyboardArrowUp, label = "Upload", value = upStr, color = gold)
                         
                         val downStr = if (vpnState is VpnState.Connected) formatBytes(vpnStats.bytesReceived) else "--"
-                        StatItem(icon = Icons.Default.KeyboardArrowDown, label = "Bajada", value = downStr, color = neonGreen)
+                        StatItem(icon = Icons.Default.KeyboardArrowDown, label = "Download", value = downStr, color = neonGreen)
                     }
                     
                     Spacer(modifier = Modifier.weight(1f))
@@ -283,13 +358,13 @@ fun VpnScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Seleccionar Servidor",
+                        "Select Server",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
-                    staticServers.forEach { server ->
+                    serverOptions.forEach { server ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -336,7 +411,7 @@ fun ServerSelector(
         ) {
             Text(selectedServer.flag, fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Servidor Actual", fontSize = 12.sp, color = Color.Gray)
+                Text("Current Server", fontSize = 12.sp, color = Color.Gray)
                 Text(selectedServer.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = textColor)
             }
             Icon(Icons.Default.ArrowDropDown, contentDescription = "Change Server", tint = Color.Gray)
@@ -363,12 +438,39 @@ fun VpnPaywall(onNavigateToPremium: () -> Unit, gold: Color, surface: Color) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_vpn_premium_shield),
-            contentDescription = null,
-            modifier = Modifier.size(120.dp),
-            contentScale = ContentScale.Fit
-        )
+        Box(
+            modifier = Modifier
+                .size(132.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            gold.copy(alpha = 0.22f),
+                            surface,
+                            Color.Black
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            gold.copy(alpha = 0.95f),
+                            gold.copy(alpha = 0.35f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                )
+                .padding(14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.emblem_golden_screen_subscription),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
@@ -377,7 +479,7 @@ fun VpnPaywall(onNavigateToPremium: () -> Unit, gold: Color, surface: Color) {
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            "Acceso exclusivo para suscriptores Pro Defender y superiores",
+            "Exclusive access for Pro Defender subscribers and above",
             fontSize = 14.sp,
             color = Color.Gray,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -391,12 +493,12 @@ fun VpnPaywall(onNavigateToPremium: () -> Unit, gold: Color, surface: Color) {
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Desbloquea VPN con:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Unlock VPN with:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
-                InfoItem("🥈 Pro Defender", "$9.99/mes")
-                InfoItem("🥇 Business Suit", "$29.99/mes")
-                InfoItem("💼 Enterprise Core", "$99.99/mes")
-                InfoItem("🔶 Ultimate Pack", "$39.49 (Lifetime)")
+                InfoItem("Pro Defender", "$9.99/month")
+                InfoItem("Business Suit", "$29.99/month")
+                InfoItem("Enterprise Core", "$99.99/month")
+                InfoItem("Ultimate Pack", "$39.49 (Lifetime)")
             }
         }
         
@@ -411,12 +513,12 @@ fun VpnPaywall(onNavigateToPremium: () -> Unit, gold: Color, surface: Color) {
             contentAlignment = Alignment.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.btn_upgrade_plan),
+                painter = painterResource(id = R.drawable.gold_pill_button),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.FillBounds
             )
-            Text("ACTUALIZAR PLAN", fontWeight = FontWeight.Black, fontSize = 18.sp, color = Color.Black)
+            Text("UPGRADE PLAN", fontWeight = FontWeight.Black, fontSize = 18.sp, color = Color.Black)
         }
     }
 }
@@ -442,3 +544,4 @@ private fun formatBytes(bytes: Long): String {
         else -> "${bytes / (1024 * 1024 * 1024)} GB"
     }
 }
+

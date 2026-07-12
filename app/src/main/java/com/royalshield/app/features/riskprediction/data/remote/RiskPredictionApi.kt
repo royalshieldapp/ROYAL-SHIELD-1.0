@@ -110,4 +110,13 @@ interface RiskPredictionApi {
         @Query("h3_cell") h3Cell: String,
         @Query("days") days: Int = 30
     ): Response<Map<String, Any>>
+
+    @GET("/api/v1/map-layers")
+    suspend fun getMapLayers(
+        @Query("bbox_min_lat") minLat: Double,
+        @Query("bbox_min_lng") minLng: Double,
+        @Query("bbox_max_lat") maxLat: Double,
+        @Query("bbox_max_lng") maxLng: Double,
+        @Query("layers") layers: String = "cameras,police,speed,protest,theft,cyber"
+    ): Response<MapLayersResponse>
 }

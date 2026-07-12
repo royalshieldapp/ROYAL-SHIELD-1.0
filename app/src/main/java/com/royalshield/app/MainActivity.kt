@@ -141,12 +141,12 @@ fun AppMainFlow() {
                 }
             )
             AppState.REGISTRATION -> RegistrationScreen(
-                onRegistrationSuccess = { currentState = AppState.MAIN },
+                onRegistrationSuccess = { currentState = AppState.PREMIUM_PROMO },
                 onNavigateToPhoneAuth = { currentState = AppState.PHONE_AUTH }
             )
             AppState.PHONE_AUTH -> PhoneAuthScreen(
                 onBack = { currentState = AppState.REGISTRATION },
-                onAuthSuccess = { currentState = AppState.MAIN }
+                onAuthSuccess = { currentState = AppState.PREMIUM_PROMO }
             )
             AppState.MAIN -> RoyalShieldApp(billingManager)
         }

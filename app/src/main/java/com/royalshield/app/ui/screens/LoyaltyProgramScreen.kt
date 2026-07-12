@@ -133,8 +133,18 @@ fun LoyaltyProgramScreen(
 
 @Composable
 fun LoyaltyProgressCard(points: Int, gold: Color, deepGold: Color, surface: Color) {
-    // Logic for next tier
-    val nextTierPoints = 1000
+    val nextTier = when {
+        points < 300 -> "Silver"
+        points < 800 -> "Gold"
+        points < 1500 -> "Elite"
+        else -> null
+    }
+    val nextTierPoints = when {
+        points < 300 -> 300
+        points < 800 -> 800
+        points < 1500 -> 1500
+        else -> 1500
+    }
     val progress = (points.toFloat() / nextTierPoints).coerceIn(0f, 1f)
     val remaining = (nextTierPoints - points).coerceAtLeast(0)
 
@@ -171,9 +181,9 @@ fun LoyaltyProgressCard(points: Int, gold: Color, deepGold: Color, surface: Colo
                 trackColor = Color.DarkGray
             )
             Spacer(modifier = Modifier.height(8.dp))
-            if (remaining > 0) {
+            if (nextTier != null && remaining > 0) {
                 Text(
-                    "$remaining pts left for Platinum Tier",
+                    "$remaining pts left for $nextTier Tier",
                     color = Color.LightGray,
                     fontSize = 12.sp
                 )

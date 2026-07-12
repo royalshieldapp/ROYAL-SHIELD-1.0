@@ -49,7 +49,7 @@ fun RoyalShieldNavGraph(
         }
 
         composable(BottomNavItem.GlobalMap.route) {
-            GlobalMapScreen(onBack = { navController.popBackStack() })
+            RoyalMapScreen(onBack = { navController.popBackStack() })
         }
 
         composable(BottomNavItem.CyberMap.route) {
@@ -168,7 +168,7 @@ fun RoyalShieldNavGraph(
         }
 
         composable("tracking_shield") {
-            TrackingShieldScreen(onBack = { navController.popBackStack() })
+            RoyalMapScreen(onBack = { navController.popBackStack() })
         }
 
         composable("timeline") {

@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # =============================================================================
     nasa_firms_api_key: Optional[str] = Field(default=None, alias="NASA_FIRMS_API_KEY")
     noaa_cdo_token: Optional[str] = Field(default=None, alias="NOAA_CDO_TOKEN")
+    overpass_api_url: str = Field(
+        default="https://overpass-api.de/api/interpreter",
+        alias="OVERPASS_API_URL",
+    )
 
     # =============================================================================
     # OSINT FEEDS
