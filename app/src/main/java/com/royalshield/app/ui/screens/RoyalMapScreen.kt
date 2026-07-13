@@ -93,6 +93,7 @@ fun RoyalMapScreen(
     var showProtest by remember { mutableStateOf(true) }
     var showTheft by remember { mutableStateOf(true) }
     var showCyber by remember { mutableStateOf(true) }
+    var is3D by remember { mutableStateOf(false) }
     var isGoogleMapLoaded by remember { mutableStateOf(false) }
     var currentLocation by remember { mutableStateOf<LatLng?>(null) }
     var lastRecordedLocation by remember { mutableStateOf<LatLng?>(null) }
@@ -119,6 +120,12 @@ fun RoyalMapScreen(
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
+        }
+    }
+
+    LaunchedEffect(trackingState.deviceRole, hasLocationPermission) {
+        if (trackingState.deviceRole == "CHILD" && hasLocationPermission) {
+            trackingVm.startChildLocationService()
         }
     }
 
@@ -194,7 +201,8 @@ fun RoyalMapScreen(
             properties = MapProperties(
                 isMyLocationEnabled = hasLocationPermission,
                 mapStyleOptions = mapStyle,
-                mapType = MapType.NORMAL
+                mapType = MapType.NORMAL,
+                isBuildingEnabled = is3D
             ),
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,
@@ -352,7 +360,20 @@ fun RoyalMapScreen(
                     onZones = { trackingVm.toggleZoneSheet(!trackingState.isZoneSheetOpen) },
                     onPanel = { trackingVm.toggleControlPanel(!trackingState.isControlPanelOpen) },
                     onGpsMode = { trackingVm.setGpsMode(it) },
-                    onRefresh = { trackingVm.refreshChildLocation() }
+                    onRefresh = { trackingVm.refreshChildLocation() },
+                    is3D = is3D,
+                    onToggle3D = {
+                        is3D = !is3D
+                        val target = CameraPosition.Builder(cameraPositionState.position)
+                            .tilt(if (is3D) 55f else 0f)
+                            .build()
+                        scope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newCameraPosition(target),
+                                900
+                            )
+                        }
+                    }
                 )
             }
             AnimatedVisibility(visible = selectedTab == RoyalMapTab.REMINDERS, enter = fadeIn(), exit = fadeOut()) {
@@ -391,7 +412,8 @@ fun RoyalMapScreen(
                     safeZones = trackingState.safeZones,
                     riskZones = trackingState.riskZones,
                     onDeleteSafe = { trackingVm.deleteSafeZone(it) },
-                    onDeleteRisk = { trackingVm.deleteRiskZone(it) }
+                    onDeleteRisk = { trackingVm.deleteRiskZone(it) },
+                    onClose = { trackingVm.toggleZoneSheet(false) }
                 )
             }
         }
@@ -783,7 +805,9 @@ private fun RoyalMapControlPanel(
     onZones: () -> Unit,
     onPanel: () -> Unit,
     onGpsMode: (GpsMode) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    is3D: Boolean,
+    onToggle3D: () -> Unit
 ) {
     RoyalMapSheet {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -797,6 +821,14 @@ private fun RoyalMapControlPanel(
             ControlAction("Panel", Icons.Default.Tune, false, Modifier.weight(1f), onPanel)
             ControlAction("Refresh", Icons.Default.Refresh, false, Modifier.weight(1f), onRefresh)
         }
+        Spacer(Modifier.height(10.dp))
+        ControlAction(
+            label = if (is3D) "2D View" else "3D View",
+            icon = Icons.Default.Layers,
+            active = is3D,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onToggle3D
+        )
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Column {

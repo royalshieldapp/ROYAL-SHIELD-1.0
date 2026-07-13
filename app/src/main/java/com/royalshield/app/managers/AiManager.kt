@@ -148,7 +148,7 @@ class AiManager {
         }
 
         val request = Request.Builder()
-            .url("https://server-beckend.onrender.com/api/ai/chat") // Endpoint Assumption
+            .url("https://server-beckend.onrender.com/api/assistant/chat")
             .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 

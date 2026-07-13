@@ -97,6 +97,12 @@ fun TrackingShieldScreen(
     }
 
     // ── Child Specific Permissions (Background + Notifications) ──
+    LaunchedEffect(state.deviceRole, hasLocationPermission) {
+        if (state.deviceRole == "CHILD" && hasLocationPermission) {
+            vm.startChildLocationService()
+        }
+    }
+
     if (state.deviceRole == "CHILD" && hasLocationPermission) {
         val bgPermissionLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -646,7 +652,8 @@ fun TrackingShieldScreen(
                     safeZones = state.safeZones,
                     riskZones = state.riskZones,
                     onDeleteSafe = { vm.deleteSafeZone(it) },
-                    onDeleteRisk = { vm.deleteRiskZone(it) }
+                    onDeleteRisk = { vm.deleteRiskZone(it) },
+                    onClose = { vm.toggleZoneSheet(false) }
                 )
             }
 

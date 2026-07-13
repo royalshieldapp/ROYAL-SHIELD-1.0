@@ -110,6 +110,7 @@ private data class SecurityParticle(
 @Composable
 fun DashboardScreen(
     onNavigateToSettings: () -> Unit,
+    onNavigateToProfile: () -> Unit = {},
     onNavigateToSystemStatus: () -> Unit,
     onNavigateToSOS: () -> Unit,
     onNavigateToAutomation: () -> Unit,
@@ -275,6 +276,26 @@ fun DashboardScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(
+                        onClick = onNavigateToProfile,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .border(1.5.dp, RoyalGold.copy(alpha = 0.9f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Profile",
+                            tint = RoyalGold
+                        )
+                    }
+                }
 
                 DashboardCommandCenter(
                     items = dashboardState.actionItems,
@@ -1079,13 +1100,14 @@ fun DashboardScreen(
                     // ROW 1: Solution Engine spans the full hub width
                     FeatureCard(
                         title = "Solution Engine",
-                        icon = Icons.Filled.Build,
-                        neonColor = CyberCyan,
+                        icon = Icons.Filled.AccountTree,
+                        imageRes = R.drawable.solution_engine_card,
+                        neonColor = RoyalGold,
                         onClick = onNavigateToSolutionEngine,
                         modifier = Modifier.fillMaxWidth().height(138.dp),
                         borderAnimation = false,
                         imageAlignment = Alignment.Center,
-                        backgroundOffset = cardParallaxOffset
+                        backgroundOffset = Offset.Zero
                     )
 
                     // ROW 2: Learn & Secure Vault
@@ -1095,10 +1117,14 @@ fun DashboardScreen(
                     ) {
                         FeatureCard(
                             title = "Learn",
-                            icon = Icons.Filled.School,
-                            imageRes = com.royalshield.app.R.drawable.learn_laptop_book,
-                            neonColor = com.royalshield.app.ui.theme.NeonOrange,
-                            onClick = onNavigateToCourses,
+                        icon = Icons.Filled.School,
+                        imageRes = com.royalshield.app.R.drawable.learn_laptop_book,
+                        neonColor = com.royalshield.app.ui.theme.NeonOrange,
+                        borderColors = listOf(
+                            com.royalshield.app.ui.theme.NeonBlue,
+                            com.royalshield.app.ui.theme.NeonPink
+                        ),
+                        onClick = onNavigateToCourses,
                             modifier = Modifier.weight(1f).height(125.dp),
                             borderAnimation = false,
                             imageAlignment = Alignment.CenterEnd,
@@ -1222,7 +1248,7 @@ fun DashboardScreen(
                         onClick = onNavigateToTrackingShield,
                         modifier = Modifier.fillMaxWidth().height(138.dp),
                         borderAnimation = false,
-                        imageAlignment = Alignment.Center,
+                        imageAlignment = Alignment.CenterStart,
                         backgroundOffset = cardParallaxOffset
                     )
 
@@ -1700,6 +1726,12 @@ private fun CommandLogStatusPanel(
     val statusIcon = if (hasOpenItems) Icons.Default.Error else Icons.Default.CheckCircle
     val statusText = if (hasOpenItems) "ATTENTION" else "CLEAR"
     var commandLogAcknowledged by remember { mutableStateOf(false) }
+    var selectedFilter by remember { mutableStateOf<CommandLogFilter?>(null) }
+    val visibleItems = when (selectedFilter) {
+        CommandLogFilter.OPEN -> openItems
+        CommandLogFilter.RESOLVED -> items.filter { it.status.equals("Resolved", ignoreCase = true) }
+        null -> items
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -1772,6 +1804,13 @@ private fun CommandLogStatusPanel(
                         .clip(RoundedCornerShape(18.dp))
                         .background(statusColor.copy(alpha = 0.12f))
                         .border(1.dp, statusColor.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+                        .clickable {
+                            selectedFilter = if (hasOpenItems) {
+                                if (selectedFilter == CommandLogFilter.OPEN) null else CommandLogFilter.OPEN
+                            } else {
+                                null
+                            }
+                        }
                         .padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1792,12 +1831,20 @@ private fun CommandLogStatusPanel(
                 CommandArrowBadge(
                     iconRes = R.drawable.arrow_up,
                     tint = Color(0xFF00FF94),
-                    label = resolvedItems.coerceAtLeast(0).toString()
+                    label = resolvedItems.coerceAtLeast(0).toString(),
+                    isSelected = selectedFilter == CommandLogFilter.RESOLVED,
+                    onClick = {
+                        selectedFilter = if (selectedFilter == CommandLogFilter.RESOLVED) null else CommandLogFilter.RESOLVED
+                    }
                 )
                 CommandArrowBadge(
                     iconRes = R.drawable.arrow_down,
                     tint = Color(0xFFFF3B30),
-                    label = openItems.size.toString()
+                    label = openItems.size.toString(),
+                    isSelected = selectedFilter == CommandLogFilter.OPEN,
+                    onClick = {
+                        selectedFilter = if (selectedFilter == CommandLogFilter.OPEN) null else CommandLogFilter.OPEN
+                    }
                 )
             }
         }
@@ -1813,15 +1860,15 @@ private fun CommandLogStatusPanel(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (items.isEmpty()) {
+            if (visibleItems.isEmpty()) {
                 CommandLogRow(
-                    title = "Royal Shield active",
-                    description = "No critical command events pending",
+                    title = if (selectedFilter == CommandLogFilter.RESOLVED) "No resolved events" else "Royal Shield active",
+                    description = if (selectedFilter == CommandLogFilter.RESOLVED) "No resolved command events to display" else "No critical command events pending",
                     severity = Severity.LOW,
                     status = "Resolved"
                 )
             } else {
-                items.take(4).forEach { item ->
+                visibleItems.take(4).forEach { item ->
                     CommandLogRow(
                         title = item.title,
                         description = item.description,
@@ -1912,18 +1959,23 @@ private fun SystemSecurityParticles(modifier: Modifier = Modifier) {
     }
 }
 
+private enum class CommandLogFilter { OPEN, RESOLVED }
+
 @Composable
 private fun CommandArrowBadge(
     iconRes: Int,
     tint: Color,
-    label: String
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .height(34.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(tint.copy(alpha = 0.12f))
-            .border(1.dp, tint.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+            .background(tint.copy(alpha = if (isSelected) 0.28f else 0.12f))
+            .border(1.dp, tint.copy(alpha = if (isSelected) 0.95f else 0.45f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -2081,6 +2133,7 @@ fun FeatureCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     imageRes: Int = 0,
     neonColor: Color = RoyalGold,
+    borderColors: List<Color>? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     borderAnimation: Boolean = false,
@@ -2121,7 +2174,7 @@ fun FeatureCard(
         )
     } else {
         Brush.linearGradient(
-            colors = listOf(neonColor, neonColor.copy(alpha = 0.3f))
+            colors = (borderColors ?: listOf(neonColor, neonColor.copy(alpha = 0.3f)))
         )
     }
 

@@ -29,8 +29,7 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
 
     init {
         checkRole()
-        // Only start tracking if we are PARENT or CHILD (logic tailored later)
-        // For now, if role is set, we proceed.
+        // Location services are started by the screen after runtime permission is granted.
         if (PreferencesManager.getDeviceRole() != "UNSET") {
              manager.startTracking()
         }
@@ -43,10 +42,6 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
     private fun checkRole() {
         val role = PreferencesManager.getDeviceRole()
         _uiState.value = _uiState.value.copy(deviceRole = role)
-        
-        if (role == "CHILD") {
-             startLocationService()
-        }
     }
 
     fun setRole(role: String) {
@@ -55,18 +50,34 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
         
         if (role == "PARENT") {
             manager.startTracking()
-        } else if (role == "CHILD") {
-            startLocationService()
         }
     }
-    
-    private fun startLocationService() {
+
+    /** Starts the child service only after the UI has confirmed location permission. */
+    fun startChildLocationService() {
+        if (PreferencesManager.getDeviceRole() != "CHILD") return
         val context = com.royalshield.app.RoyalShieldApp.instance
+        val hasLocationPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!hasLocationPermission) return
+
         val intent = android.content.Intent(context, com.royalshield.app.services.LocationTrackerService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: IllegalStateException) {
+            android.util.Log.e("TrackingShieldViewModel", "Unable to start child location service", e)
+        } catch (e: SecurityException) {
+            android.util.Log.e("TrackingShieldViewModel", "Location service permission denied", e)
         }
     }
 

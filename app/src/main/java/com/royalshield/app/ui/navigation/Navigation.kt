@@ -22,6 +22,7 @@ fun RoyalShieldNavGraph(
         composable(BottomNavItem.Home.route) {
             DashboardScreen(
                 onNavigateToSettings = { navController.navigate(BottomNavItem.Settings.route) },
+                onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToSystemStatus = { navController.navigate("system_status") },
                 onNavigateToSOS = onTriggerSOS,
                 onNavigateToAutomation = { navController.navigate(BottomNavItem.Automation.route) },
@@ -84,6 +85,18 @@ fun RoyalShieldNavGraph(
             )
         }
 
+        composable("profile") {
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(BottomNavItem.Settings.route) },
+                onSignedOut = {
+                    navController.navigate(BottomNavItem.Home.route) {
+                        popUpTo(BottomNavItem.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable("subscription") {
             val isPremium by billingManager.hasPremiumAccess.collectAsState()
             SubscriptionScreen(
@@ -122,13 +135,11 @@ fun RoyalShieldNavGraph(
         }
 
         composable("ai_neural_hub") {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            AiNeuralHubScreen(
+            AiHubScreen(
                 onBack = { navController.popBackStack() },
-                onTriggerSos = onTriggerSOS,
-                onCheckUrl = { url ->
-                    android.widget.Toast.makeText(context, "Scanning URL: $url", android.widget.Toast.LENGTH_SHORT).show()
-                }
+                billingManager = billingManager,
+                onNavigateToPremium = { navController.navigate("subscription") },
+                onNavigateToScriptLab = { navController.navigate("ai_script_lab") }
             )
         }
         composable("ai_script_lab") { AiScriptLabScreen(onBack = { navController.popBackStack() }) }
@@ -188,6 +199,19 @@ fun RoyalShieldNavGraph(
         }
 
         composable("solution_engine") {
+            SolutionEngineResolutionScreen(
+                onBack = { navController.popBackStack() },
+                onHistory = { navController.navigate("audit_logs") },
+                onOpenFileScan = { navController.navigate("file_scan") },
+                onOpenPhishing = { navController.navigate("phishing_detector") },
+                onOpenVpn = { navController.navigate("vpn") },
+                onOpenTracking = { navController.navigate("tracking_shield") },
+                onOpenAutomation = { navController.navigate(BottomNavItem.Automation.route) },
+                onOpenGrid = { navController.navigate("solution_engine_grid") }
+            )
+        }
+
+        composable("solution_engine_grid") {
             SolutionEngineScreen(onBack = { navController.popBackStack() })
         }
 

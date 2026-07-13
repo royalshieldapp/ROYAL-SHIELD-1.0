@@ -115,7 +115,9 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp),
+                    .height(140.dp)
+                    .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f)
+                    .border(1.5.dp, RoyalGold.copy(alpha = 0.85f), RoundedCornerShape(20.dp)),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
@@ -147,7 +149,10 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                     modifier = Modifier
                         .weight(1f)
                         .height(100.dp)
+                        .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 7f, maxRotationY = 10f)
                         .clickable { onBusinessClick() }
+                    ,
+                    borderColor = RoyalGold.copy(alpha = 0.75f)
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize()
@@ -184,7 +189,10 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                     modifier = Modifier
                         .weight(1f)
                         .height(100.dp)
+                        .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 7f, maxRotationY = 10f)
                         .clickable { showNetworkTools = true }
+                    ,
+                    borderColor = RoyalGold.copy(alpha = 0.75f)
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -282,7 +290,13 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                 }
                 
                 if (connectedDevices.isEmpty() && scannedDevices.isEmpty() && !isScanning) {
-                     PremiumGlassCard(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+                     PremiumGlassCard(
+                         modifier = Modifier
+                             .fillMaxWidth()
+                             .height(100.dp)
+                             .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f),
+                         borderColor = RoyalGold.copy(alpha = 0.65f)
+                     ) {
                          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                              Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                  Icon(Icons.Default.Lightbulb, null, tint = Color.Gray)
@@ -316,6 +330,8 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f)
+                    .border(1.5.dp, RoyalGold.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
                     .clickable {
                         scope.launch(Dispatchers.IO) {
                             val routeRule = AutomationRule(

@@ -55,7 +55,11 @@ fun ScannedDeviceItem(device: SmartDevice, onConnect: () -> Unit) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth().clickable { onConnect() }
+        modifier = Modifier
+            .fillMaxWidth()
+            .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f)
+            .border(1.5.dp, RoyalGold.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+            .clickable { onConnect() }
     ) {
         Row(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
@@ -78,7 +82,12 @@ fun ScannedDeviceItem(device: SmartDevice, onConnect: () -> Unit) {
 
 @Composable
 fun SmartDeviceControlCard(device: SmartDevice, onUpdate: (SmartDevice) -> Unit) {
-    PremiumGlassCard(modifier = Modifier.fillMaxWidth()) {
+    PremiumGlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f),
+        borderColor = RoyalGold.copy(alpha = 0.75f)
+    ) {
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -400,7 +409,10 @@ fun AutomationRuleItem(
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, RoyalGold.copy(alpha = 0.75f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f)
     ) {
         Row(
             modifier = Modifier

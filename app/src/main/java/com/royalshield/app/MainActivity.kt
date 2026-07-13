@@ -49,6 +49,7 @@ import com.royalshield.app.ui.screens.PremiumEliteScreen
 import com.royalshield.app.ui.screens.RegistrationScreen
 import com.royalshield.app.ui.screens.PhoneAuthScreen
 import com.royalshield.app.services.RoyalShieldService
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -131,7 +132,11 @@ fun AppMainFlow() {
     Crossfade(targetState = currentState, label = "AppFlow") { state ->
         when (state) {
             AppState.SPLASH -> SplashScreen {
-                currentState = AppState.MAIN
+                currentState = if (FirebaseAuth.getInstance().currentUser == null) {
+                    AppState.REGISTRATION
+                } else {
+                    AppState.MAIN
+                }
             }
             AppState.PREMIUM_PROMO -> PremiumEliteScreen(
                 billingManager = billingManager,
@@ -480,4 +485,3 @@ fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager) 
         }
     }
 }
-

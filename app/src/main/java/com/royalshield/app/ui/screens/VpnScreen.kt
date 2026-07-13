@@ -504,21 +504,23 @@ fun VpnPaywall(onNavigateToPremium: () -> Unit, gold: Color, surface: Color) {
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Box(
+        Surface(
+            onClick = onNavigateToPremium,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .clickable { onNavigateToPremium() },
-            contentAlignment = Alignment.Center
+                .height(64.dp),
+            shape = RoundedCornerShape(32.dp),
+            color = Color.Transparent
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.gold_pill_button),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.FillBounds
-            )
-            Text("UPGRADE PLAN", fontWeight = FontWeight.Black, fontSize = 18.sp, color = Color.Black)
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painter = painterResource(id = R.drawable.gold_pill_button),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds
+                )
+                Text("UPGRADE PLAN", fontWeight = FontWeight.Black, fontSize = 18.sp, color = Color.Black)
+            }
         }
     }
 }
