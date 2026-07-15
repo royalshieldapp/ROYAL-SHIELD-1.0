@@ -1,6 +1,11 @@
 package com.royalshield.app.ui.screens
 
 import android.widget.Toast
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,6 +67,10 @@ import kotlin.math.PI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.ContextCompat
+import com.royalshield.app.features.smarthome.SmartHomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,14 +78,43 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val db = remember { AppDatabase.getDatabase(context) }
+    val smartHomeViewModel: SmartHomeViewModel = viewModel()
+    val smartHomeState by smartHomeViewModel.uiState.collectAsStateWithLifecycle()
+    val bluetoothPermissions = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results.values.all { it }) {
+            smartHomeViewModel.scan()
+        } else {
+            Toast.makeText(
+                context,
+                "Nearby devices permission is required for Smart Home discovery",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    fun scanSmartHomeDevices() {
+        val missingPermissions = bluetoothPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missingPermissions.isEmpty()) {
+            smartHomeViewModel.scan()
+        } else {
+            bluetoothPermissionLauncher.launch(missingPermissions.toTypedArray())
+        }
+    }
     
     // Automation Rules State
     var rules by remember { mutableStateOf(emptyList<AutomationRule>()) }
 
-    // Smart Home State
-    var isScanning by remember { mutableStateOf(false) }
-    var scannedDevices by remember { mutableStateOf(listOf<SmartDevice>()) }
-    var connectedDevices by remember { mutableStateOf(listOf<SmartDevice>()) }
     var showNetworkTools by remember { mutableStateOf(false) }
     var showWifiScanDialog by remember { mutableStateOf(false) }
     var showSpeedTestDialog by remember { mutableStateOf(false) }
@@ -85,6 +123,13 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
     LaunchedEffect(Unit) {
         db.automationDao().getAllRules().collect {
             rules = it
+        }
+    }
+
+    LaunchedEffect(smartHomeState.message) {
+        smartHomeState.message?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            smartHomeViewModel.consumeMessage()
         }
     }
 
@@ -221,31 +266,9 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                         fontSize = 18.sp
                     )
                     
-                    if (!isScanning) {
+                    if (!smartHomeState.isScanning) {
                         FloatingActionButton(
-                            onClick = {
-                                isScanning = true
-                                scope.launch {
-                                    // Mimic scanning delay
-                                    delay(2000)
-                                    // Mock results
-                                    val newDevices = listOf(
-                                        SmartDevice("1", "Living Room Light", DeviceType.LIGHT),
-                                        SmartDevice("2", "Kitchen LED Strip", DeviceType.LIGHT),
-                                        SmartDevice("3", "Smart Plug A1", DeviceType.PLUG)
-                                    ).filter { device -> 
-                                        // Filter out already connected
-                                        connectedDevices.none { it.id == device.id }
-                                    }
-                                    
-                                    scannedDevices = newDevices
-                                    isScanning = false
-                                    
-                                    if (newDevices.isEmpty()) {
-                                        Toast.makeText(context, "No new devices found", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
+                            onClick = ::scanSmartHomeDevices,
                             containerColor = CyberCyan,
                             contentColor = Color.Black,
                             modifier = Modifier.size(40.dp) // Small size
@@ -261,35 +284,26 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                 }
 
                 // List Connected Devices (The functional control panel)
-                if (connectedDevices.isNotEmpty()) {
+                if (smartHomeState.connectedDevices.isNotEmpty()) {
                     Text("My Devices", color = Color.Gray, fontSize = 12.sp)
-                    connectedDevices.forEach { device ->
-                        SmartDeviceControlCard(device, onUpdate = { updatedDevice ->
-                            // Update local state list
-                            connectedDevices = connectedDevices.map { 
-                                if (it.id == updatedDevice.id) updatedDevice else it 
-                            }
-                        })
+                    smartHomeState.connectedDevices.forEach { device ->
+                        SmartDeviceControlCard(device, onUpdate = smartHomeViewModel::updateDevice)
                     }
                 }
 
                 // List Scanned/Found Devices (Waiting to connect)
-                AnimatedVisibility(visible = scannedDevices.isNotEmpty()) {
+                AnimatedVisibility(visible = smartHomeState.scannedDevices.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Found Nearby", color = Color.Gray, fontSize = 12.sp)
-                        scannedDevices.forEach { device ->
+                        Text("Google Home devices", color = Color.Gray, fontSize = 12.sp)
+                        smartHomeState.scannedDevices.forEach { device ->
                             ScannedDeviceItem(device) {
-                                // Connect logic
-                                val connected = device.copy(isConnected = true, isOn = true)
-                                connectedDevices = connectedDevices + connected
-                                scannedDevices = scannedDevices - device
-                                Toast.makeText(context, "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
+                                smartHomeViewModel.connect(device)
                             }
                         }
                     }
                 }
                 
-                if (connectedDevices.isEmpty() && scannedDevices.isEmpty() && !isScanning) {
+                if (smartHomeState.connectedDevices.isEmpty() && smartHomeState.scannedDevices.isEmpty() && !smartHomeState.isScanning) {
                      PremiumGlassCard(
                          modifier = Modifier
                              .fillMaxWidth()

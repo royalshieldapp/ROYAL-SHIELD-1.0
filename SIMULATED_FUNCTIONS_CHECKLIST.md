@@ -7,14 +7,16 @@ Estado:
 
 ## Pendientes activos
 
+- [!] Smart Home ya usa Google Home APIs Android SDK 1.9.1 y persistencia Room.
+  - Archivos: `app/src/main/java/com/royalshield/app/features/smarthome/`, `app/src/main/java/com/royalshield/app/ui/screens/AutomationScreen.kt`, `app/src/main/java/com/royalshield/app/ui/components/AutomationComponents.kt`.
+  - Cambio parcial: OAuth/consentimiento de estructura, lectura de luces y enchufes, encendido/apagado y brillo usan Google Home real; se elimino el proveedor demo.
+  - Configurado: proyecto `royalshield-fbd06` importado en Google Home Developer Console, cliente OAuth Android debug registrado para `com.royalshield.app` y usuario de prueba autorizado.
+  - Pendiente externo: registrar el SHA-1 de release/Google Play App Signing y probar con Google Play services compatible y un hogar real.
+
 - [!] VPN ya no usa config mock en Android, pero requiere infraestructura WireGuard real.
   - Archivos: `app/src/main/java/com/royalshield/app/vpn/VpnProfileRepository.kt`, `backend/routes/vpn.js`, `app/src/main/java/com/royalshield/app/ui/screens/VpnScreen.kt`.
   - Cambio parcial: Android consulta `/api/vpn/status`, `/api/vpn/servers` y `/api/vpn/config`; el servicio usa `GoBackend` de WireGuard; backend responde `not_configured` o `peer_registration_not_configured` en vez de simular.
   - Pendiente: configurar servidor WireGuard real y flujo de registro de peers antes de marcarlo hecho.
-
-- [!] Phone number checker cae a resultados mock cuando no hay `NUMVERIFY_API_KEY`.
-  - Archivos: `backend/routes/phone.js`, `app/src/main/java/com/royalshield/app/managers/ReputationManager.kt`.
-  - Meta: configurar proveedor real o devolver `not_configured` sin inventar carrier/location.
 
 - [ ] Loyalty usa variables en memoria como "mock database".
   - Archivos: `backend/routes/loyalty.js`, `app/src/main/java/com/royalshield/app/data/LoyaltyRepository.kt`.
@@ -40,16 +42,12 @@ Estado:
   - Archivo: `app/src/main/java/com/royalshield/app/ui/screens/ReportsCenterScreen.kt`.
   - Meta: generar reportes desde scans/eventos reales.
 
-- [ ] Speed test muestra valores random.
-  - Archivo: `app/src/main/java/com/royalshield/app/ui/components/SpeedTestDialog.kt`.
-  - Meta: medir latencia/descarga/subida reales o renombrarlo como diagnostico estimado.
-
 - [ ] Voice scam screen incrementa amenazas con random.
   - Archivo: `app/src/main/java/com/royalshield/app/ui/screens/VoiceScamScreen.kt`.
   - Meta: alimentar desde `VoiceScamDetectionService` o logs reales.
 
-- [!] Seguridad alta: token Mapbox hardcodeado en `settings.gradle.kts`.
-  - Meta: mover a `local.properties`/variable de entorno y rotar el token expuesto.
+- [!] Seguridad alta: el token Mapbox anteriormente expuesto debe rotarse en Mapbox.
+  - Cambio: `settings.gradle.kts` lee `MAPBOX_DOWNLOADS_TOKEN` desde el entorno o `local.properties`.
 
 - [!] Config/API faltante al migrar desde otros Royal Shield.
   - Hallazgo: este checkout solo tenia `sdk.dir` en `local.properties`; faltaban nombres de claves Android usadas por Gradle.
@@ -58,6 +56,12 @@ Estado:
   - Cambio parcial: agregado `local.properties.example`, documentadas variables backend faltantes sin secretos reales y `ADMOB_APP_ID` ahora entra por placeholder.
 
 ## Hechas / descartadas
+
+-> Phone number checker ya no inventa resultados cuando falta `NUMVERIFY_API_KEY` o falla NumVerify.
+  - Cambio: valida E.164, usa HTTPS y devuelve errores de configuración/proveedor explícitos.
+
+-> Speed test mide ping, descarga y subida reales contra el backend configurado.
+  - Cambio: Android realiza la medición fuera del composable y el backend entrega payloads sin cache.
 
 -> GPS tracking Android enviaba a `https://your-api.com/location`.
   - Cambio: conectado a `BuildConfig.API_BASE_URL + /api/location/track` y agregado endpoint backend con validacion.

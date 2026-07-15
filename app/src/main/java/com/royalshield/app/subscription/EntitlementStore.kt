@@ -43,10 +43,9 @@ class EntitlementStore(context: Context) {
         private const val KEY_TIER = "subscription_tier_v1"
         
         /**
-         * SUPERPOWERS MODE: When true, forces ULTIMATE tier on startup.
-         * All features, skills, and capabilities are fully unlocked.
-         * Set to false before production release.
+         * Development override. Keep false for normal builds so premium
+         * features require the Google Play purchase flow.
          */
-        const val DEV_SUPERPOWERS = true
+        const val DEV_SUPERPOWERS = false
     }
 }

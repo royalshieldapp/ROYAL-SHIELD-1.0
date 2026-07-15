@@ -169,6 +169,7 @@ class Settings(BaseSettings):
     vpn_dns: str = Field(default="1.1.1.1, 1.0.0.1", alias="VPN_DNS")
     vpn_server_public_key: Optional[str] = Field(default=None, alias="VPN_SERVER_PUBLIC_KEY")
     vpn_server_private_key: Optional[str] = Field(default=None, alias="VPN_SERVER_PRIVATE_KEY")
+    vpn_allow_static_config: bool = Field(default=False, alias="VPN_ALLOW_STATIC_CONFIG")
 
     @field_validator("environment", mode="before")
     @classmethod

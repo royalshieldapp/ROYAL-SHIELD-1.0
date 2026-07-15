@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.VpnLock
@@ -1107,6 +1108,8 @@ fun DashboardScreen(
                         modifier = Modifier.fillMaxWidth().height(138.dp),
                         borderAnimation = false,
                         imageAlignment = Alignment.Center,
+                        imageContentScale = ContentScale.Fit,
+                        imageScale = 1.48f,
                         backgroundOffset = Offset.Zero
                     )
 
@@ -1510,8 +1513,15 @@ private fun DashboardCommandCenter(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    var showCommandLog by remember { mutableStateOf(false) }
     var showCyberNews by remember { mutableStateOf(false) }
     val openItems = items.count { !it.status.equals("Resolved", ignoreCase = true) }
+
+    LaunchedEffect(isExpanded) {
+        if (!isExpanded) {
+            showCommandLog = false
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -1614,7 +1624,24 @@ private fun DashboardCommandCenter(
                     )
                 }
 
-                CommandLogStatusPanel(items = items)
+                MiniControlButton(
+                    icon = Icons.AutoMirrored.Filled.List,
+                    label = if (showCommandLog) "Hide Command Log" else "Command Log",
+                    accent = if (showCommandLog) Color(0xFF00FF94) else RoyalGold,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { showCommandLog = !showCommandLog }
+                )
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showCommandLog,
+                    enter = androidx.compose.animation.fadeIn(tween(180)) + androidx.compose.animation.expandVertically(),
+                    exit = androidx.compose.animation.fadeOut(tween(140)) + androidx.compose.animation.shrinkVertically()
+                ) {
+                    CommandLogStatusPanel(
+                        items = items,
+                        isCommandLogVisible = showCommandLog
+                    )
+                }
             }
         }
     }
@@ -1717,6 +1744,7 @@ private fun CyberNewsDialog(onDismiss: () -> Unit) {
 @Composable
 private fun CommandLogStatusPanel(
     items: List<ActionItem>,
+    isCommandLogVisible: Boolean,
     modifier: Modifier = Modifier
 ) {
     val openItems = items.filterNot { it.status.equals("Resolved", ignoreCase = true) }
@@ -1725,7 +1753,6 @@ private fun CommandLogStatusPanel(
     val statusColor = if (hasOpenItems) Color(0xFFFF3B30) else Color(0xFF00FF94)
     val statusIcon = if (hasOpenItems) Icons.Default.Error else Icons.Default.CheckCircle
     val statusText = if (hasOpenItems) "ATTENTION" else "CLEAR"
-    var commandLogAcknowledged by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<CommandLogFilter?>(null) }
     val visibleItems = when (selectedFilter) {
         CommandLogFilter.OPEN -> openItems
@@ -1760,21 +1787,20 @@ private fun CommandLogStatusPanel(
                                 .size(26.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (commandLogAcknowledged) Color(0xFF00FF94).copy(alpha = 0.12f)
+                                    if (isCommandLogVisible) Color(0xFF00FF94).copy(alpha = 0.12f)
                                     else RoyalGold.copy(alpha = 0.12f)
                                 )
                                 .border(
                                     1.dp,
-                                    if (commandLogAcknowledged) Color(0xFF00FF94).copy(alpha = 0.5f)
+                                    if (isCommandLogVisible) Color(0xFF00FF94).copy(alpha = 0.5f)
                                     else RoyalGold.copy(alpha = 0.45f),
                                     CircleShape
-                                )
-                                .clickable { commandLogAcknowledged = true },
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
                                 painter = painterResource(
-                                    id = if (commandLogAcknowledged) {
+                                    id = if (isCommandLogVisible) {
                                         R.drawable.ic_action_checkmark_green
                                     } else {
                                         R.drawable.ic_action_checkmark_gold
@@ -2139,6 +2165,7 @@ fun FeatureCard(
     borderAnimation: Boolean = false,
     imageAlignment: Alignment = Alignment.Center,
     imageContentScale: ContentScale = ContentScale.Crop,
+    imageScale: Float = 1.12f,
     baseRotationY: Float = 0f,
     backgroundOffset: Offset = Offset.Zero
 ) {
@@ -2235,8 +2262,8 @@ fun FeatureCard(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                scaleX = 1.12f
-                                scaleY = 1.12f
+                                scaleX = imageScale
+                                scaleY = imageScale
                                 translationX = backgroundOffset.x
                                 translationY = backgroundOffset.y
                             }

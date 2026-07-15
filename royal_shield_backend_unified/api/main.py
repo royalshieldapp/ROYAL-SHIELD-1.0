@@ -164,7 +164,7 @@ app.include_router(predictions.router)
 app.include_router(map_layers.router)
 
 # App Service routes (ported from Node.js backend)
-from api.routes import phone, sos, scan, threats, loyalty, business, courses, system, threat_map, xr
+from api.routes import phone, sos, scan, threats, loyalty, business, courses, system, threat_map, xr, vpn
 app.include_router(phone.router)
 app.include_router(sos.router)
 app.include_router(scan.router)
@@ -175,6 +175,7 @@ app.include_router(courses.router)
 app.include_router(system.router)
 app.include_router(threat_map.router)
 app.include_router(xr.router)
+app.include_router(vpn.router)
 
 
 if __name__ == "__main__":

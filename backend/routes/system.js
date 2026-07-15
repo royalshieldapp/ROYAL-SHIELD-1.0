@@ -75,4 +75,37 @@ router.get('/status', async (req, res) => {
     });
 });
 
+// Controlled payloads used by Android to measure the real device-to-backend path.
+router.get('/speed-test/ping', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.status(204).end();
+});
+
+router.get('/speed-test/download', (req, res) => {
+    const requestedBytes = Number.parseInt(req.query.bytes, 10);
+    const bytes = Number.isFinite(requestedBytes)
+        ? Math.min(Math.max(requestedBytes, 64 * 1024), 5 * 1024 * 1024)
+        : 2 * 1024 * 1024;
+
+    res.set({
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(bytes)
+    });
+    res.send(Buffer.alloc(bytes));
+});
+
+router.post(
+    '/speed-test/upload',
+    express.raw({ type: 'application/octet-stream', limit: '5mb' }),
+    (req, res) => {
+        const bytesReceived = Buffer.isBuffer(req.body) ? req.body.length : 0;
+        if (bytesReceived === 0) {
+            return res.status(400).json({ error: 'Binary payload is required' });
+        }
+        res.set('Cache-Control', 'no-store');
+        return res.json({ bytesReceived, receivedAt: new Date().toISOString() });
+    }
+);
+
 module.exports = router;

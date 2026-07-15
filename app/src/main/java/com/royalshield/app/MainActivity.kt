@@ -51,6 +51,7 @@ import com.royalshield.app.ui.screens.PhoneAuthScreen
 import com.royalshield.app.services.RoyalShieldService
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
+import com.royalshield.app.features.smarthome.google.GoogleHomeClientManager
 
 class MainActivity : ComponentActivity() {
 
@@ -83,6 +84,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PreferencesManager.init(applicationContext)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            GoogleHomeClientManager.registerPermissionCaller(this)
+        }
 
         // Initialize state with current preference
         _themeStyle.value = PreferencesManager.getThemeStyle()

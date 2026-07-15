@@ -80,3 +80,15 @@ services:
         value: "true"
       - key: ENABLE_VECTOR_SEARCH
         value: "false"
+      - key: VPN_PROVIDER
+        sync: false
+      - key: VPN_SERVER_PUBLIC_KEY
+        sync: false
+      - key: VPN_SERVERS
+        sync: false
+      - key: VPN_PORT
+        value: "51820"
+      - key: VPN_DNS
+        value: "1.1.1.1, 1.0.0.1"
+      - key: VPN_ALLOW_STATIC_CONFIG
+        value: "false"

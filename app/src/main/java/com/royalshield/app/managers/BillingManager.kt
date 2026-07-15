@@ -34,7 +34,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     private val _purchaseState = MutableStateFlow<PurchaseState>(PurchaseState.Idle)
     val purchaseState: StateFlow<PurchaseState> = _purchaseState.asStateFlow()
 
-    private val _hasPremiumAccess = MutableStateFlow(EntitlementStore.DEV_SUPERPOWERS) // SUPERPOWERS: starts unlocked
+    private val _hasPremiumAccess = MutableStateFlow(false)
     val hasPremiumAccess: StateFlow<Boolean> = _hasPremiumAccess.asStateFlow()
 
     private val _currentProduct = MutableStateFlow<String?>(null)
@@ -129,19 +129,14 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
 
                 if (productId != null) {
                    PreferencesManager.savePurchasedPack(productId)
+                   _currentProduct.value = productId
                 }
                 return hasAccess
             }
-            // Fallback to local
-            val localPack = PreferencesManager.getPurchasedPack()
-            if (localPack != null) {
-                _hasPremiumAccess.value = true
-                return true
-            }
-
             false
         } catch (e: Exception) {
             Log.e(TAG, "Error verifying premium access", e)
+            _hasPremiumAccess.value = false
             false
         }
     }
@@ -369,7 +364,11 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                 val hasActivePurchase = purchases.any {
                     it.purchaseState == Purchase.PurchaseState.PURCHASED
                 }
+                val activeProductId = purchases.firstOrNull {
+                    it.purchaseState == Purchase.PurchaseState.PURCHASED
+                }?.products?.firstOrNull()
                 _hasPremiumAccess.value = if (isDevMode) true else hasActivePurchase
+                _currentProduct.value = if (isDevMode) PRODUCT_ULTIMATE else activeProductId
 
                 Log.d(TAG, "Existing purchases: ${purchases.size}")
             }

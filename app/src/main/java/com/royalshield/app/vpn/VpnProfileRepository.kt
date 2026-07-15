@@ -158,9 +158,13 @@ class VpnProfileRepository {
             val json = if (body.isBlank()) JSONObject() else JSONObject(body)
 
             if (!response.isSuccessful) {
+                val errorJson = json.optJSONObject("detail") ?: json
                 throw VpnConfigurationException(
-                    code = json.optString("code", "HTTP_${response.code}"),
-                    message = json.optString("message", json.optString("error", "VPN request failed"))
+                    code = errorJson.optString("code", "HTTP_${response.code}"),
+                    message = errorJson.optString(
+                        "message",
+                        errorJson.optString("error", "VPN request failed")
+                    )
                 )
             }
             return json

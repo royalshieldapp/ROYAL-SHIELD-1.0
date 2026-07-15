@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.royalshield.app.data.db.AutomationRule
+import com.royalshield.app.features.smarthome.data.DeviceType
+import com.royalshield.app.features.smarthome.data.SmartDevice
 import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.ui.theme.RoyalGold
 import com.royalshield.app.ui.theme.SafeGreen
@@ -32,23 +34,6 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 // --- Smart Home Components ---
-
-enum class DeviceType {
-    LIGHT, PLUG, THERMOSTAT, CAMERA, LOCK, SPEAKER, TV, OTHER
-}
-
-data class SmartDevice(
-    val id: String,
-    val name: String,
-    val type: DeviceType,
-    var isConnected: Boolean = false,
-    var isOn: Boolean = false,
-    var brightness: Float = 1f, // 0f to 1f
-    var lightColor: Color = Color(0xFFFFE4B5), // Warm white default
-    val ipAddress: String = "192.168.1.${(100..200).random()}",
-    val macAddress: String = "A1:B2:C3:D4:E5:${(10..99).random()}",
-    val vendor: String = listOf("Apple", "Samsung", "TP-Link", "Google", "Amazon").random()
-)
 
 @Composable
 fun ScannedDeviceItem(device: SmartDevice, onConnect: () -> Unit) {
@@ -71,8 +56,8 @@ fun ScannedDeviceItem(device: SmartDevice, onConnect: () -> Unit) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(device.name, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("${device.vendor} • ${device.ipAddress}", color = Color.Gray, fontSize = 11.sp)
-                    Text(device.macAddress, color = Color.DarkGray, fontSize = 10.sp)
+                    Text(device.provider, color = Color.Gray, fontSize = 11.sp)
+                    Text(device.endpointLabel, color = Color.DarkGray, fontSize = 10.sp)
                 }
             }
             Text("Connect", color = CyberCyan, fontWeight = FontWeight.Bold)
@@ -97,7 +82,7 @@ fun SmartDeviceControlCard(device: SmartDevice, onUpdate: (SmartDevice) -> Unit)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
-                        color = if (device.isOn) device.lightColor else Color.Gray.copy(alpha = 0.2f),
+                        color = if (device.isOn) Color(device.lightColorArgb) else Color.Gray.copy(alpha = 0.2f),
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -138,7 +123,7 @@ fun SmartDeviceControlCard(device: SmartDevice, onUpdate: (SmartDevice) -> Unit)
                 ) {
                     SegmentedCircularSlider(
                         value = device.brightness,
-                        activeColor = device.lightColor,
+                        activeColor = Color(device.lightColorArgb),
                         onValueChange = { newBrightness ->
                             onUpdate(device.copy(brightness = newBrightness))
                         }
@@ -189,9 +174,9 @@ fun SmartDeviceControlCard(device: SmartDevice, onUpdate: (SmartDevice) -> Unit)
                             colorPalette.take(6).forEach { color ->
                                 ColorSwatch(
                                     color = color,
-                                    isSelected = device.lightColor == color,
+                                    isSelected = device.lightColorArgb == color.value.toLong(),
                                     onClick = {
-                                        onUpdate(device.copy(lightColor = color))
+                                        onUpdate(device.copy(lightColorArgb = color.value.toLong()))
                                     }
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -205,9 +190,9 @@ fun SmartDeviceControlCard(device: SmartDevice, onUpdate: (SmartDevice) -> Unit)
                             colorPalette.drop(6).forEach { color ->
                                 ColorSwatch(
                                     color = color,
-                                    isSelected = device.lightColor == color,
+                                    isSelected = device.lightColorArgb == color.value.toLong(),
                                     onClick = {
-                                        onUpdate(device.copy(lightColor = color))
+                                        onUpdate(device.copy(lightColorArgb = color.value.toLong()))
                                     }
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))

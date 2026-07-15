@@ -206,7 +206,7 @@ fun SubscriptionScreen(
                 }
             }
 
-            if (isPremium || purchasedPack != null) {
+            if (isPremium) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
                         text = "Premium Features Active - ${purchasedPack ?: "Elite User"}", 
