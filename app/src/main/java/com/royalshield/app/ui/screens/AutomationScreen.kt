@@ -115,10 +115,6 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
     // Automation Rules State
     var rules by remember { mutableStateOf(emptyList<AutomationRule>()) }
 
-    var showNetworkTools by remember { mutableStateOf(false) }
-    var showWifiScanDialog by remember { mutableStateOf(false) }
-    var showSpeedTestDialog by remember { mutableStateOf(false) }
-
     // Load initial automation data
     LaunchedEffect(Unit) {
         db.automationDao().getAllRules().collect {
@@ -229,27 +225,6 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                     }
                 }
 
-                // Card 2: NETWORK
-                PremiumGlassCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(100.dp)
-                        .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 7f, maxRotationY = 10f)
-                        .clickable { showNetworkTools = true }
-                    ,
-                    borderColor = RoyalGold.copy(alpha = 0.75f)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                             Icon(Icons.Default.BluetoothSearching, contentDescription = null, tint = NeonBlue, modifier = Modifier.size(32.dp))
-                             Spacer(modifier = Modifier.height(8.dp))
-                             Text("NETWORK", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                    }
-                }
             }
 
             // --- SMART HOME SECTION ---
@@ -401,56 +376,6 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
             }
         }
         
-        if (showNetworkTools) {
-             androidx.compose.material3.AlertDialog(
-                onDismissRequest = { showNetworkTools = false },
-                containerColor = Color(0xFF1A1A1A),
-                title = { Text("Network Tools", color = Color.White, fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        NetworkToolItem(
-                            icon = Icons.Default.Wifi,
-                            title = "WiFi Scan",
-                            description = "Analyze signal strength & channels",
-                            onClick = { 
-                                showNetworkTools = false
-                                showWifiScanDialog = true
-                            }
-                        )
-                         NetworkToolItem(
-                            icon = Icons.Default.CompareArrows,
-                            title = "Ping Tracker",
-                            description = "Monitor latency & packet loss",
-                             onClick = { 
-                                Toast.makeText(context, "Tracking Ping...", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                        NetworkToolItem(
-                            icon = Icons.Default.Timer, // Or Speed/ShutterSpeed
-                            title = "Speed Test",
-                            description = "Measure download/upload speed",
-                             onClick = { 
-                                showNetworkTools = false
-                                showSpeedTestDialog = true
-                            }
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showNetworkTools = false }) {
-                        Text("Close", color = CyberCyan)
-                    }
-                }
-            )
-        }
-        
-        if (showWifiScanDialog) {
-            WifiScanDialog(onDismiss = { showWifiScanDialog = false })
-        }
-        
-        if (showSpeedTestDialog) {
-            com.royalshield.app.ui.components.SpeedTestDialog(onDismiss = { showSpeedTestDialog = false })
-        }
     }
     }
 }

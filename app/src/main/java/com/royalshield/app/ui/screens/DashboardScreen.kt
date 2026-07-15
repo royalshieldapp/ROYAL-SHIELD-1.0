@@ -1688,11 +1688,10 @@ private fun MiniControlButton(
 
 @Composable
 private fun CyberNewsDialog(onDismiss: () -> Unit) {
-    val newsItems = listOf(
-        "Phishing kits are increasingly using AI-written messages and cloned login pages.",
-        "Mobile spyware campaigns keep targeting risky APK installs outside trusted stores.",
-        "Credential stuffing remains high risk when users reuse passwords across services."
-    )
+    val viewModel: com.royalshield.app.features.cybernews.CyberNewsViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel()
+    val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1700,8 +1699,13 @@ private fun CyberNewsDialog(onDismiss: () -> Unit) {
         titleContentColor = RoyalGold,
         textContentColor = Color.White,
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("CLOSE", color = RoyalGold, fontWeight = FontWeight.Bold)
+            Row {
+                TextButton(onClick = viewModel::refresh, enabled = !state.isLoading) {
+                    Text("REFRESH", color = Color(0xFF35D7FF), fontWeight = FontWeight.Bold)
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("CLOSE", color = RoyalGold, fontWeight = FontWeight.Bold)
+                }
             }
         },
         icon = {
@@ -1715,25 +1719,84 @@ private fun CyberNewsDialog(onDismiss: () -> Unit) {
             Text("Cybersecurity News", fontWeight = FontWeight.Black)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                newsItems.forEach { item ->
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .padding(top = 5.dp)
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(RoyalGold)
-                        )
+            when {
+                state.isLoading && state.response == null -> {
+                    Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = RoyalGold)
+                    }
+                }
+                state.errorMessage != null && state.response == null -> {
+                    Text(state.errorMessage ?: "Unable to load news", color = Color(0xFFFF6B6B))
+                }
+                else -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = item,
-                            color = Color.White.copy(alpha = 0.82f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
+                            text = "SOURCE: ${state.response?.source.orEmpty()}  •  ${state.response?.catalogVersion.orEmpty()}",
+                            color = Color(0xFF35D7FF),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
                         )
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.heightIn(max = 430.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            items(
+                                count = state.response?.items?.size ?: 0,
+                                key = { index -> state.response?.items?.get(index)?.cveId ?: index },
+                            ) { index ->
+                                val item = state.response?.items?.get(index) ?: return@items
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color.White.copy(alpha = 0.045f))
+                                        .border(1.dp, RoyalGold.copy(alpha = 0.24f), RoundedCornerShape(14.dp))
+                                        .clickable {
+                                            val intent = android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(item.sourceUrl),
+                                            )
+                                            context.startActivity(intent)
+                                        }
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(item.cveId, color = RoyalGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                        Text(item.dateAdded, color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
+                                    }
+                                    Text(
+                                        text = "${item.vendor} • ${item.product}",
+                                        color = Color(0xFF35D7FF),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    Text(item.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        item.summary,
+                                        color = Color.White.copy(alpha = 0.76f),
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp,
+                                        maxLines = 3,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = "ACTION: ${item.requiredAction}",
+                                        color = Color(0xFFFFC857),
+                                        fontSize = 10.sp,
+                                        lineHeight = 14.sp,
+                                        maxLines = 2,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                        if (state.isLoading) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = RoyalGold)
+                        }
                     }
                 }
             }

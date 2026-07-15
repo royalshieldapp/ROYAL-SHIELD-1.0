@@ -60,8 +60,13 @@ fun RoyalShieldNavGraph(
                 onNavigateToCourses = { navController.navigate("courses") },
                 onNavigateToVoiceScam = { navController.navigate("voice_scam") },
                 onNavigateToXdr = { navController.navigate("xdr_dashboard") },
-                onNavigateToIntel = { navController.navigate("intel_hub") }
+                onNavigateToIntel = { navController.navigate("intel_hub") },
+                onNavigateToNetworkToolkit = { navController.navigate("network_toolkit") }
             )
+        }
+
+        composable("network_toolkit") {
+            NetworkToolkitScreen(onBack = { navController.popBackStack() })
         }
 
 

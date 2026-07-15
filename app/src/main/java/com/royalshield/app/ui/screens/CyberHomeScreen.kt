@@ -21,8 +21,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
@@ -41,6 +43,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -60,6 +63,9 @@ import com.royalshield.app.ui.components.CyberButtonRound
 import com.royalshield.app.ui.components.CyberButtonRect
 import com.royalshield.app.ui.theme.*
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.royalshield.app.features.threatmap.LiveCyberThreatMap
+import com.royalshield.app.features.threatmap.ThreatMapViewModel
 
 @Composable
 fun CyberHomeScreen(
@@ -68,10 +74,13 @@ fun CyberHomeScreen(
     onNavigateToCourses: () -> Unit,
     onNavigateToVoiceScam: () -> Unit = {},
     onNavigateToXdr: () -> Unit = {},
-    onNavigateToIntel: () -> Unit = {}
+    onNavigateToIntel: () -> Unit = {},
+    onNavigateToNetworkToolkit: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val threatMapViewModel: ThreatMapViewModel = viewModel()
+    val threatMapState by threatMapViewModel.uiState.collectAsState()
 
     // Vulnerability Analysis State
     val vulnerabilities by VulnerabilityManager.vulnerabilities.collectAsState()
@@ -262,6 +271,26 @@ fun CyberHomeScreen(
 
                 }
 
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF171D27))
+                        .border(1.dp, RoyalGold.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
+                        .clickable(onClick = onNavigateToNetworkToolkit)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = RoyalGold, modifier = Modifier.size(30.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("NETWORK TOOLKIT", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                        Text("Connectivity and security diagnostics", color = Color.White.copy(alpha = .62f), fontSize = 11.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = RoyalGold)
+                }
+
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -276,22 +305,6 @@ fun CyberHomeScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Dynamic Metrics State
-                var attacksCount by remember { mutableLongStateOf(1240500L) }
-                var botnetsCount by remember { mutableIntStateOf(892) }
-                var iotCount by remember { mutableIntStateOf(45200) }
-
-                // Simulation Loop
-                LaunchedEffect(Unit) {
-                    while (true) {
-                        kotlinx.coroutines.delay(800) // Update every 800ms
-                        attacksCount += (1..50).random()
-                        // Random fluctuation for botnets
-                        if ((0..1).random() == 1) botnetsCount += (1..3).random() else botnetsCount -= (1..3).random()
-                        iotCount += (1..10).random()
-                    }
-                }
-
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -299,43 +312,29 @@ fun CyberHomeScreen(
                         .padding(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween // Space them evenly
                 ) {
-                    CyberMetricCard("Attacks", String.format("%,d", attacksCount), NeonRed)
-                    CyberMetricCard("Target", "Banking", CyberCyan)
-                    CyberMetricCard("Botnets", botnetsCount.toString(), RoyalGold)
+                    CyberMetricCard("Events", threatMapState.events.size.toString(), NeonRed)
+                    CyberMetricCard("Target", threatMapState.primaryTarget, CyberCyan)
+                    CyberMetricCard("Alerts", threatMapState.alertCount.toString(), RoyalGold)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Cyber Stats Graph
-                Image(
-                    painter = painterResource(id = com.royalshield.app.R.drawable.cyber_stats_graph),
-                    contentDescription = "Global Cybercrime Cost Evolution",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp) // Slightly taller to show the graph clearly
-                        .padding(horizontal = 0.dp),
-                    contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Row(
+                LiveCyberThreatMap(
+                    state = threatMapState,
+                    onRefresh = threatMapViewModel::refresh,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    CyberEmbedCard(
-                        title = "THREAT EDUCATION",
-                        assetPath = "file:///android_asset/threat_education_embed.html",
-                        modifier = Modifier.weight(1f).height(190.dp)
-                    )
-                    CyberEmbedCard(
-                        title = "ROYAL TERMS",
-                        assetPath = "file:///android_asset/terms_embed.html",
-                        modifier = Modifier.weight(1f).height(190.dp)
-                    )
-                }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                CybercrimeCostChart(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(270.dp)
+                        .padding(horizontal = 20.dp)
+                )
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -452,43 +451,120 @@ fun CyberHomeScreen(
     }
 
 @Composable
-private fun CyberEmbedCard(
-    title: String,
-    assetPath: String,
+private fun CybercrimeCostChart(
     modifier: Modifier = Modifier
 ) {
+    val transition = rememberInfiniteTransition(label = "cybercrime-chart")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 5_800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "chart-line-progress"
+    )
+    val glowOffset by transition.animateFloat(
+        initialValue = -0.25f,
+        targetValue = 1.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 7_500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "chart-background-glow"
+    )
+    val values = remember { listOf(6f, 9f, 8.4f, 11.2f, 12.6f, 13.9f) }
+    val years = remember { listOf("2021", "2022", "2023", "2024", "2025", "2026") }
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF0D0D12))
-            .border(1.dp, CyberCyan.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
+            .background(Color(0xFF08080C))
+            .border(1.dp, Color(0xFFFF5050).copy(alpha = 0.38f), RoundedCornerShape(24.dp))
     ) {
-        androidx.compose.ui.viewinterop.AndroidView(
-            factory = { ctx ->
-                android.webkit.WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    webViewClient = android.webkit.WebViewClient()
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    loadUrl(assetPath)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.62f))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .align(Alignment.TopStart)
-        ) {
-            Text(
-                title,
-                color = CyberCyan,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0x66FF3030), Color.Transparent),
+                    center = androidx.compose.ui.geometry.Offset(size.width * glowOffset, size.height * 0.45f),
+                    radius = size.width * 0.72f
+                )
             )
+
+            val left = 42.dp.toPx()
+            val right = size.width - 14.dp.toPx()
+            val top = 62.dp.toPx()
+            val bottom = size.height - 34.dp.toPx()
+            val chartWidth = right - left
+            val chartHeight = bottom - top
+            val minValue = 5f
+            val maxValue = 15f
+            fun point(index: Int): androidx.compose.ui.geometry.Offset {
+                val x = left + chartWidth * index / values.lastIndex
+                val y = bottom - ((values[index] - minValue) / (maxValue - minValue)) * chartHeight
+                return androidx.compose.ui.geometry.Offset(x, y)
+            }
+
+            listOf(5f, 10f, 15f).forEach { tick ->
+                val y = bottom - ((tick - minValue) / (maxValue - minValue)) * chartHeight
+                drawLine(Color.White.copy(alpha = 0.10f), androidx.compose.ui.geometry.Offset(left, y), androidx.compose.ui.geometry.Offset(right, y), 1.dp.toPx())
+            }
+            years.indices.forEach { index ->
+                val x = point(index).x
+                drawLine(Color.White.copy(alpha = 0.08f), androidx.compose.ui.geometry.Offset(x, top), androidx.compose.ui.geometry.Offset(x, bottom), 1.dp.toPx())
+            }
+
+            val completedSegment = progress.toInt().coerceIn(0, values.lastIndex)
+            val segmentProgress = progress - completedSegment
+            val path = androidx.compose.ui.graphics.Path().apply {
+                val first = point(0)
+                moveTo(first.x, first.y)
+                for (index in 1..completedSegment) {
+                    val next = point(index)
+                    lineTo(next.x, next.y)
+                }
+                if (completedSegment < values.lastIndex) {
+                    val from = point(completedSegment)
+                    val to = point(completedSegment + 1)
+                    lineTo(
+                        from.x + (to.x - from.x) * segmentProgress,
+                        from.y + (to.y - from.y) * segmentProgress
+                    )
+                }
+            }
+            drawPath(path, Color(0xFFFF3C3C), style = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+
+            values.indices.forEach { index ->
+                val p = point(index)
+                val active = index == (completedSegment + 1).coerceAtMost(values.lastIndex)
+                drawCircle(Color(0xFFFF3C3C).copy(alpha = if (active) 0.30f else 0.12f), radius = if (active) 10.dp.toPx() else 7.dp.toPx(), center = p)
+                drawCircle(Color.White, radius = if (active) 4.5.dp.toPx() else 3.5.dp.toPx(), center = p)
+                drawCircle(Color(0xFFFF3C3C), radius = if (active) 4.5.dp.toPx() else 3.5.dp.toPx(), center = p, style = Stroke(1.5.dp.toPx()))
+            }
+
+            drawContext.canvas.nativeCanvas.apply {
+                val titlePaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.rgb(255, 90, 90)
+                    textSize = 14.sp.toPx()
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    isAntiAlias = true
+                }
+                drawText("GLOBAL CYBERCRIME COST EVOLUTION", size.width / 2f, 25.dp.toPx(), titlePaint)
+                val labelPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.argb(165, 255, 255, 255)
+                    textSize = 9.sp.toPx()
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    isAntiAlias = true
+                }
+                drawText("USD TRILLIONS • PROVIDED DATASET • 2021–2026", size.width / 2f, 43.dp.toPx(), labelPaint)
+                years.forEachIndexed { index, year -> drawText(year, point(index).x, size.height - 12.dp.toPx(), labelPaint) }
+                val yPaint = android.graphics.Paint(labelPaint).apply { textAlign = android.graphics.Paint.Align.RIGHT }
+                listOf(5, 10, 15).forEach { tick ->
+                    val y = bottom - ((tick - minValue) / (maxValue - minValue)) * chartHeight
+                    drawText("$${tick}T", left - 6.dp.toPx(), y + 3.dp.toPx(), yPaint)
+                }
+            }
         }
     }
 }
