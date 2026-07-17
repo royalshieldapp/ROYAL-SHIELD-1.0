@@ -79,6 +79,7 @@ def get_db_context() -> Generator[Session, None, None]:
 
 def init_db():
     """Initialize database (create tables if not exist)"""
+    from services.data_ingestion import storage as _forecast_storage  # noqa: F401
     logger.info("Initializing database at host: %s", settings.database_host)
     Base.metadata.create_all(bind=engine)
     logger.info("Database initialized successfully")

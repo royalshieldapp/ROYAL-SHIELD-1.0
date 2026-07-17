@@ -4,7 +4,7 @@ Aggregates events and POIs into H3 cells for analysis
 """
 from typing import List, Dict, Any
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from .h3_grid import get_h3_generator
@@ -24,7 +24,8 @@ class SpatialAggregator:
     def aggregate_events_by_cell(
         self,
         events: List[Dict[str, Any]],
-        time_window_days: int = 30
+        time_window_days: int = 30,
+        reference_time: datetime = None,
     ) -> Dict[str, Dict[str, Any]]:
         """
         Aggregate events into H3 cells
@@ -52,8 +53,11 @@ class SpatialAggregator:
             "latest_event_date": None
         })
 
-        cutoff_7d = datetime.utcnow() - timedelta(days=7)
-        cutoff_30d = datetime.utcnow() - timedelta(days=time_window_days)
+        reference_time = reference_time or datetime.now(timezone.utc)
+        if reference_time.tzinfo is None:
+            reference_time = reference_time.replace(tzinfo=timezone.utc)
+        cutoff_7d = reference_time - timedelta(days=7)
+        cutoff_30d = reference_time - timedelta(days=time_window_days)
 
         for event in events:
             # Get H3 cell for event location
@@ -96,6 +100,8 @@ class SpatialAggregator:
             if occurred_at:
                 if isinstance(occurred_at, str):
                     occurred_at = datetime.fromisoformat(occurred_at.replace("Z", "+00:00"))
+                if occurred_at.tzinfo is None:
+                    occurred_at = occurred_at.replace(tzinfo=timezone.utc)
 
                 if occurred_at >= cutoff_7d:
                     cell["recent_events_7d"] += 1

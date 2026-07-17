@@ -164,14 +164,8 @@ class OpenStreetMapCollector(BaseCollector):
 
     async def store(self, records: List[Dict[str, Any]]) -> Dict[str, int]:
         """Store OSM POI data in database"""
-        # TODO: Implement database storage
-        logger.info(f"Would store {len(records)} OSM POIs")
-
-        return {
-            "records_inserted": len(records),
-            "records_updated": 0,
-            "records_failed": 0
-        }
+        from services.data_ingestion.storage import store_forecast_pois
+        return store_forecast_pois(records)
 
     def _build_overpass_query(self, bbox: str, filter_string: str) -> str:
         """

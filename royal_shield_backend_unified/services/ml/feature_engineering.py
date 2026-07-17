@@ -5,7 +5,7 @@ Extracts and transforms features from spatial and temporal data
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 import logging
 
@@ -34,7 +34,8 @@ class FeatureEngineer:
         self,
         events: List[Dict[str, Any]],
         pois: List[Dict[str, Any]] = None,
-        lookback_days: int = 90
+        lookback_days: int = 90,
+        reference_time: datetime = None,
     ) -> pd.DataFrame:
         """
         Create complete feature dataset for ML training
@@ -50,7 +51,9 @@ class FeatureEngineer:
         logger.info("Engineering features for ML training...")
 
         # Aggregate events by H3 cell
-        event_metrics = self.aggregator.aggregate_events_by_cell(events, lookback_days)
+        event_metrics = self.aggregator.aggregate_events_by_cell(
+            events, lookback_days, reference_time=reference_time
+        )
 
         # Aggregate POIs if provided
         poi_metrics = None
@@ -80,6 +83,58 @@ class FeatureEngineer:
 
         logger.info(f"Created dataset with {len(df)} cells and {len(df.columns)} features")
         return df
+
+    def create_forecast_dataset(
+        self,
+        events: List[Dict[str, Any]],
+        pois: List[Dict[str, Any]] = None,
+        lookback_days: int = 90,
+        forecast_days: int = 7,
+        step_days: int = 7,
+    ) -> pd.DataFrame:
+        """Build leakage-safe samples using history before each cutoff as features."""
+        normalized = []
+        for event in events:
+            occurred_at = event.get("occurred_at")
+            if isinstance(occurred_at, str):
+                occurred_at = datetime.fromisoformat(occurred_at.replace("Z", "+00:00"))
+            if not isinstance(occurred_at, datetime):
+                continue
+            if occurred_at.tzinfo is None:
+                occurred_at = occurred_at.replace(tzinfo=timezone.utc)
+            item = dict(event)
+            item["occurred_at"] = occurred_at
+            normalized.append(item)
+
+        if not normalized:
+            return pd.DataFrame()
+
+        normalized.sort(key=lambda item: item["occurred_at"])
+        first = normalized[0]["occurred_at"] + timedelta(days=lookback_days)
+        last = normalized[-1]["occurred_at"] - timedelta(days=forecast_days)
+        rows = []
+        cutoff = first
+
+        while cutoff <= last:
+            history_start = cutoff - timedelta(days=lookback_days)
+            target_end = cutoff + timedelta(days=forecast_days)
+            history = [e for e in normalized if history_start <= e["occurred_at"] < cutoff]
+            future = [e for e in normalized if cutoff <= e["occurred_at"] < target_end]
+            if history and future:
+                features = self.create_training_dataset(
+                    history, pois, lookback_days, reference_time=cutoff
+                )
+                future_metrics = self.aggregator.aggregate_events_by_cell(
+                    future, forecast_days, reference_time=target_end
+                )
+                targets = self.aggregator.calculate_risk_scores(future_metrics)
+                if not features.empty:
+                    features["risk_score"] = features["h3_cell"].map(targets).fillna(0.0)
+                    features["forecast_cutoff"] = cutoff.isoformat()
+                    rows.extend(features.to_dict("records"))
+            cutoff += timedelta(days=step_days)
+
+        return pd.DataFrame(rows)
 
     def _extract_cell_features(
         self,

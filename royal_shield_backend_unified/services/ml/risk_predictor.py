@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Tuple
 from pathlib import Path
 import pickle
 import logging
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from .feature_engineering import get_feature_engineer
 
@@ -72,15 +73,17 @@ class RiskPredictor:
         """
         logger.info("Training XGBoost risk predictor...")
 
-        # Create training dataset
-        df = self.feature_engineer.create_training_dataset(
-            events,
-            pois,
-            lookback_days
-        )
+        if not getattr(xgb, "__version__", None):
+            raise RuntimeError(
+                "The local xgboost.py mock is shadowing the real XGBoost package"
+            )
 
-        # Remove cells with no events (zero risk)
-        df = df[df["risk_score"] > 0].copy()
+        # Create chronological, leakage-safe forecast samples.
+        df = self.feature_engineer.create_forecast_dataset(
+            events=events,
+            pois=pois,
+            lookback_days=lookback_days,
+        )
 
         if len(df) < 10:
             logger.warning(f"Not enough data for training ({len(df)} cells)")
@@ -92,7 +95,12 @@ class RiskPredictor:
         # Split features and target
         target_col = "risk_score"
         id_col = "h3_cell"
-        feature_cols = [col for col in df.columns if col not in [target_col, id_col]]
+        feature_cols = [
+            col for col in df.columns
+            if col not in [target_col, id_col, "forecast_cutoff"]
+        ]
+
+        df = df.sort_values("forecast_cutoff").reset_index(drop=True)
 
         X = df[feature_cols]
         y = df[target_col]
@@ -117,6 +125,9 @@ class RiskPredictor:
         # Evaluate
         train_score = self.model.score(X_train, y_train)
         val_score = self.model.score(X_val, y_val)
+        val_predictions = self.model.predict(X_val)
+        mae = mean_absolute_error(y_val, val_predictions)
+        rmse = mean_squared_error(y_val, val_predictions) ** 0.5
 
         # Get feature importance
         feature_importance = self._get_feature_importance()
@@ -127,6 +138,8 @@ class RiskPredictor:
             "status": "success",
             "r2_train": train_score,
             "r2_val": val_score,
+            "mae_val": float(mae),
+            "rmse_val": float(rmse),
             "n_samples_train": len(X_train),
             "n_samples_val": len(X_val),
             "n_features": len(feature_cols),

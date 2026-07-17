@@ -87,6 +87,11 @@ class Settings(BaseSettings):
 
     news_api_key: Optional[str] = Field(default=None, alias="NEWS_API_KEY")
 
+    # Cyber threat intelligence. CISA KEV is public and requires no key.
+    otx_api_key: Optional[str] = Field(default=None, alias="OTX_API_KEY")
+    abuseipdb_api_key: Optional[str] = Field(default=None, alias="ABUSEIPDB_API_KEY")
+    cyber_feed_limit: int = Field(default=500, alias="CYBER_FEED_LIMIT")
+
     twitter_bearer_token: Optional[str] = Field(default=None, alias="TWITTER_BEARER_TOKEN")
     twitter_api_key: Optional[str] = Field(default=None, alias="TWITTER_API_KEY")
     twitter_api_secret: Optional[str] = Field(default=None, alias="TWITTER_API_SECRET")
@@ -152,6 +157,7 @@ class Settings(BaseSettings):
     enable_crime_collection: bool = Field(default=True, alias="ENABLE_CRIME_COLLECTION")
     enable_environmental_collection: bool = Field(default=True, alias="ENABLE_ENVIRONMENTAL_COLLECTION")
     enable_osint_collection: bool = Field(default=True, alias="ENABLE_OSINT_COLLECTION")
+    enable_cyber_collection: bool = Field(default=True, alias="ENABLE_CYBER_COLLECTION")
     enable_camera_integration: bool = Field(default=False, alias="ENABLE_CAMERA_INTEGRATION")
     enable_ml_predictions: bool = Field(default=True, alias="ENABLE_ML_PREDICTIONS")
     enable_vector_search: bool = Field(default=True, alias="ENABLE_VECTOR_SEARCH")

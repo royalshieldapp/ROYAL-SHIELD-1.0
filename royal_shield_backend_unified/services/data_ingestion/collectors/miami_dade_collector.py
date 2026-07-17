@@ -126,16 +126,8 @@ class MiamiDadeCrimeCollector(BaseCollector):
 
     async def store(self, records: List[Dict[str, Any]]) -> Dict[str, int]:
         """Store Miami-Dade crime data in database"""
-        # TODO: Implement database storage using SQLAlchemy
-        # For now, return zero stats (will implement with ORM models)
-
-        logger.info(f"Would store {len(records)} Miami-Dade crime records")
-
-        return {
-            "records_inserted": len(records),  # Simulated
-            "records_updated": 0,
-            "records_failed": 0
-        }
+        from services.data_ingestion.storage import store_forecast_events
+        return store_forecast_events(records)
 
     def _build_where_clause(
         self,
