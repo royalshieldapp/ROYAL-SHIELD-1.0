@@ -577,10 +577,19 @@ fun DashboardScreen(
 
 
                 var isArmed by remember { mutableStateOf(PreferencesManager.isSystemArmed()) }
+                var lockIconRes by remember { mutableIntStateOf(RoyalIcons.LockGoldLarge) }
+                LaunchedEffect(lockIconRes) {
+                    if (lockIconRes != RoyalIcons.LockGoldLarge) {
+                        delay(5_000)
+                        lockIconRes = RoyalIcons.LockGoldLarge
+                    }
+                }
                 DisposableEffect(Unit) {
                     val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                         if (key == PreferencesManager.KEY_SYSTEM_ARMED) {
-                            isArmed = PreferencesManager.isSystemArmed()
+                            val updatedArmedState = PreferencesManager.isSystemArmed()
+                            isArmed = updatedArmedState
+                            lockIconRes = if (updatedArmedState) RoyalIcons.LockGreenLarge else RoyalIcons.LockRedLarge
                         }
                     }
                     PreferencesManager.registerListener(listener)
@@ -651,6 +660,7 @@ fun DashboardScreen(
                                 val targetState = !isArmed
                                 PreferencesManager.setSystemArmed(targetState)
                                 isArmed = targetState
+                                lockIconRes = if (targetState) RoyalIcons.LockGreenLarge else RoyalIcons.LockRedLarge
                                 showArmedDialog = false
                             }) {
                                 Text(
@@ -681,6 +691,7 @@ fun DashboardScreen(
                         .background(Color(0xFF0F0F13).copy(alpha = 0.4f))
                         .border(1.dp, RoyalGold.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                 ) {
+                    GoldenSecurityWave(modifier = Modifier.matchParentSize())
                     SystemSecurityParticles(modifier = Modifier.matchParentSize())
 
                     Column(
@@ -688,7 +699,7 @@ fun DashboardScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                    val rotatingColor = if (isArmed) Color(0xFF00FF94) else Color.Red
+                    val rotatingColor = RoyalGold
 
                     val rotationTransition = rememberInfiniteTransition(label = "lock_rotation")
                     val angle by rotationTransition.animateFloat(
@@ -811,7 +822,7 @@ fun DashboardScreen(
                             }
                         }
 
-                        // Orbiting particles that follow the armed/disarmed status color.
+                        // Gold orbiting particles preserve the premium black-and-gold identity.
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val particleCount = 18
@@ -858,7 +869,7 @@ fun DashboardScreen(
 
                         // Padlock Image - Perfectly centered
                         Image(
-                            painter = painterResource(id = RoyalIcons.LockGoldLarge),
+                            painter = painterResource(id = lockIconRes),
                             contentDescription = "ArmedStatus",
                             modifier = Modifier.size(38.dp)
                         )
@@ -868,11 +879,24 @@ fun DashboardScreen(
 
                     // ARMED Text with Gold Lux Frame
                     com.royalshield.app.ui.components.GoldLuxFrame {
-                        com.royalshield.app.ui.components.GoldLuxText(
-                            text = if(isArmed) "SYSTEM ARMED" else "SYSTEM DISARMED",
-                            fontSize = 13,
-                            letterSpacing = 1.5f
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(8.dp)) {
+                                drawCircle(
+                                    color = if (isArmed) Color(0xFF00FF94) else Color(0xFFFF3B30)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isArmed) "SYSTEM ARMED" else "SYSTEM DISARMED",
+                                color = if (isArmed) Color(0xFF00FF94) else Color(0xFFFF3B30),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp
+                            )
+                        }
                     }
                     }
                 }

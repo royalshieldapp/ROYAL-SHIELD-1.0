@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -406,20 +408,43 @@ fun SettingsScreen(
                     }
                 }
 
-                // 8. Support & Contact Section
+                // 8. Support & Feedback Section
                 SettingsSection(
-                    title = "📧 Support & Contact",
-                    description = "Get in touch with Royal Shield"
+                    title = "Support & Feedback",
+                    description = "Contact Royal Shield or share your experience"
                 ) {
-                    CyberButtonRect(
-                        text = "Contact Support",
-                        icon = Icons.Default.Email,
-                        color = CyberCyan,
-                        onClick = {
-                            activeContentWindow = SettingsContentWindow.ContactSupport
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CyberButtonRect(
+                            text = "Contact Support",
+                            icon = Icons.Default.Email,
+                            color = CyberCyan,
+                            onClick = {
+                                activeContentWindow = SettingsContentWindow.ContactSupport
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        GooglePlayFeedbackButton(
+                            onClick = {
+                                val appId = context.packageName
+                                val playStoreIntent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("market://details?id=$appId")
+                                )
+                                try {
+                                    context.startActivity(playStoreIntent)
+                                } catch (_: Exception) {
+                                    context.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("https://play.google.com/store/apps/details?id=$appId")
+                                        )
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
 
                 // 9. Social Section (Placeholder)
@@ -574,6 +599,58 @@ private fun SocialActionButton(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun GooglePlayFeedbackButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier
+            .height(72.dp)
+            .border(BorderStroke(1.dp, RoyalGold.copy(alpha = 0.8f)), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = Color(0xFF151515).copy(alpha = 0.97f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(
+                    id = com.royalshield.app.R.drawable.ic_google_play_feedback
+                ),
+                contentDescription = "Google Play Store",
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "RATE US ON GOOGLE PLAY",
+                    color = RoyalGold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = "Share feedback and support Royal Shield",
+                    color = Color.White.copy(alpha = 0.68f),
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 }

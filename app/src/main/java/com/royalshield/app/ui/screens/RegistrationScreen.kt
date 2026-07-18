@@ -1,9 +1,15 @@
 package com.royalshield.app.ui.screens
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -43,6 +50,130 @@ import com.royalshield.app.R
 import com.royalshield.app.ui.components.RoyalGoldButton
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
+
+private data class RegistrationParticle(
+    val x: Float,
+    val y: Float,
+    val radius: Float,
+    val speed: Float,
+    val drift: Float,
+    val phase: Float,
+    val color: Color
+)
+
+@Composable
+private fun rememberRegistrationTilt(): Pair<Float, Float> {
+    val context = LocalContext.current
+    var tiltX by remember { mutableFloatStateOf(0f) }
+    var tiltY by remember { mutableFloatStateOf(0f) }
+
+    DisposableEffect(context) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
+            ?: sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        var baselinePitch: Float? = null
+        var baselineRoll: Float? = null
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val rotationMatrix = FloatArray(9)
+                val orientation = FloatArray(3)
+                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                SensorManager.getOrientation(rotationMatrix, orientation)
+
+                val pitch = orientation[1]
+                val roll = orientation[2]
+                if (baselinePitch == null || baselineRoll == null) {
+                    baselinePitch = pitch
+                    baselineRoll = roll
+                    return
+                }
+
+                fun angleDelta(current: Float, baseline: Float): Float {
+                    var delta = current - baseline
+                    while (delta > PI.toFloat()) delta -= (2f * PI.toFloat())
+                    while (delta < -PI.toFloat()) delta += (2f * PI.toFloat())
+                    return delta
+                }
+
+                val targetX = (angleDelta(roll, baselineRoll!!) / 0.35f).coerceIn(-1f, 1f)
+                val targetY = (angleDelta(pitch, baselinePitch!!) / 0.35f).coerceIn(-1f, 1f)
+                tiltX += (targetX - tiltX) * 0.14f
+                tiltY += (targetY - tiltY) * 0.14f
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+
+        if (rotationSensor != null) {
+            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+        }
+
+        onDispose {
+            sensorManager.unregisterListener(listener)
+        }
+    }
+
+    return tiltX to tiltY
+}
+
+@Composable
+private fun CyberParticleField(
+    tiltX: Float,
+    tiltY: Float,
+    modifier: Modifier = Modifier
+) {
+    val particles = remember {
+        val random = Random(7421)
+        List(52) { index ->
+            RegistrationParticle(
+                x = random.nextFloat(),
+                y = random.nextFloat(),
+                radius = random.nextFloat() * 2.2f + 0.8f,
+                speed = random.nextFloat() * 0.045f + 0.018f,
+                drift = random.nextFloat() * 0.035f + 0.008f,
+                phase = random.nextFloat() * (2f * PI.toFloat()),
+                color = if (index % 3 == 0) Color(0xFFFF32D2) else Color(0xFF27DFFF)
+            )
+        }
+    }
+    var elapsedSeconds by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        val startedAt = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { frameTime ->
+                elapsedSeconds = (frameTime - startedAt) / 1_000_000_000f
+            }
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        particles.forEach { particle ->
+            val animatedY = (particle.y - elapsedSeconds * particle.speed).let {
+                ((it % 1.15f) + 1.15f) % 1.15f
+            } - 0.08f
+            val wave = sin(elapsedSeconds * 0.8f + particle.phase) * particle.drift
+            val px = (particle.x + wave + tiltX * 0.018f) * size.width
+            val py = (animatedY + tiltY * 0.012f) * size.height
+            val pulse = 0.55f + 0.45f * sin(elapsedSeconds * 1.6f + particle.phase)
+
+            drawCircle(
+                color = particle.color.copy(alpha = 0.10f + pulse * 0.16f),
+                radius = particle.radius * 3.2f,
+                center = androidx.compose.ui.geometry.Offset(px, py)
+            )
+            drawCircle(
+                color = particle.color.copy(alpha = 0.35f + pulse * 0.45f),
+                radius = particle.radius,
+                center = androidx.compose.ui.geometry.Offset(px, py)
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +187,7 @@ fun RegistrationScreen(
     var isLoading by remember { mutableStateOf(false) }
     var showEmailForm by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val (backgroundTiltX, backgroundTiltY) = rememberRegistrationTilt()
 
     // Firebase Auth instance
     val auth = remember {
@@ -112,11 +244,24 @@ fun RegistrationScreen(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Background image - Cybersecurity with lock
+        // Cyber face background with a subtle sensor-driven parallax effect.
         Image(
-            painter = painterResource(id = R.drawable.bg_google_login),
+            painter = painterResource(id = R.drawable.bg_registration_cyber_face),
             contentDescription = null,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = 1.12f
+                    scaleY = 1.12f
+                    translationX = backgroundTiltX * 28.dp.toPx()
+                    translationY = backgroundTiltY * 22.dp.toPx()
+                }
+        )
+
+        CyberParticleField(
+            tiltX = backgroundTiltX,
+            tiltY = backgroundTiltY,
             modifier = Modifier.fillMaxSize()
         )
         

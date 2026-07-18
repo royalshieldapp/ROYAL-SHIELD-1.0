@@ -27,9 +27,10 @@ object NetworkSpeedTestRepository {
 
     suspend fun run(): NetworkSpeedResult = withContext(Dispatchers.IO) {
         val baseUrl = BuildConfig.API_BASE_URL.trimEnd('/')
-        val ping = measurePing("$baseUrl/api/system/speed-test/ping")
-        val download = measureDownload("$baseUrl/api/system/speed-test/download?bytes=$DOWNLOAD_BYTES")
-        val upload = measureUpload("$baseUrl/api/system/speed-test/upload")
+        val systemUrl = "$baseUrl/api/v1/system/speed-test"
+        val ping = measurePing("$systemUrl/ping")
+        val download = measureDownload("$systemUrl/download?bytes=$DOWNLOAD_BYTES")
+        val upload = measureUpload("$systemUrl/upload")
         NetworkSpeedResult(ping, download, upload)
     }
 
@@ -50,6 +51,7 @@ object NetworkSpeedTestRepository {
                 check(response.isSuccessful) { "Download failed: ${response.code}" }
                 response.body?.bytes()?.size ?: error("Empty download response")
             }
+        check(bytes == DOWNLOAD_BYTES) { "Incomplete download payload" }
         return megabitsPerSecond(bytes, System.nanoTime() - started)
     }
 

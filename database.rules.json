@@ -1,0 +1,21 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "profile": {
+          ".validate": "newData.hasChildren(['name', 'email', 'updatedAt'])",
+          "name": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 60" },
+          "email": { ".validate": "newData.isString() && newData.val().length <= 320" },
+          "phone": { ".validate": "newData.isString() && newData.val().length <= 25" },
+          "city": { ".validate": "newData.isString() && newData.val().length <= 80" },
+          "country": { ".validate": "newData.isString() && newData.val().length <= 80" },
+          "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now" }
+        }
+      }
+    }
+  }
+}

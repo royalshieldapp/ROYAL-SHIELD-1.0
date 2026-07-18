@@ -14,6 +14,8 @@ object RoyalIcons {
     val GalleryGold = R.drawable.gallery_icon_sin_frame
     val LockGold = R.drawable.ic_lock_gold
     val LockGoldLarge = R.drawable.ic_lock_gold_large
+    val LockGreenLarge = R.drawable.ic_lock_green_large
+    val LockRedLarge = R.drawable.ic_lock_red_large
     val NavAutomation = R.drawable.nav_automation
 
     // Feature Grid Icons (New structure)
