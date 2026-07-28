@@ -124,6 +124,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_expire_minutes: int = Field(default=60, alias="JWT_EXPIRE_MINUTES")
     rate_limit_per_minute: int = Field(default=60, alias="RATE_LIMIT_PER_MINUTE")
+    firebase_project_id: Optional[str] = Field(default=None, alias="FIREBASE_PROJECT_ID")
+    firebase_service_account_json: Optional[str] = Field(
+        default=None,
+        alias="FIREBASE_SERVICE_ACCOUNT_JSON",
+    )
 
     # =============================================================================
     # APPLICATION
@@ -176,6 +181,8 @@ class Settings(BaseSettings):
     vpn_server_public_key: Optional[str] = Field(default=None, alias="VPN_SERVER_PUBLIC_KEY")
     vpn_server_private_key: Optional[str] = Field(default=None, alias="VPN_SERVER_PRIVATE_KEY")
     vpn_allow_static_config: bool = Field(default=False, alias="VPN_ALLOW_STATIC_CONFIG")
+    vpn_control_url: Optional[str] = Field(default=None, alias="VPN_CONTROL_URL")
+    vpn_control_secret: Optional[str] = Field(default=None, alias="VPN_CONTROL_SECRET")
 
     @field_validator("environment", mode="before")
     @classmethod

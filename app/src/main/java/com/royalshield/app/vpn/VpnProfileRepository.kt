@@ -1,8 +1,8 @@
 package com.royalshield.app.vpn
 
+import android.content.Context
 import android.util.Log
 import com.royalshield.app.BuildConfig
-import com.wireguard.crypto.KeyPair
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -36,7 +36,9 @@ class VpnConfigurationException(
  * Fetches WireGuard VPN status and profiles from the Royal Shield backend.
  * This class intentionally does not provide fallback/mock configs.
  */
-class VpnProfileRepository {
+class VpnProfileRepository(context: Context) {
+    private val keyStore = VpnKeyStore(context)
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -106,13 +108,14 @@ class VpnProfileRepository {
         }
     }
 
-    suspend fun getVpnConfig(serverId: String, userId: String = "android-client"): Result<String> =
+    suspend fun getVpnConfig(serverId: String): Result<String> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val keyPair = KeyPair()
+                val keyPair = keyStore.getOrCreateKeyPair()
+                val clientId = keyStore.getOrCreateClientId()
                 val payload = JSONObject().apply {
                     put("serverId", serverId)
-                    put("userId", userId)
+                    put("userId", clientId)
                     put("publicKey", keyPair.publicKey.toBase64())
                 }
 

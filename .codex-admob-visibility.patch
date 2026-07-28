@@ -1,0 +1,106 @@
+diff --git a/app/src/main/java/com/royalshield/app/MainActivity.kt b/app/src/main/java/com/royalshield/app/MainActivity.kt
+--- a/app/src/main/java/com/royalshield/app/MainActivity.kt
++++ b/app/src/main/java/com/royalshield/app/MainActivity.kt
+@@ -457,6 +457,8 @@ fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager)
+     val context = LocalContext.current
+     val navController = rememberNavController()
++    val hasPremiumAccess by billingManager.hasPremiumAccess.collectAsState()
++    val showAds = !hasPremiumAccess
+ 
+     // Service activation (Safe Mode) - Enabled
+     // Service activation (Safe Mode) - Enabled
+@@ -475,12 +477,13 @@ fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager)
+     Scaffold(
+         containerColor = MaterialTheme.colorScheme.background,
+-        bottomBar = { RoyalShieldBottomBar(navController) }
++        bottomBar = { RoyalShieldBottomBar(navController, showAds = showAds) }
+     ) { innerPadding ->
+         Box(modifier = Modifier.padding(innerPadding)) {
+             RoyalShieldNavGraph(
+                 navController = navController,
+                 billingManager = billingManager,
++                showAds = showAds,
+                 onTriggerSOS = {
+                     com.royalshield.app.SosManager.triggerSos(context)
+                 }
+diff --git a/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt b/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt
+--- a/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt
++++ b/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt
+@@ -42,7 +42,7 @@ sealed class BottomNavItem(
+ }
+ 
+ @Composable
+-fun RoyalShieldBottomBar(navController: NavController) {
++fun RoyalShieldBottomBar(navController: NavController, showAds: Boolean) {
+     val items = listOf(
+         BottomNavItem.Home,
+         BottomNavItem.GlobalMap,
+@@ -51,14 +51,16 @@ fun RoyalShieldBottomBar(navController: NavController) {
+         BottomNavItem.Settings
+     )
++    val navBackStackEntry = navController.currentBackStackEntryAsState()
++    val currentRoute = navBackStackEntry.value?.destination?.route
+ 
+     Column {
+-        // Kept above the carousel so the ad cannot overlap navigation controls.
+-        AdBanner()
++        // Cyber owns its inline banner; every other free route uses this slot.
++        if (showAds && currentRoute != BottomNavItem.CyberMap.route) {
++            AdBanner()
++        }
+ 
+     NavigationBar(
+         containerColor = SpaceDeep.copy(alpha = 0.95f),
+         contentColor = Color.White
+     ) {
+-        val navBackStackEntry = navController.currentBackStackEntryAsState()
+-        val currentRoute = navBackStackEntry.value?.destination?.route
+-
+         items.forEach { item ->
+             NavigationBarItem(
+diff --git a/app/src/main/java/com/royalshield/app/ui/navigation/Navigation.kt b/app/src/main/java/com/royalshield/app/ui/navigation/Navigation.kt
+--- a/app/src/main/java/com/royalshield/app/ui/navigation/Navigation.kt
++++ b/app/src/main/java/com/royalshield/app/ui/navigation/Navigation.kt
+@@ -13,6 +13,7 @@ fun RoyalShieldNavGraph(
+     navController: NavHostController,
+     billingManager: com.royalshield.app.managers.BillingManager,
++    showAds: Boolean,
+     onTriggerSOS: () -> Unit
+ ) {
+@@ -56,6 +57,7 @@ fun RoyalShieldNavGraph(
+         composable(BottomNavItem.CyberMap.route) {
+             CyberHomeScreen(
++                showAds = showAds,
+                 onBack = { navController.popBackStack() },
+                 onNavigateToMap = { navController.navigate(BottomNavItem.GlobalMap.route) },
+                 onNavigateToCourses = { navController.navigate("courses") },
+diff --git a/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt b/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt
+--- a/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt
++++ b/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt
+@@ -69,6 +69,7 @@ import com.royalshield.app.features.threatmap.ThreatMapViewModel
+ 
+ @Composable
+ fun CyberHomeScreen(
++    showAds: Boolean = true,
+     onBack: () -> Unit = {},
+     onNavigateToMap: () -> Unit,
+     onNavigateToCourses: () -> Unit,
+@@ -434,11 +435,13 @@ fun CyberHomeScreen(
+                 }
+ 
+                 // Separate from security actions and contained in the scrollable Cyber content.
+-                AdBanner(
+-                    modifier = Modifier
+-                        .fillMaxWidth()
+-                        .padding(horizontal = 20.dp, vertical = 8.dp)
+-                )
++                if (showAds) {
++                    AdBanner(
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .padding(horizontal = 20.dp, vertical = 8.dp)
++                    )
++                }
+ 
+ 
+             } // End Column

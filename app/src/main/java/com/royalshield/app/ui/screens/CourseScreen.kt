@@ -201,7 +201,7 @@ class CourseViewModel {
                 lessons = listOf(
                     Lesson("l1", "Deepfake Audio Analysis", "30 min", LessonType.VIDEO, "How AI models generate voices and what cadence errors to look for.", videoUrl = "https://www.youtube.com/watch?v=uK1_v67fXoM"),
                     Lesson("l2", "The 3-Second Verification Rule", "15 min", LessonType.TEXT, "The 'Challenge-Response' technique: Asking questions an AI wouldn't know."),
-                    Lesson("l3", "Social Engineering via AI", "20 min", LessonType.VIDEO, "Real-world examples of AI-driven phishing.")
+                    Lesson("l3", "Social Engineering via AI", "20 min", LessonType.TEXT, "Recognize urgency, impersonation, synthetic media, and requests to bypass normal verification. Confirm sensitive requests through a second trusted channel before acting.")
                 )
             ),
             Course(
@@ -216,7 +216,7 @@ class CourseViewModel {
                 level = CourseLevel.ADVANCED,
                 category = "Privacy",
                 lessons = listOf(
-                    Lesson("l1", "PGP Mastery", "45 min", LessonType.VIDEO, "Setting up keys and signing messages."),
+                    Lesson("l1", "PGP Mastery", "45 min", LessonType.PRACTICAL, "Set up a test key pair, verify its fingerprint through a trusted channel, sign a sample message, and keep the private key protected with a strong passphrase."),
                     Lesson("l2", "Metadata Sanitization", "30 min", LessonType.PRACTICAL, "Removing EXIF data from photos and documents.")
                 )
             )
@@ -585,7 +585,10 @@ fun CourseDetailView(course: Course, progress: CourseProgress?, onBack: () -> Un
                         
                         when (lesson.type) {
                             LessonType.VIDEO -> {
-                                var isPlaying by remember { mutableStateOf(false) }
+                                val videoSource = remember(lesson.videoUrl) {
+                                    parseLearnVideoSource(lesson.videoUrl)
+                                }
+                                var isPlaying by remember(lesson.id) { mutableStateOf(false) }
                                 
                                 Box(
                                     modifier = Modifier
@@ -596,23 +599,9 @@ fun CourseDetailView(course: Course, progress: CourseProgress?, onBack: () -> Un
                                         .border(1.dp, RoyalGold.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (isPlaying && !lesson.videoUrl.isNullOrEmpty()) {
-                                        // Real Video Player using WebView for flexibility (YouTube/Direct)
-                                        androidx.compose.ui.viewinterop.AndroidView(
-                                            factory = { ctx ->
-                                                android.webkit.WebView(ctx).apply {
-                                                    settings.javaScriptEnabled = true
-                                                    settings.mediaPlaybackRequiresUserGesture = false
-                                                    webViewClient = android.webkit.WebViewClient()
-                                                    val videoHtml = if (lesson.videoUrl!!.contains("youtube.com") || lesson.videoUrl!!.contains("youtu.be")) {
-                                                        val videoId = lesson.videoUrl!!.substringAfterLast("/").substringAfterLast("v=")
-                                                        "<html><body style='margin:0;padding:0;background:black;'><iframe width='100%' height='100%' src='https://www.youtube.com/embed/$videoId?autoplay=1' frameborder='0' allowfullscreen></iframe></body></html>"
-                                                    } else {
-                                                        "<html><body style='margin:0;padding:0;background:black;'><video width='100%' height='100%' controls autoplay><source src='${lesson.videoUrl}' type='video/mp4'></video></body></html>"
-                                                    }
-                                                    loadData(videoHtml, "text/html", "utf-8")
-                                                }
-                                            },
+                                    if (isPlaying && videoSource != null) {
+                                        LearnVideoPlayer(
+                                            source = videoSource,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     } else {
@@ -624,15 +613,27 @@ fun CourseDetailView(course: Course, progress: CourseProgress?, onBack: () -> Un
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            CyberButtonRound(
-                                                size = 80.dp,
-                                                icon = Icons.Default.PlayArrow,
-                                                onClick = { isPlaying = true }
-                                            )
+                                            if (videoSource != null) {
+                                                CyberButtonRound(
+                                                    size = 80.dp,
+                                                    icon = Icons.Default.PlayArrow,
+                                                    onClick = { isPlaying = true }
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Default.VideoLibrary,
+                                                    contentDescription = null,
+                                                    tint = Color.Gray,
+                                                    modifier = Modifier.size(56.dp)
+                                                )
+                                            }
                                             Spacer(modifier = Modifier.height(12.dp))
-                                            Text("NEURAL_LINK STREAM", color = RoyalGold, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 2.sp)
-                                            Text(if (lesson.videoUrl.isNullOrEmpty()) "Generating Academic Simulation..." else "Encrypted Feed Available", 
-                                                color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                                            Text("SECURE LEARNING STREAM", color = RoyalGold, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 2.sp)
+                                            Text(
+                                                if (videoSource == null) "Video not available for this lesson" else "Tap to play",
+                                                color = Color.White.copy(alpha = 0.7f),
+                                                fontSize = 12.sp
+                                            )
                                         }
                                     }
                                     
@@ -649,6 +650,25 @@ fun CourseDetailView(course: Course, progress: CourseProgress?, onBack: () -> Un
                                             )
                                     )
                                 }
+                                if (videoSource != null) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    OutlinedButton(
+                                        onClick = { openLearnVideo(context, videoSource.originalUrl) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        border = BorderStroke(1.dp, RoyalGold.copy(alpha = 0.6f))
+                                    ) {
+                                        Icon(Icons.Default.OpenInNew, contentDescription = null, tint = RoyalGold)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("OPEN IN VIDEO APP", color = RoyalGold)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    lesson.content,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 14.sp
+                                )
                             }
                             LessonType.QUIZ -> {
                                 Surface(
@@ -688,6 +708,114 @@ fun CourseDetailView(course: Course, progress: CourseProgress?, onBack: () -> Un
             )
         }
     }
+}
+
+@Composable
+private fun LearnVideoPlayer(
+    source: LearnVideoSource,
+    modifier: Modifier = Modifier
+) {
+    if (source is LearnVideoSource.External) {
+        Box(modifier = modifier.background(Color.Black), contentAlignment = Alignment.Center) {
+            Text(
+                "This video must be opened in a compatible video app.",
+                color = Color.White,
+                modifier = Modifier.padding(24.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+        return
+    }
+
+    val context = LocalContext.current
+    val webView = remember(source.originalUrl) {
+        android.webkit.WebView(context).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            settings.javaScriptEnabled = source is LearnVideoSource.YouTube
+            settings.domStorageEnabled = source is LearnVideoSource.YouTube
+            settings.mediaPlaybackRequiresUserGesture = false
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            settings.safeBrowsingEnabled = true
+            webViewClient = android.webkit.WebViewClient()
+            webChromeClient = android.webkit.WebChromeClient()
+
+            val videoHtml = when (source) {
+                is LearnVideoSource.YouTube -> """
+                    <!doctype html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+                        <style>html,body,iframe{width:100%;height:100%;margin:0;background:#000;border:0;overflow:hidden}</style>
+                    </head>
+                    <body>
+                        <iframe
+                            src="https://www.youtube-nocookie.com/embed/${source.videoId}?autoplay=1&playsinline=1&rel=0"
+                            title="Royal Shield learning video"
+                            allow="autoplay; encrypted-media; picture-in-picture"
+                            allowfullscreen>
+                        </iframe>
+                    </body>
+                    </html>
+                """.trimIndent()
+
+                is LearnVideoSource.Direct -> {
+                    val safeUrl = android.text.TextUtils.htmlEncode(source.originalUrl)
+                    """
+                        <!doctype html>
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+                            <style>html,body,video{width:100%;height:100%;margin:0;background:#000}</style>
+                        </head>
+                        <body><video controls autoplay playsinline src="$safeUrl"></video></body>
+                        </html>
+                    """.trimIndent()
+                }
+
+                is LearnVideoSource.External -> error("External videos are handled before WebView creation")
+            }
+
+            // A real HTTPS base URL supplies the Referer required by YouTube embeds.
+            loadDataWithBaseURL(
+                "https://royalshield.app/learn/",
+                videoHtml,
+                "text/html",
+                "UTF-8",
+                null
+            )
+        }
+    }
+
+    DisposableEffect(webView) {
+        onDispose {
+            webView.stopLoading()
+            webView.loadUrl("about:blank")
+            webView.destroy()
+        }
+    }
+
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { webView },
+        modifier = modifier
+    )
+}
+
+private fun openLearnVideo(context: android.content.Context, url: String) {
+    val intent = android.content.Intent(
+        android.content.Intent.ACTION_VIEW,
+        android.net.Uri.parse(url)
+    )
+
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            android.widget.Toast.makeText(
+                context,
+                "No compatible video app is installed",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
 }
 
 @Composable

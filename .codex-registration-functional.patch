@@ -1,0 +1,327 @@
+diff --git a/app/src/main/java/com/royalshield/app/ui/screens/RegistrationScreen.kt b/app/src/main/java/com/royalshield/app/ui/screens/RegistrationScreen.kt
+--- a/app/src/main/java/com/royalshield/app/ui/screens/RegistrationScreen.kt
++++ b/app/src/main/java/com/royalshield/app/ui/screens/RegistrationScreen.kt
+@@ -43,9 +43,17 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+ import com.google.android.gms.common.api.ApiException
+ import com.google.firebase.auth.FirebaseAuth
++import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
++import com.google.firebase.auth.FirebaseAuthInvalidUserException
++import com.google.firebase.auth.FirebaseAuthUserCollisionException
++import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+ import com.google.firebase.auth.GoogleAuthProvider
++import com.google.firebase.auth.UserProfileChangeRequest
+ import com.royalshield.app.ui.theme.*
+ import com.royalshield.app.R
++import com.royalshield.app.auth.AuthProfileRepository
++import com.royalshield.app.auth.isValidEmail
++import com.royalshield.app.auth.normalizeEmail
++import com.royalshield.app.auth.passwordValidationMessage
+ import com.royalshield.app.ui.components.RoyalGoldButton
+ import kotlinx.coroutines.launch
+ import kotlinx.coroutines.tasks.await
+@@ -182,11 +190,17 @@ fun RegistrationScreen(
+ ) {
+     val context = LocalContext.current
++    var fullName by rememberSaveable { mutableStateOf("") }
+     var email by remember { mutableStateOf("") }
+     var password by remember { mutableStateOf("") }
++    var confirmPassword by rememberSaveable { mutableStateOf("") }
+     var isLoading by remember { mutableStateOf(false) }
+     var showEmailForm by remember { mutableStateOf(false) }
++    var isSignInMode by rememberSaveable { mutableStateOf(false) }
++    var acceptTerms by rememberSaveable { mutableStateOf(false) }
++    var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
++    var infoMessage by rememberSaveable { mutableStateOf<String?>(null) }
+     val coroutineScope = rememberCoroutineScope()
++    val profileRepository = remember { AuthProfileRepository() }
+     val (backgroundTiltX, backgroundTiltY) = rememberRegistrationTilt()
+ 
+     // Firebase Auth instance
+@@ -221,10 +235,12 @@ fun RegistrationScreen(
+                     try {
+                         val credential = GoogleAuthProvider.getCredential(idToken, null)
+                         auth.signInWithCredential(credential).await()
+-                        val displayName = auth.currentUser?.displayName ?: "User"
++                        val user = auth.currentUser ?: error("Google authentication returned no user")
++                        profileRepository.ensureProfile(user, user.displayName.orEmpty())
++                        val displayName = user.displayName ?: "User"
+                         Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
+                         isLoading = false
+                         onRegistrationSuccess()
+                     } catch (e: Exception) {
+                         isLoading = false
+-                        Toast.makeText(context, "Auth error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
++                        errorMessage = registrationErrorMessage(e)
+                     }
+                 }
+             } else {
+@@ -289,20 +305,6 @@ fun RegistrationScreen(
+         ) {
+             Spacer(modifier = Modifier.height(16.dp))
+ 
+-            // Skip for Testing
+-            Row(
+-                modifier = Modifier.fillMaxWidth(),
+-                horizontalArrangement = Arrangement.End
+-            ) {
+-                TextButton(onClick = { 
+-                    Toast.makeText(context, "Skipping registration (Testing Mode)", Toast.LENGTH_SHORT).show()
+-                    onRegistrationSuccess() 
+-                }) {
+-                    Text("SKIP >>", color = RoyalGold, fontWeight = FontWeight.Bold)
+-                }
+-            }
+-            
+-            Spacer(modifier = Modifier.height(24.dp))
+-            
+             // App Logo/Icon
+             Image(
+                 painter = painterResource(id = R.drawable.royal_shield_logo),
+@@ -367,42 +369,6 @@ fun RegistrationScreen(
+             
+             Spacer(modifier = Modifier.height(16.dp))
+ 
+-            SocialLoginButton(
+-                text = "Continue with Apple",
+-                iconRes = R.drawable.ic_apple,
+-                color = Color.Black,
+-                textColor = Color.White
+-            ) {
+-                isLoading = true
+-                Toast.makeText(context, "Redirecting to Apple ID...", Toast.LENGTH_SHORT).show()
+-                onRegistrationSuccess()
+-            }
+-            
+-            Spacer(modifier = Modifier.height(16.dp))
+-
+-            SocialLoginButton(
+-                text = "Continue with GitHub",
+-                icon = Icons.Default.Code,
+-                color = Color(0xFF24292E),
+-                textColor = Color.White
+-            ) {
+-                isLoading = true
+-                Toast.makeText(context, "Redirecting to GitHub...", Toast.LENGTH_SHORT).show()
+-                onRegistrationSuccess()
+-            }
+-            
+-            Spacer(modifier = Modifier.height(16.dp))
+-            
+-            SocialLoginButton(
+-                text = "Continue with Facebook",
+-                iconRes = R.drawable.ic_facebook,
+-                color = Color(0xFF1877F2),
+-                textColor = Color.White
+-            ) {
+-                isLoading = true
+-                Toast.makeText(context, "Redirecting to Facebook...", Toast.LENGTH_SHORT).show()
+-                onRegistrationSuccess()
+-            }
+-            
+-            Spacer(modifier = Modifier.height(24.dp))
+-            
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.1f))
+                 Text(" OR ", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
+@@ -414,18 +380,154 @@ fun RegistrationScreen(
+             
+             Spacer(modifier = Modifier.height(24.dp))
+ 
+-            if (!showEmailForm) {
++            if (showEmailForm) {
++                Text(
++                    if (isSignInMode) "Sign in with Email" else "Create Account with Email",
++                    color = Color.White,
++                    fontWeight = FontWeight.Bold,
++                    fontSize = 18.sp
++                )
++                Spacer(modifier = Modifier.height(16.dp))
++                if (!isSignInMode) {
++                    OutlinedTextField(
++                        value = fullName,
++                        onValueChange = { fullName = it.take(60) },
++                        label = { Text("Full name") },
++                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
++                        modifier = Modifier.fillMaxWidth(),
++                        singleLine = true
++                    )
++                    Spacer(modifier = Modifier.height(12.dp))
++                }
++                OutlinedTextField(
++                    value = email,
++                    onValueChange = { email = it.take(320) },
++                    label = { Text("Email address") },
++                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
++                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
++                    modifier = Modifier.fillMaxWidth(),
++                    singleLine = true,
++                    isError = email.isNotBlank() && !isValidEmail(email)
++                )
++                Spacer(modifier = Modifier.height(12.dp))
++                OutlinedTextField(
++                    value = password,
++                    onValueChange = { password = it.take(128) },
++                    label = { Text("Password") },
++                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
++                    visualTransformation = PasswordVisualTransformation(),
++                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
++                    modifier = Modifier.fillMaxWidth(),
++                    singleLine = true
++                )
++                if (!isSignInMode) {
++                    Spacer(modifier = Modifier.height(12.dp))
++                    OutlinedTextField(
++                        value = confirmPassword,
++                        onValueChange = { confirmPassword = it.take(128) },
++                        label = { Text("Confirm password") },
++                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
++                        visualTransformation = PasswordVisualTransformation(),
++                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
++                        modifier = Modifier.fillMaxWidth(),
++                        singleLine = true,
++                        isError = confirmPassword.isNotBlank() && confirmPassword != password
++                    )
++                    Row(
++                        modifier = Modifier.fillMaxWidth(),
++                        verticalAlignment = Alignment.CenterVertically
++                    ) {
++                        Checkbox(
++                            checked = acceptTerms,
++                            onCheckedChange = { acceptTerms = it }
++                        )
++                        Text(
++                            "I agree to the Terms of Service and Privacy Policy",
++                            color = Color.White.copy(alpha = 0.75f),
++                            fontSize = 12.sp
++                        )
++                    }
++                }
++
++                errorMessage?.let {
++                    Text(it, color = Color(0xFFFF6B6B), fontSize = 12.sp)
++                    Spacer(modifier = Modifier.height(8.dp))
++                }
++                infoMessage?.let {
++                    Text(it, color = Color(0xFF66E3A4), fontSize = 12.sp)
++                    Spacer(modifier = Modifier.height(8.dp))
++                }
++
++                RoyalGoldButton(
++                    text = if (isSignInMode) "SIGN IN" else "CREATE ACCOUNT",
++                    modifier = Modifier.fillMaxWidth(),
++                    isLoading = isLoading,
++                    onClick = {
++                        errorMessage = null
++                        infoMessage = null
++                        val normalizedEmail = normalizeEmail(email)
++                        val validationError = when {
++                            auth == null -> "Firebase authentication is unavailable"
++                            !isValidEmail(normalizedEmail) -> "Enter a valid email address"
++                            isSignInMode && password.isBlank() -> "Enter your password"
++                            !isSignInMode && fullName.trim().length !in 2..60 ->
++                                "Enter your full name"
++                            !isSignInMode && passwordValidationMessage(password) != null ->
++                                passwordValidationMessage(password)
++                            !isSignInMode && password != confirmPassword ->
++                                "Passwords do not match"
++                            !isSignInMode && !acceptTerms ->
++                                "Accept the Terms of Service and Privacy Policy"
++                            else -> null
++                        }
++
++                        if (validationError != null) {
++                            errorMessage = validationError
++                        } else {
++                            isLoading = true
++                            coroutineScope.launch {
++                                try {
++                                    if (isSignInMode) {
++                                        val result = auth!!.signInWithEmailAndPassword(
++                                            normalizedEmail,
++                                            password
++                                        ).await()
++                                        val user = result.user ?: error("Firebase returned no user")
++                                        user.reload().await()
++                                        if (!user.isEmailVerified) {
++                                            auth.signOut()
++                                            error("Verify your email before signing in")
++                                        }
++                                        profileRepository.ensureProfile(user)
++                                        onRegistrationSuccess()
++                                    } else {
++                                        val result = auth!!.createUserWithEmailAndPassword(
++                                            normalizedEmail,
++                                            password
++                                        ).await()
++                                        val user = result.user ?: error("Firebase returned no user")
++                                        user.updateProfile(
++                                            UserProfileChangeRequest.Builder()
++                                                .setDisplayName(fullName.trim())
++                                                .build()
++                                        ).await()
++                                        profileRepository.ensureProfile(user, fullName)
++                                        user.sendEmailVerification().await()
++                                        auth.signOut()
++                                        password = ""
++                                        confirmPassword = ""
++                                        isSignInMode = true
++                                        infoMessage =
++                                            "Verification email sent. Verify the address, then sign in."
++                                    }
++                                } catch (error: Exception) {
++                                    errorMessage = registrationErrorMessage(error)
++                                } finally {
++                                    isLoading = false
++                                }
++                            }
++                        }
++                    }
++                )
++                TextButton(onClick = {
++                    isSignInMode = !isSignInMode
++                    errorMessage = null
++                    infoMessage = null
++                }) {
++                    Text(
++                        if (isSignInMode) "Need an account? Create one" else "Already registered? Sign in",
++                        color = RoyalGold
++                    )
++                }
++            } else {
+                 OutlinedButton(
+-                    onClick = { showEmailForm = true },
++                    onClick = {
++                        showEmailForm = true
++                        isSignInMode = false
++                    },
+                     modifier = Modifier.fillMaxWidth().height(56.dp),
+                     shape = RoundedCornerShape(16.dp),
+                     border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+@@ -443,8 +545,11 @@ fun RegistrationScreen(
+                     color = RoyalGold,
+                     fontSize = 14.sp,
+                     fontWeight = FontWeight.Bold,
+-                    modifier = Modifier.clickable { 
+-                        Toast.makeText(context, "Switching to Login...", Toast.LENGTH_SHORT).show()
++                    modifier = Modifier.clickable {
++                        showEmailForm = true
++                        isSignInMode = true
++                        errorMessage = null
++                        infoMessage = null
+                     }
+                 )
+             }
+@@ -508,3 +613,13 @@ fun SocialLoginButton(
+         }
+     }
+ }
++
++private fun registrationErrorMessage(error: Throwable): String = when (error) {
++    is FirebaseAuthUserCollisionException -> "This email is already registered"
++    is FirebaseAuthWeakPasswordException -> "Choose a stronger password"
++    is FirebaseAuthInvalidCredentialsException -> "The email or password is invalid"
++    is FirebaseAuthInvalidUserException -> "No account exists for this email"
++    else -> error.message
++        ?.takeIf { it == "Verify your email before signing in" }
++        ?: "Authentication failed. Check your connection and try again"
++}

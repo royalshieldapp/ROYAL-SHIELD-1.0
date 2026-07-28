@@ -39,13 +39,15 @@ android {
         val vtKey = localProps.getProperty("VIRUSTOTAL_API_KEY", "")
         val geminiKey = localProps.getProperty("GEMINI_API_KEY", "")
         val mapsKey = localProps.getProperty("MAPS_API_KEY", "")
-        val admobAppId = localProps.getProperty("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
+        // AdMob identifiers are public configuration values, not credentials.
+        val admobAppId = "ca-app-pub-1586798082508064~3049764774"
+        val admobBannerAdUnitId = "ca-app-pub-1586798082508064/2006218364"
         val avKey = localProps.getProperty("ALIENVAULT_API_KEY", "")
         val twilioSid = localProps.getProperty("TWILIO_ACCOUNT_SID", "")
         val twilioToken = localProps.getProperty("TWILIO_AUTH_TOKEN", "")
         val didKey = localProps.getProperty("DID_API_KEY", "")
-        val loyaltyUrl = localProps.getProperty("LOYALTY_API_URL", "https://server-beckend.onrender.com/api/loyalty")
         val apiBaseUrl = localProps.getProperty("API_BASE_URL", "https://server-beckend.onrender.com")
+        val loyaltyUrl = "${apiBaseUrl.trimEnd('/')}/api/v1/loyalty"
 
         buildConfigField("String", "VIRUSTOTAL_API_KEY", "\"$vtKey\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
@@ -55,6 +57,7 @@ android {
         buildConfigField("String", "DID_API_KEY", "\"$didKey\"")
         buildConfigField("String", "LOYALTY_API_URL", "\"$loyaltyUrl\"")
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "ADMOB_BANNER_AD_UNIT_ID", "\"$admobBannerAdUnitId\"")
 
         // Maps key injected into Manifest via placeholder (never hardcoded)
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey

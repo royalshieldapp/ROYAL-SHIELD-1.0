@@ -39,7 +39,8 @@ class UserProfileRepository(
                 ?: user.phoneNumber.orEmpty(),
             city = snapshot.child("city").getValue(String::class.java).orEmpty(),
             country = snapshot.child("country").getValue(String::class.java).orEmpty(),
-            emergencyPhone = PreferencesManager.getEmergencyPhone().orEmpty(),
+            emergencyPhone = snapshot.child("emergencyPhone").getValue(String::class.java)
+                ?: PreferencesManager.getEmergencyPhone().orEmpty(),
             photoUrl = user.photoUrl?.toString()
         )
     }
@@ -65,6 +66,7 @@ class UserProfileRepository(
                     "phone" to profile.phone.trim(),
                     "city" to profile.city.trim(),
                     "country" to profile.country.trim(),
+                    "emergencyPhone" to profile.emergencyPhone.trim(),
                     "updatedAt" to ServerValue.TIMESTAMP
                 )
             )

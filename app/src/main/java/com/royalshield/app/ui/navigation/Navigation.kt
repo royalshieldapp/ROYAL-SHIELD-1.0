@@ -13,6 +13,7 @@ import com.royalshield.app.ui.screens.*
 fun RoyalShieldNavGraph(
     navController: NavHostController,
     billingManager: com.royalshield.app.managers.BillingManager,
+    showAds: Boolean,
     onTriggerSOS: () -> Unit
 ) {
     NavHost(
@@ -55,6 +56,7 @@ fun RoyalShieldNavGraph(
 
         composable(BottomNavItem.CyberMap.route) {
             CyberHomeScreen(
+                showAds = showAds,
                 onBack = { navController.popBackStack() },
                 onNavigateToMap = { navController.navigate(BottomNavItem.GlobalMap.route) },
                 onNavigateToCourses = { navController.navigate("courses") },

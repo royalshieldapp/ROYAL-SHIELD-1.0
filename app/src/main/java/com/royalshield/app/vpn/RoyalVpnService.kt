@@ -47,7 +47,7 @@ class RoyalVpnService : VpnService() {
                 val config = intent.getStringExtra(EXTRA_CONFIG)
                 if (config.isNullOrBlank()) {
                     Log.e(TAG, "VPN config is missing")
-                    sendBroadcast(Intent(ACTION_VPN_MISSING_CONFIG))
+                    sendBroadcast(Intent(ACTION_VPN_MISSING_CONFIG).setPackage(packageName))
                     stopSelf()
                 } else {
                     establishVpn(config)
@@ -70,7 +70,7 @@ class RoyalVpnService : VpnService() {
 
                 val state = backend.setState(tunnel, Tunnel.State.UP, config)
                 if (state == Tunnel.State.UP) {
-                    sendBroadcast(Intent(ACTION_VPN_CONNECTED))
+                    sendBroadcast(Intent(ACTION_VPN_CONNECTED).setPackage(packageName))
                     startStatsLoop()
                     Log.i(TAG, "WireGuard VPN started successfully")
                 } else {
@@ -79,6 +79,7 @@ class RoyalVpnService : VpnService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting WireGuard VPN", e)
                 sendBroadcast(Intent(ACTION_VPN_ERROR).apply {
+                    setPackage(packageName)
                     putExtra("error", e.message ?: "Failed to establish WireGuard VPN")
                 })
                 stopSelf()
@@ -93,6 +94,7 @@ class RoyalVpnService : VpnService() {
                 try {
                     val stats = backend.getStatistics(tunnel)
                     sendBroadcast(Intent(ACTION_VPN_STATS).apply {
+                        setPackage(packageName)
                         putExtra(EXTRA_BYTES_RECEIVED, stats.totalRx())
                         putExtra(EXTRA_BYTES_SENT, stats.totalTx())
                     })
@@ -115,7 +117,7 @@ class RoyalVpnService : VpnService() {
                 Log.e(TAG, "Error stopping WireGuard VPN", e)
             } finally {
                 withContext(NonCancellable) {
-                    sendBroadcast(Intent(ACTION_VPN_DISCONNECTED))
+                    sendBroadcast(Intent(ACTION_VPN_DISCONNECTED).setPackage(packageName))
                     stopSelf()
                 }
             }

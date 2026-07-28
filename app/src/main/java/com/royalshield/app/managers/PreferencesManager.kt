@@ -667,4 +667,30 @@ object PreferencesManager {
     fun isSystemArmed(): Boolean {
         return if (isInitialized()) prefs.getBoolean(KEY_SYSTEM_ARMED, true) else true
     }
+
+    // ===== Voice Scam Cache =====
+    private const val KEY_VOICE_CALLS_SCREENED = "key_voice_calls_screened"
+    private const val KEY_VOICE_THREATS_BLOCKED = "key_voice_threats_blocked"
+
+    fun getVoiceCallsScreened(): Int {
+        return if (isInitialized()) prefs.getInt(KEY_VOICE_CALLS_SCREENED, 0) else 0
+    }
+
+    fun incrementVoiceCallsScreened() {
+        if (isInitialized()) {
+            val current = getVoiceCallsScreened()
+            prefs.edit().putInt(KEY_VOICE_CALLS_SCREENED, current + 1).apply()
+        }
+    }
+
+    fun getVoiceThreatsBlocked(): Int {
+        return if (isInitialized()) prefs.getInt(KEY_VOICE_THREATS_BLOCKED, 0) else 0
+    }
+
+    fun incrementVoiceThreatsBlocked() {
+        if (isInitialized()) {
+            val current = getVoiceThreatsBlocked()
+            prefs.edit().putInt(KEY_VOICE_THREATS_BLOCKED, current + 1).apply()
+        }
+    }
 }

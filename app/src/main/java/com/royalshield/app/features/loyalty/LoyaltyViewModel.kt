@@ -6,107 +6,79 @@ import com.royalshield.app.managers.PreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
 data class LoyaltyUiState(
     val points: Int = 0,
-    val tier: String = "Starter",
+    val tier: String = "Bronze",
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )
 
 class LoyaltyViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(
         LoyaltyUiState(
             points = PreferencesManager.getLoyaltyPoints(),
-            tier = PreferencesManager.getLoyaltyTier()
+            tier = PreferencesManager.getLoyaltyTier().ifBlank { "Bronze" },
         )
     )
     val uiState: StateFlow<LoyaltyUiState> = _uiState.asStateFlow()
 
     init {
-        loadLoyaltyStatus()
+        claimDailyLogin()
     }
 
     fun loadLoyaltyStatus() {
         _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-        LoyaltyRepository.getStatus { success, points, tier ->
-            if (success) {
-                val finalPoints = points ?: 0
-                val finalTier = tier ?: "Starter"
-                PreferencesManager.saveLoyaltyPoints(finalPoints)
-                PreferencesManager.saveLoyaltyTier(finalTier)
-                _uiState.value = _uiState.value.copy(
-                    points = finalPoints,
-                    tier = finalTier,
-                    isLoading = false,
-                    error = null
-                )
+        LoyaltyRepository.getStatus { success, points, tier, error ->
+            if (success && points != null && tier != null) {
+                applyServerBalance(points, tier)
             } else {
-                val cachedPoints = PreferencesManager.getLoyaltyPoints()
-                val cachedTier = PreferencesManager.getLoyaltyTier()
                 _uiState.value = _uiState.value.copy(
-                    points = cachedPoints,
-                    tier = cachedTier,
                     isLoading = false,
-                    error = null
+                    error = error ?: "Unable to refresh Loyalty",
                 )
             }
         }
     }
 
-    fun syncActivityPoints(points: Int, action: String) {
-        LoyaltyRepository.syncPoints(points, action) { success, newTotal ->
-            if (success && newTotal != null) {
-                PreferencesManager.saveLoyaltyPoints(newTotal)
-                val newTier = when {
-                    newTotal >= 1500 -> "Elite"
-                    newTotal >= 800 -> "Gold"
-                    newTotal >= 300 -> "Silver"
-                    else -> "Bronze"
-                }
-                PreferencesManager.saveLoyaltyTier(newTier)
-                _uiState.value = _uiState.value.copy(points = newTotal, tier = newTier)
+    fun claimDailyLogin() {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        LoyaltyRepository.claimDailyLogin { success, points, tier, _, error ->
+            if (success && points != null && tier != null) {
+                applyServerBalance(points, tier)
+            } else {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = error)
+                loadLoyaltyStatus()
             }
         }
     }
 
-    fun redeemReward(pointsCost: Int, rewardName: String, onResult: (Boolean, String) -> Unit) {
-        val currentPoints = _uiState.value.points
-        if (currentPoints < pointsCost) {
-            onResult(false, "Insufficient points. You need $pointsCost pts.")
-            return
-        }
-        val remainingPoints = currentPoints - pointsCost
-        
-        PreferencesManager.saveLoyaltyPoints(remainingPoints)
-        val newTier = when {
-            remainingPoints >= 1500 -> "Elite"
-            remainingPoints >= 800 -> "Gold"
-            remainingPoints >= 300 -> "Silver"
-            else -> "Bronze"
-        }
-        PreferencesManager.saveLoyaltyTier(newTier)
-        
-        _uiState.value = _uiState.value.copy(
-            points = remainingPoints,
-            tier = newTier
-        )
-        
-        LoyaltyRepository.syncPoints(-pointsCost, "redeem_$rewardName") { success, newTotal ->
-            if (success && newTotal != null) {
-                PreferencesManager.saveLoyaltyPoints(newTotal)
-                val finalTier = when {
-                    newTotal >= 1500 -> "Elite"
-                    newTotal >= 800 -> "Gold"
-                    newTotal >= 300 -> "Silver"
-                    else -> "Bronze"
-                }
-                PreferencesManager.saveLoyaltyTier(finalTier)
-                _uiState.value = _uiState.value.copy(points = newTotal, tier = finalTier)
+    fun redeemReward(
+        rewardId: String,
+        rewardName: String,
+        onResult: (Boolean, String) -> Unit,
+    ) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        LoyaltyRepository.redeemReward(
+            rewardId = rewardId,
+            idempotencyKey = UUID.randomUUID().toString(),
+        ) { success, newTotal, tier, redemptionStatus, error ->
+            if (success && newTotal != null && tier != null) {
+                applyServerBalance(newTotal, tier)
+                onResult(true, "$rewardName: ${redemptionStatus ?: "PENDING"}")
+            } else {
+                val message = error ?: "Unable to redeem reward"
+                _uiState.value = _uiState.value.copy(isLoading = false, error = message)
+                onResult(false, message)
             }
         }
-        
-        onResult(true, "Successfully redeemed $rewardName!")
+    }
+
+    private fun applyServerBalance(points: Int, tier: String) {
+        // Preferences are an offline visual cache only; the backend remains authoritative.
+        PreferencesManager.saveLoyaltyPoints(points)
+        PreferencesManager.saveLoyaltyTier(tier)
+        _uiState.value = LoyaltyUiState(points = points, tier = tier, isLoading = false)
     }
 }
-

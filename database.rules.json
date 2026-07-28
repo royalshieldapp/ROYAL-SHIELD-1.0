@@ -2,6 +2,18 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "pairing_codes": {
+      "$code": {
+        ".read": "auth != null && data.exists() && data.child('expiresAt').isNumber() && data.child('expiresAt').val() > now && (!data.child('claimedBy').exists() || data.child('claimedBy').val() === auth.uid || data.child('parentUid').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && newData.child('parentUid').val() === auth.uid && newData.child('createdAt').isNumber() && newData.child('expiresAt').isNumber() && newData.child('expiresAt').val() > now && newData.child('expiresAt').val() <= now + 600000 && !newData.child('claimedBy').exists()) || (data.exists() && data.child('parentUid').val() === auth.uid && !newData.exists()) || (data.exists() && !data.child('claimedBy').exists() && data.child('expiresAt').val() > now && newData.child('parentUid').val() === data.child('parentUid').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('expiresAt').val() === data.child('expiresAt').val() && newData.child('claimedBy').val() === auth.uid && newData.child('claimedAt').isNumber() && newData.child('claimedAt').val() <= now))",
+        "parentUid": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128" },
+        "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now" },
+        "expiresAt": { ".validate": "newData.isNumber() && newData.val() > now" },
+        "claimedBy": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128" },
+        "claimedAt": { ".validate": "newData.isNumber() && newData.val() <= now" },
+        "$other": { ".validate": false }
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -13,7 +25,53 @@
           "phone": { ".validate": "newData.isString() && newData.val().length <= 25" },
           "city": { ".validate": "newData.isString() && newData.val().length <= 80" },
           "country": { ".validate": "newData.isString() && newData.val().length <= 80" },
-          "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now" }
+          "emergencyPhone": { ".validate": "newData.isString() && newData.val().length <= 25" },
+          "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now" },
+          "$other": { ".validate": false }
+        },
+        "children": {
+          "$childId": {
+            ".read": "auth != null && (auth.uid === $uid || data.child('ownerUid').val() === auth.uid)",
+            ".write": "auth != null && (auth.uid === $uid || (!data.exists() && newData.child('ownerUid').val() === auth.uid && newData.child('id').val() === $childId && newData.child('pairingCode').isString() && root.child('pairing_codes').child(newData.child('pairingCode').val()).child('parentUid').val() === $uid && root.child('pairing_codes').child(newData.child('pairingCode').val()).child('expiresAt').val() > now && !root.child('pairing_codes').child(newData.child('pairingCode').val()).child('claimedBy').exists()) || (data.exists() && data.child('ownerUid').val() === auth.uid && newData.child('ownerUid').val() === auth.uid && newData.child('id').val() === data.child('id').val() && newData.child('pairingCode').val() === data.child('pairingCode').val()))",
+            ".validate": "newData.hasChildren(['id', 'ownerUid', 'pairingCode', 'name', 'status', 'last_update'])",
+            "id": { ".validate": "newData.isString() && newData.val() === $childId" },
+            "ownerUid": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128" },
+            "pairingCode": { ".validate": "newData.isString() && newData.val().length === 12" },
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },
+            "status": { ".validate": "newData.isString() && (newData.val() === 'SAFE' || newData.val() === 'WARNING' || newData.val() === 'DANGER')" },
+            "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+            "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+            "speed_kmh": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
+            "battery": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+            "last_update": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "signal_strength": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4" },
+            "gps_mode": { ".validate": "newData.isString() && (newData.val() === 'HIGH_ACCURACY' || newData.val() === 'BALANCED' || newData.val() === 'BATTERY_SAVER')" },
+            "play_sound_trigger": { ".validate": "newData.isNumber() && newData.val() <= now" },
+            "$other": { ".validate": false }
+          }
+        },
+        "safe_zones": {
+          "$zoneId": {
+            ".validate": "newData.hasChildren(['name', 'lat', 'lng', 'radius', 'type', 'enabled'])",
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80" },
+            "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+            "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+            "radius": { ".validate": "newData.isNumber() && newData.val() >= 25 && newData.val() <= 50000" },
+            "type": { ".validate": "newData.isString() && (newData.val() === 'HOME' || newData.val() === 'SCHOOL' || newData.val() === 'PARK' || newData.val() === 'CUSTOM')" },
+            "enabled": { ".validate": "newData.isBoolean()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "risk_zones": {
+          "$zoneId": {
+            ".validate": "newData.hasChildren(['name', 'lat', 'lng', 'radius', 'level'])",
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80" },
+            "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+            "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+            "radius": { ".validate": "newData.isNumber() && newData.val() >= 25 && newData.val() <= 50000" },
+            "level": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "$other": { ".validate": false }
+          }
         }
       }
     }

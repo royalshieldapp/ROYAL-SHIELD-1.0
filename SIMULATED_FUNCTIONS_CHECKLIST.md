@@ -18,9 +18,9 @@ Estado:
   - Cambio parcial: Android consulta `/api/vpn/status`, `/api/vpn/servers` y `/api/vpn/config`; el servicio usa `GoBackend` de WireGuard; backend responde `not_configured` o `peer_registration_not_configured` en vez de simular.
   - Pendiente: configurar servidor WireGuard real y flujo de registro de peers antes de marcarlo hecho.
 
-- [ ] Loyalty usa variables en memoria como "mock database".
+-> [x] Loyalty usa variables en memoria como "mock database".
   - Archivos: `backend/routes/loyalty.js`, `app/src/main/java/com/royalshield/app/data/LoyaltyRepository.kt`.
-  - Meta: persistir por usuario en base de datos o storage durable.
+  - Meta: persistir por usuario en base de datos o storage durable. (MIGRADO A FIREBASE FIRESTORE)
 
 - [ ] Threat map/risk endpoints devuelven datos dummy o `mock-h3`.
   - Archivos: `backend/routes/threats.js`, `backend/routes/risk.js`, `royal_shield_backend_unified/api/routes/risk_maps.py`, `royal_shield_backend_unified/api/routes/hotspots.py`.
@@ -42,7 +42,7 @@ Estado:
   - Archivo: `app/src/main/java/com/royalshield/app/ui/screens/ReportsCenterScreen.kt`.
   - Meta: generar reportes desde scans/eventos reales.
 
-- [ ] Voice scam screen incrementa amenazas con random.
+-> [x] Voice scam screen incrementa amenazas con random.
   - Archivo: `app/src/main/java/com/royalshield/app/ui/screens/VoiceScamScreen.kt`.
   - Meta: alimentar desde `VoiceScamDetectionService` o logs reales.
 

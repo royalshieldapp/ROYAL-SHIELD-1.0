@@ -1,0 +1,14 @@
+diff --git a/royal_shield_backend_unified/config/.env.example b/royal_shield_backend_unified/config/.env.example
+--- a/royal_shield_backend_unified/config/.env.example
++++ b/royal_shield_backend_unified/config/.env.example
+@@ -99,6 +99,10 @@ JWT_EXPIRE_MINUTES=60
+ 
+ # API Rate Limiting
+ RATE_LIMIT_PER_MINUTE=60
++
++# Firebase Admin is backend-only. Store the complete JSON as a Render secret.
++FIREBASE_PROJECT_ID=
++FIREBASE_SERVICE_ACCOUNT_JSON=
+ 
+ # =============================================================================
+ # APPLICATION SETTINGS

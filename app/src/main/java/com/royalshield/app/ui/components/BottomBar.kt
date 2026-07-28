@@ -7,6 +7,8 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -40,7 +42,7 @@ sealed class BottomNavItem(
 }
 
 @Composable
-fun RoyalShieldBottomBar(navController: NavController) {
+fun RoyalShieldBottomBar(navController: NavController, showAds: Boolean) {
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.GlobalMap,
@@ -48,14 +50,19 @@ fun RoyalShieldBottomBar(navController: NavController) {
         BottomNavItem.Automation,
         BottomNavItem.Settings
     )
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    Column {
+        // Cyber owns its inline banner; every other free route uses this slot.
+        if (showAds && currentRoute != BottomNavItem.CyberMap.route) {
+            AdBanner()
+        }
 
     NavigationBar(
         containerColor = SpaceDeep.copy(alpha = 0.95f),
         contentColor = Color.White
     ) {
-        val navBackStackEntry = navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry.value?.destination?.route
-
         items.forEach { item ->
             NavigationBarItem(
                 icon = {
@@ -63,14 +70,18 @@ fun RoyalShieldBottomBar(navController: NavController) {
                         Icon(
                             painter = painterResource(id = item.iconResId),
                             contentDescription = item.title,
-                            modifier = androidx.compose.ui.Modifier.size(48.dp), // Increased size
+                            modifier = Modifier
+                                .size(48.dp)
+                                .offset(y = (-6).dp),
                             tint = Color.Unspecified // Keep original colors for the PNG
                         )
                     } else if (item.icon != null) {
                         Icon(
                             imageVector = item.icon,
                             contentDescription = item.title,
-                            modifier = androidx.compose.ui.Modifier.size(40.dp) // Increased size
+                            modifier = Modifier
+                                .size(40.dp)
+                                .offset(y = (-6).dp)
                         )
                     }
                 },
@@ -94,5 +105,6 @@ fun RoyalShieldBottomBar(navController: NavController) {
                 }
             )
         }
+    }
     }
 }

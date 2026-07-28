@@ -69,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.royalshield.app.BuildConfig
 import com.royalshield.app.R
 import com.royalshield.app.managers.BillingManager
 import com.royalshield.app.vpn.VpnConfigurationException
@@ -124,12 +125,14 @@ fun VpnScreen(
 
     val hasPremiumAccess = billingManager?.hasPremiumAccess?.collectAsState()?.value ?: false
     val currentProduct = billingManager?.currentProduct?.collectAsState()?.value
-    val hasVpnAccess = hasPremiumAccess && (
-        currentProduct == BillingManager.PRODUCT_GOLD ||
-            currentProduct == BillingManager.PRODUCT_ULTIMATE
+    val hasVpnAccess = BuildConfig.DEBUG || (
+        hasPremiumAccess && (
+            currentProduct == BillingManager.PRODUCT_GOLD ||
+                currentProduct == BillingManager.PRODUCT_ULTIMATE
+            )
         )
 
-    val vpnProfileRepository = remember { VpnProfileRepository() }
+    val vpnProfileRepository = remember { VpnProfileRepository(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var isFetchingConfig by remember { mutableStateOf(false) }
     var vpnNotice by remember { mutableStateOf<String?>(null) }
@@ -255,8 +258,13 @@ fun VpnScreen(
                     Spacer(modifier = Modifier.height(42.dp))
                     AurumPowerButton(
                         vpnState = vpnState,
-                        enabled = backendAvailable == true && !isFetchingConfig,
+                        enabled = !isFetchingConfig,
                         onClick = {
+                            if (backendAvailable != true && vpnState !is VpnState.Connected) {
+                                vpnNotice = "Contacting the Royal VPN service..."
+                                requestVpnConnection()
+                                return@AurumPowerButton
+                            }
                             when (vpnState) {
                                 is VpnState.Disconnected,
                                 is VpnState.Error,
@@ -376,7 +384,7 @@ private fun AurumHeader(onBack: () -> Unit) {
         Spacer(modifier = Modifier.width(18.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Aurum VPN",
+                "ROYAL VPN",
                 color = AurumGoldSoft,
                 fontSize = 26.sp,
                 fontFamily = FontFamily.Serif,
@@ -465,36 +473,12 @@ private fun AurumWorldMapCard(selectedServer: VpnServer) {
             .border(1.dp, AurumStroke.copy(alpha = 0.86f), RoundedCornerShape(31.dp))
             .padding(12.dp)
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            drawRect(Color(0xFF100A04).copy(alpha = 0.45f))
-
-            val continent = Color(0xFF251B11).copy(alpha = 0.72f)
-            drawOval(continent, topLeft = Offset(w * 0.12f, h * 0.18f), size = Size(w * 0.29f, h * 0.22f))
-            drawOval(continent, topLeft = Offset(w * 0.30f, h * 0.35f), size = Size(w * 0.15f, h * 0.34f))
-            drawOval(continent, topLeft = Offset(w * 0.49f, h * 0.22f), size = Size(w * 0.14f, h * 0.17f))
-            drawOval(continent, topLeft = Offset(w * 0.47f, h * 0.38f), size = Size(w * 0.17f, h * 0.36f))
-            drawOval(continent, topLeft = Offset(w * 0.63f, h * 0.21f), size = Size(w * 0.28f, h * 0.24f))
-            drawOval(continent, topLeft = Offset(w * 0.73f, h * 0.47f), size = Size(w * 0.12f, h * 0.18f))
-            drawOval(continent, topLeft = Offset(w * 0.82f, h * 0.62f), size = Size(w * 0.08f, h * 0.10f))
-
-            val routeColor = AurumGold.copy(alpha = 0.13f)
-            drawLine(routeColor, Offset(w * 0.52f, h * 0.29f), Offset(w * 0.36f, h * 0.26f), 1.3f)
-            drawLine(routeColor, Offset(w * 0.52f, h * 0.29f), Offset(w * 0.68f, h * 0.34f), 1.3f)
-            drawLine(routeColor, Offset(w * 0.52f, h * 0.29f), Offset(w * 0.84f, h * 0.31f), 1.3f)
-
-            val nodes = listOf(
-                Offset(w * 0.52f, h * 0.29f), Offset(w * 0.34f, h * 0.26f), Offset(w * 0.20f, h * 0.33f),
-                Offset(w * 0.38f, h * 0.72f), Offset(w * 0.60f, h * 0.74f), Offset(w * 0.68f, h * 0.40f),
-                Offset(w * 0.84f, h * 0.31f), Offset(w * 0.80f, h * 0.52f), Offset(w * 0.90f, h * 0.79f),
-                Offset(w * 0.73f, h * 0.45f), Offset(w * 0.88f, h * 0.32f)
-            )
-            nodes.forEachIndexed { index, point ->
-                drawCircle(AurumGold.copy(alpha = 0.14f), radius = if (index == 0) 14f else 10f, center = point)
-                drawCircle(if (index == 0) AurumWhite else AurumGold, radius = if (index == 0) 5.8f else 4.1f, center = point)
-            }
-        }
+        Image(
+            painter = painterResource(id = R.drawable.royal_vpn_world_map),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
         AurumLegend(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -738,7 +722,7 @@ private fun AurumVpnPaywall(onNavigateToPremium: () -> Unit) {
             )
         }
         Spacer(modifier = Modifier.height(25.dp))
-        Text("Aurum VPN", color = AurumGoldSoft, fontSize = 32.sp, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+        Text("ROYAL VPN", color = AurumGoldSoft, fontSize = 32.sp, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
         Text(
             "Exclusive secure tunnel for premium members.",
             color = AurumMuted,

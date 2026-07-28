@@ -1,0 +1,7 @@
+diff --git a/local.properties b/local.properties
+--- a/local.properties
++++ b/local.properties
+@@ -3 +3,2 @@
+-ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
++ADMOB_APP_ID=ca-app-pub-1586798082508064~3049764774
++ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-1586798082508064/2006218364

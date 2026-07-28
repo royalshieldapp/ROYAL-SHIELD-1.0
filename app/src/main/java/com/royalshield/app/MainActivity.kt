@@ -456,6 +456,8 @@ fun SplashScreenLegacy(onTimeout: () -> Unit) {
 fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager) {
     val context = LocalContext.current
     val navController = rememberNavController()
+    val hasPremiumAccess by billingManager.hasPremiumAccess.collectAsState()
+    val showAds = !hasPremiumAccess
 
     // Service activation (Safe Mode) - Enabled
     // Service activation (Safe Mode) - Enabled
@@ -476,12 +478,13 @@ fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager) 
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = { RoyalShieldBottomBar(navController) }
+        bottomBar = { RoyalShieldBottomBar(navController, showAds = showAds) }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             RoyalShieldNavGraph(
                 navController = navController,
                 billingManager = billingManager,
+                showAds = showAds,
                 onTriggerSOS = {
                     com.royalshield.app.SosManager.triggerSos(context)
                 }

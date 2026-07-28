@@ -1,0 +1,184 @@
+diff --git a/royal_shield_backend_unified/services/loyalty/service.py b/royal_shield_backend_unified/services/loyalty/service.py
+--- a/royal_shield_backend_unified/services/loyalty/service.py
++++ b/royal_shield_backend_unified/services/loyalty/service.py
+@@ -52,13 +52,29 @@ def next_tier(points: int) -> tuple[str | None, int]:
+ 
+ 
+ def get_or_create_account(db: Session, firebase_uid: str, *, lock: bool = False) -> LoyaltyAccount:
+-    query = db.query(LoyaltyAccount).filter(LoyaltyAccount.firebase_uid == firebase_uid)
+-    account = query.with_for_update().one_or_none() if lock else query.one_or_none()
++    def find_account() -> LoyaltyAccount | None:
++        query = db.query(LoyaltyAccount).filter(LoyaltyAccount.firebase_uid == firebase_uid)
++        return query.with_for_update().one_or_none() if lock else query.one_or_none()
++
++    account = find_account()
+     if account is None:
+-        account = LoyaltyAccount(firebase_uid=firebase_uid, points=0)
+-        db.add(account)
+-        db.flush()
++        try:
++            # A savepoint keeps the surrounding request transaction usable if two
++            # first requests try to create the same Firebase account concurrently.
++            with db.begin_nested():
++                account = LoyaltyAccount(firebase_uid=firebase_uid, points=0)
++                db.add(account)
++                db.flush()
++        except IntegrityError:
++            account = find_account()
++            if account is None:
++                raise
+     return account
+ 
+ 
++def _claim_response(action: str, balance: int, *, awarded: int, duplicate: bool) -> dict:
++    return {
++        "success": True,
++        "action": action,
++        "pointsAwarded": awarded,
++        "newTotal": balance,
++        "currentTier": tier_for(balance),
++        "duplicate": duplicate,
++    }
++
++
+ def status_for(db: Session, firebase_uid: str) -> dict:
+     account = get_or_create_account(db, firebase_uid)
+     db.commit()
+@@ -76,23 +92,16 @@ def claim_daily_login(db: Session, firebase_uid: str) -> dict:
+ def claim_daily_login(db: Session, firebase_uid: str) -> dict:
+     action = "daily_login"
+     event_key = f"{action}:{datetime.now(timezone.utc).date().isoformat()}"
++    account = get_or_create_account(db, firebase_uid, lock=True)
+     existing = db.query(LoyaltyLedgerEntry).filter_by(firebase_uid=firebase_uid, event_key=event_key).one_or_none()
+     if existing is not None:
+-        return {
+-            "success": True,
+-            "action": action,
+-            "pointsAwarded": 0,
+-            "newTotal": existing.balance_after,
+-            "currentTier": tier_for(existing.balance_after),
+-            "duplicate": True,
+-        }
++        balance = account.points
++        db.commit()
++        return _claim_response(action, balance, awarded=0, duplicate=True)
+ 
+     try:
+-        account = get_or_create_account(db, firebase_uid, lock=True)
+         account.points += 10
+         db.add(
+             LoyaltyLedgerEntry(
+@@ -109,27 +118,16 @@ def claim_daily_login(db: Session, firebase_uid: str) -> dict:
+     except IntegrityError:
+         db.rollback()
+-        existing = db.query(LoyaltyLedgerEntry).filter_by(firebase_uid=firebase_uid, event_key=event_key).one()
+-        account = get_or_create_account(db, firebase_uid)
+-        return {
+-            "success": True,
+-            "action": action,
+-            "pointsAwarded": 0,
+-            "newTotal": account.points,
+-            "currentTier": tier_for(account.points),
+-            "duplicate": True,
+-        }
+-
+-    return {
+-        "success": True,
+-        "action": action,
+-        "pointsAwarded": 10,
+-        "newTotal": account.points,
+-        "currentTier": tier_for(account.points),
+-        "duplicate": False,
+-    }
++        account = get_or_create_account(db, firebase_uid, lock=True)
++        db.query(LoyaltyLedgerEntry).filter_by(firebase_uid=firebase_uid, event_key=event_key).one()
++        balance = account.points
++        db.commit()
++        return _claim_response(action, balance, awarded=0, duplicate=True)
++
++    return _claim_response(action, account.points, awarded=10, duplicate=False)
+ 
+ 
+ def redeem_reward(db: Session, firebase_uid: str, reward_id: str, idempotency_key: str) -> dict:
++    # Locking the account serializes balance changes and idempotency checks per user.
++    account = get_or_create_account(db, firebase_uid, lock=True)
+     previous = db.query(LoyaltyRedemption).filter_by(
+         firebase_uid=firebase_uid,
+         idempotency_key=idempotency_key,
+     ).one_or_none()
+     if previous is not None:
+-        account = get_or_create_account(db, firebase_uid)
++        if previous.reward_id != reward_id:
++            raise ValueError("IDEMPOTENCY_CONFLICT")
+         return _redemption_response(previous, account.points)
+ 
+@@ -140,7 +138,6 @@ def redeem_reward(db: Session, firebase_uid: str, reward_id: str, idempotency_ke
+     if not reward.enabled:
+         raise ValueError("REWARD_NOT_AVAILABLE")
+ 
+-    account = get_or_create_account(db, firebase_uid, lock=True)
+     if account.points < reward.cost:
+         raise ValueError("INSUFFICIENT_POINTS")
+ 
+@@ -165,7 +162,18 @@ def redeem_reward(db: Session, firebase_uid: str, reward_id: str, idempotency_ke
+             balance_after=account.points,
+         )
+     )
+-    db.commit()
++    try:
++        db.commit()
++    except IntegrityError:
++        db.rollback()
++        previous = db.query(LoyaltyRedemption).filter_by(
++            firebase_uid=firebase_uid,
++            idempotency_key=idempotency_key,
++        ).one_or_none()
++        if previous is None:
++            raise
++        if previous.reward_id != reward_id:
++            raise ValueError("IDEMPOTENCY_CONFLICT") from None
++        account = get_or_create_account(db, firebase_uid)
++        return _redemption_response(previous, account.points)
+     return _redemption_response(redemption, account.points)
+diff --git a/royal_shield_backend_unified/api/routes/loyalty.py b/royal_shield_backend_unified/api/routes/loyalty.py
+--- a/royal_shield_backend_unified/api/routes/loyalty.py
++++ b/royal_shield_backend_unified/api/routes/loyalty.py
+@@ -104,6 +104,8 @@ def redeem_loyalty_reward(
+             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Reward is not available yet") from None
+         if code == "INSUFFICIENT_POINTS":
+             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Insufficient points") from None
++        if code == "IDEMPOTENCY_CONFLICT":
++            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Idempotency key already used") from None
+         raise
+diff --git a/royal_shield_backend_unified/tests/test_loyalty_service.py b/royal_shield_backend_unified/tests/test_loyalty_service.py
+--- a/royal_shield_backend_unified/tests/test_loyalty_service.py
++++ b/royal_shield_backend_unified/tests/test_loyalty_service.py
+@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
+ from sqlalchemy.orm import sessionmaker
+ 
+ from services.geospatial.database.connection import Base
++from services.loyalty.models import LoyaltyAccount
+ from services.loyalty.service import claim_daily_login, redeem_reward, status_for
+ 
+ 
+@@ -38,6 +39,19 @@ def test_daily_login_is_idempotent():
+     assert second["duplicate"] is True
+ 
+ 
++def test_duplicate_daily_login_returns_current_balance():
++    db = _session()
++    claim_daily_login(db, "firebase-user-current-balance")
++    account = db.query(LoyaltyAccount).filter_by(firebase_uid="firebase-user-current-balance").one()
++    account.points = 75
++    db.commit()
++
++    duplicate = claim_daily_login(db, "firebase-user-current-balance")
++
++    assert duplicate["pointsAwarded"] == 0
++    assert duplicate["newTotal"] == 75
++    assert duplicate["currentTier"] == "Bronze"
++
++
+ def test_unfulfilled_reward_cannot_spend_points():
+     db = _session()
+     claim_daily_login(db, "firebase-user-3")

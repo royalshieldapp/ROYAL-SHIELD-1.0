@@ -149,6 +149,15 @@ fun RoyalMapScreen(
         }
     }
 
+    fun toggleSignalLayer(label: String, currentlyVisible: Boolean, update: (Boolean) -> Unit) {
+        val isVisible = !currentlyVisible
+        update(isVisible)
+        Toast.makeText(
+            context,
+            "$label alerts ${if (isVisible) "shown" else "hidden"}",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
     LaunchedEffect(centerRequest) {
         centerRequest?.let {
             cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 16f), 700)
@@ -338,15 +347,15 @@ fun RoyalMapScreen(
                 showCameras = showCameras,
                 showPolice = showPolice,
                 showSpeed = showSpeed,
-                onToggleCameras = { showCameras = !showCameras },
-                onTogglePolice = { showPolice = !showPolice },
-                onToggleSpeed = { showSpeed = !showSpeed },
+                onToggleCameras = { toggleSignalLayer("Camera", showCameras) { showCameras = it } },
+                onTogglePolice = { toggleSignalLayer("Police", showPolice) { showPolice = it } },
+                onToggleSpeed = { toggleSignalLayer("Speed", showSpeed) { showSpeed = it } },
                 showProtest = showProtest,
                 showTheft = showTheft,
                 showCyber = showCyber,
-                onToggleProtest = { showProtest = !showProtest },
-                onToggleTheft = { showTheft = !showTheft },
-                onToggleCyber = { showCyber = !showCyber }
+                onToggleProtest = { toggleSignalLayer("Protest", showProtest) { showProtest = it } },
+                onToggleTheft = { toggleSignalLayer("Theft", showTheft) { showTheft = it } },
+                onToggleCyber = { toggleSignalLayer("Cyber", showCyber) { showCyber = it } }
             )
             AnimatedVisibility(visible = selectedTab == RoyalMapTab.CONTROL, enter = fadeIn(), exit = fadeOut()) {
                 RoyalMapControlPanel(

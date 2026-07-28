@@ -7,7 +7,9 @@ VIRUSTOTAL_API_KEY=
 GEMINI_API_KEY=
 MAPS_API_KEY=
 MAPBOX_DOWNLOADS_TOKEN=
-ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
+# AdMob identifiers are public. Debug requests still use Google's test banner unit.
+ADMOB_APP_ID=ca-app-pub-1586798082508064~3049764774
+ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-1586798082508064/2006218364
 ALIENVAULT_API_KEY=
 DID_API_KEY=
 
@@ -15,7 +17,7 @@ TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_FROM_NUMBER=
 
-LOYALTY_API_URL=https://server-beckend.onrender.com/api/loyalty
+LOYALTY_API_URL=https://server-beckend.onrender.com/api/v1/loyalty
 API_BASE_URL=https://server-beckend.onrender.com
 
 FIREBASE_APP_DEBUG_TOKEN=

@@ -69,6 +69,7 @@ import com.royalshield.app.features.threatmap.ThreatMapViewModel
 
 @Composable
 fun CyberHomeScreen(
+    showAds: Boolean = true,
     onBack: () -> Unit = {},
     onNavigateToMap: () -> Unit,
     onNavigateToCourses: () -> Unit,
@@ -431,6 +432,15 @@ fun CyberHomeScreen(
                             )
                         }
                     }
+                }
+
+                // Separate from security actions and contained in the scrollable Cyber content.
+                if (showAds) {
+                    AdBanner(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp)
+                    )
                 }
 
 

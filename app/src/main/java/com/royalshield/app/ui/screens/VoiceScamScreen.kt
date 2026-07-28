@@ -72,18 +72,17 @@ fun VoiceScamScreen(onBack: () -> Unit) {
     var isDeepAnalysisEnabled by remember { mutableStateOf(false) }
     var isAutoBlockEnabled by remember { mutableStateOf(true) }
 
-    // Live metrics simulation
-    var callsScreened by remember { mutableIntStateOf(47) }
-    var threatsBlocked by remember { mutableIntStateOf(3) }
+    // Live metrics from PreferencesManager
+    var callsScreened by remember { mutableIntStateOf(com.royalshield.app.managers.PreferencesManager.getVoiceCallsScreened()) }
+    var threatsBlocked by remember { mutableIntStateOf(com.royalshield.app.managers.PreferencesManager.getVoiceThreatsBlocked()) }
     var uptimeMinutes by remember { mutableIntStateOf(1440) } // 24h in minutes
 
-    // Simulate live counter
+    // Update from PreferencesManager periodically
     LaunchedEffect(isEnabled) {
         while (isEnabled) {
-            delay(12000) // Every 12 seconds
-            callsScreened++
-            if ((1..15).random() == 1) threatsBlocked++ // ~6% chance
-            uptimeMinutes++
+            delay(2000) // Every 2 seconds
+            callsScreened = com.royalshield.app.managers.PreferencesManager.getVoiceCallsScreened()
+            threatsBlocked = com.royalshield.app.managers.PreferencesManager.getVoiceThreatsBlocked()
         }
     }
 
