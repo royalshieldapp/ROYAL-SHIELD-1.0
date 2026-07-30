@@ -4,7 +4,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
 
-internal class AuthProfileRepository(
+class AuthProfileRepository(
     private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
 ) {
     suspend fun ensureProfile(user: FirebaseUser, preferredName: String = "") {

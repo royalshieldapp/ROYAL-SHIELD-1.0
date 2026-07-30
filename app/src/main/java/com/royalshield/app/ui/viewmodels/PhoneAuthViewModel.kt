@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseTooManyRequestsException
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
@@ -161,7 +161,8 @@ class PhoneAuthViewModel(
     private fun phoneAuthErrorMessage(error: Throwable?): String = when (error) {
         is FirebaseAuthInvalidCredentialsException ->
             "The phone number or verification code is invalid"
-        is FirebaseTooManyRequestsException ->
+        is FirebaseAuthException
+            if error.errorCode == "ERROR_TOO_MANY_REQUESTS" ->
             "Too many attempts. Wait before requesting another code"
         else -> "Phone verification failed. Check your connection and try again"
     }
