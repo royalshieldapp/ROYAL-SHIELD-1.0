@@ -604,21 +604,94 @@ private fun AurumPowerButton(vpnState: VpnState, enabled: Boolean, onClick: () -
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = this.center
-            drawCircle(Color(0xFF1A1108), radius = size.minDimension / 2f)
-            drawCircle(AurumBlack, radius = size.minDimension * 0.43f)
+
+            // Soft gold halo and dark housing.
             drawCircle(
-                color = ringColor.copy(alpha = if (vpnState is VpnState.Connected) 0.45f else 0.20f),
-                radius = size.minDimension * 0.47f,
-                style = Stroke(width = 3.5f)
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        ringColor.copy(alpha = 0.24f),
+                        AurumGoldDeep.copy(alpha = 0.12f),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = size.minDimension * 0.50f
+                ),
+                radius = size.minDimension * 0.50f
             )
+            drawCircle(Color(0xFF080501), radius = size.minDimension * 0.465f)
+
+            // Metallic segmented bezel inspired by the approved luxury dial.
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        Color(0xFF6B4208),
+                        Color(0xFFFFE99A),
+                        Color(0xFFB77A12),
+                        Color(0xFFFFC83F),
+                        Color(0xFF5A3506),
+                        Color(0xFFFFE99A),
+                        Color(0xFF6B4208)
+                    ),
+                    center = center
+                ),
+                radius = size.minDimension * 0.435f,
+                style = Stroke(width = size.minDimension * 0.065f)
+            )
+            drawCircle(
+                color = Color(0xFFFFF1B5).copy(alpha = 0.55f),
+                radius = size.minDimension * 0.401f,
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+
+            // Recessed black center with a subtle warm highlight.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF312820),
+                        Color(0xFF17120D),
+                        Color(0xFF050403)
+                    ),
+                    center = Offset(center.x - 22.dp.toPx(), center.y - 28.dp.toPx()),
+                    radius = size.minDimension * 0.38f
+                ),
+                radius = size.minDimension * 0.37f
+            )
+            drawCircle(
+                color = ringColor.copy(alpha = if (vpnState is VpnState.Connected) 0.72f else 0.28f),
+                radius = size.minDimension * 0.35f,
+                style = Stroke(width = 2.dp.toPx())
+            )
+
+            // Status arc and the precision marker at twelve o'clock.
             drawArc(
                 color = ringColor,
-                startAngle = -220f,
-                sweepAngle = 260f,
+                startAngle = -218f,
+                sweepAngle = 256f,
                 useCenter = false,
-                topLeft = Offset(center.x - 33f, center.y - 33f),
-                size = Size(66f, 66f),
-                style = Stroke(width = 5.5f, cap = StrokeCap.Round)
+                topLeft = Offset(center.x - 35.dp.toPx(), center.y - 35.dp.toPx()),
+                size = Size(70.dp.toPx(), 70.dp.toPx()),
+                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawLine(
+                color = Color(0xFFFFE89A),
+                start = Offset(center.x, center.y - 44.dp.toPx()),
+                end = Offset(center.x, center.y - 31.dp.toPx()),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+
+            // Symmetric decorative rails from the reference, kept inside the hit target.
+            drawLine(
+                color = AurumGold.copy(alpha = 0.72f),
+                start = Offset(13.dp.toPx(), center.y),
+                end = Offset(50.dp.toPx(), center.y),
+                strokeWidth = 1.5.dp.toPx()
+            )
+            drawLine(
+                color = AurumGold.copy(alpha = 0.72f),
+                start = Offset(size.width - 50.dp.toPx(), center.y),
+                end = Offset(size.width - 13.dp.toPx(), center.y),
+                strokeWidth = 1.5.dp.toPx()
             )
         }
         Icon(

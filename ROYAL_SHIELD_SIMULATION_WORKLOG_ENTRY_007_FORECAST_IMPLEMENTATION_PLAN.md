@@ -28,3 +28,13 @@ Convertir la especificación aprobada de Forecast Engine v2 en un plan de implem
 Resultado: existe un plan secuencial con criterios de aceptación explícitos; no se modificó código de producción ni se hizo push/deploy.
 
 Bloqueo de ejecución: se debe elegir modalidad de ejecución. La implementación empieza por obtener una copia verificable del repositorio privado `royalshieldapp/server-beckend`.
+
+## Requisito de entrega añadido
+
+- Al finalizar el entrenamiento se entregará un reporte con fuentes y periodo, conteos válidos/rechazados, modelo/versión/checksum, métricas, estado de despliegue y evidencia Android/API, sin secretos ni datos sensibles.
+- El reporte incluirá una guía priorizada de mejora en cuatro áreas: cobertura/calidad de datos, calidad del modelo, operación en Render y experiencia Android.
+
+## Aceleración de ejecución
+
+- Se creó y validó el skill local `C:\Users\Anonymous\.codex\skills\royal-shield-fast-track` para acelerar inventario, trabajo por lotes y validaciones sin reducir evidencia ni aceptar resultados simulados.
+- El skill no acorta dependencias externas reales, como acumulación de historial, límites de fuentes, pagos o tiempos de plataforma.

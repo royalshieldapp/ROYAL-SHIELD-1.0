@@ -1,5 +1,15 @@
 package com.royalshield.app.ui.screens
 
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -44,10 +54,10 @@ import com.royalshield.app.managers.PreferencesManager
 import android.widget.Toast
 import com.royalshield.app.SosManager
 
-private enum class SettingsContentWindow(val title: String) {
+private enum class SettingsContentWindow(val title: String, val assetName: String? = null) {
     ContactSupport("Contact Support"),
-    PrivacyPolicy("Privacy Policy"),
-    TermsAndConditions("Terms & Conditions")
+    PrivacyPolicy("Privacy Policy", "privacy_policy_embed.html"),
+    TermsAndConditions("Terms & Conditions", "terms_embed.html")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -519,13 +529,116 @@ fun SettingsScreen(
         }
 
         activeContentWindow?.let { window ->
-            EmptySettingsContentDialog(
-                title = window.title,
-                onDismiss = { activeContentWindow = null }
-            )
+            if (window.assetName != null) {
+                LegalDocumentDialog(
+                    title = window.title,
+                    assetName = window.assetName,
+                    onDismiss = { activeContentWindow = null }
+                )
+            } else {
+                EmptySettingsContentDialog(
+                    title = window.title,
+                    onDismiss = { activeContentWindow = null }
+                )
+            }
         }
     }
 }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun LegalDocumentDialog(
+    title: String,
+    assetName: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    BackHandler(onBack = onDismiss)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(12.dp)
+                .background(Color(0xFF080808), RoundedCornerShape(22.dp))
+                .border(1.5.dp, RoyalGold, RoundedCornerShape(22.dp))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = title,
+                    color = RoyalGold,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close $title",
+                        tint = RoyalGold
+                    )
+                }
+            }
+
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(start = 6.dp, end = 6.dp, bottom = 6.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, RoyalGold.copy(alpha = 0.38f), RoundedCornerShape(16.dp)),
+                factory = { webViewContext ->
+                    WebView(webViewContext).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        settings.javaScriptEnabled = false
+                        settings.domStorageEnabled = false
+                        settings.databaseEnabled = false
+                        settings.allowContentAccess = false
+                        settings.allowFileAccess = true
+                        settings.allowFileAccessFromFileURLs = false
+                        settings.allowUniversalAccessFromFileURLs = false
+                        settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val uri = request?.url ?: return true
+                                if (uri.scheme == "https" || uri.scheme == "mailto") {
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString())))
+                                    }
+                                }
+                                return true
+                            }
+                        }
+                        loadUrl("file:///android_asset/$assetName")
+                    }
+                },
+                update = { webView ->
+                    val expectedUrl = "file:///android_asset/$assetName"
+                    if (webView.url != expectedUrl) webView.loadUrl(expectedUrl)
+                }
+            )
+        }
+    }
 }
 
 @Composable

@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.VpnLock
@@ -135,6 +136,7 @@ fun DashboardScreen(
     val scrollState = rememberScrollState()
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     var showVoiceAssistant by remember { mutableStateOf(false) }
+    var showTextAssistant by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val cardParallaxOffset = rememberDashboardParallaxOffset()
     val leftCardTiltY = 8f
@@ -979,6 +981,26 @@ fun DashboardScreen(
                         )
                     }
 
+                    // Text chat button beside the existing voice assistant.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .offset(x = (-44).dp)
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF11131A))
+                            .border(1.dp, RoyalGold, CircleShape)
+                            .clickable { showTextAssistant = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Chat,
+                            contentDescription = "Text Assistant",
+                            tint = RoyalGold,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
+
                     // Floating Mic Button â€” separated, aligned to end with offset
                     Box(
                         modifier = Modifier
@@ -997,6 +1019,12 @@ fun DashboardScreen(
                             modifier = Modifier.size(22.dp)
                         )
                     }
+                }
+
+                if (showTextAssistant) {
+                    com.royalshield.app.ui.components.VirtualAgentDialog(
+                        onDismiss = { showTextAssistant = false }
+                    )
                 }
 
                 if (showVoiceAssistant) {

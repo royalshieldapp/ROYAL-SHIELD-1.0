@@ -29,8 +29,14 @@ data class AssistantUiState(
 )
 
 class AssistantViewModel(
-    private val repository: AssistantRepository = AssistantRepository()
+    repository: AssistantRepository? = null,
+    sender: (suspend (
+        message: String,
+        history: List<AssistantHistoryEntry>
+    ) -> AssistantRepositoryResult)? = null
 ) : ViewModel() {
+    private val sendToRepository = sender
+        ?: (repository ?: AssistantRepository())::sendMessage
     private val _uiState = MutableStateFlow(AssistantUiState())
     val uiState = _uiState.asStateFlow()
 
@@ -58,7 +64,7 @@ class AssistantViewModel(
         )
 
         viewModelScope.launch {
-            val result = repository.sendMessage(normalized, history)
+            val result = sendToRepository(normalized, history)
             val response = when (result) {
                 is AssistantRepositoryResult.Success -> AssistantMessage(
                     text = result.reply,

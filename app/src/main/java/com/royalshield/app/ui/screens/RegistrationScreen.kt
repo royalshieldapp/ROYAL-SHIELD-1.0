@@ -244,16 +244,16 @@ fun RegistrationScreen(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Cyber face background with a subtle sensor-driven parallax effect.
+        // Approved gold AI background, exclusive to Registration.
         Image(
-            painter = painterResource(id = R.drawable.bg_registration_cyber_face),
+            painter = painterResource(id = R.drawable.bg_registration_gold_ai),
             contentDescription = null,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    scaleX = 1.12f
-                    scaleY = 1.12f
+                    scaleX = 1.08f
+                    scaleY = 1.08f
                     translationX = backgroundTiltX * 28.dp.toPx()
                     translationY = backgroundTiltY * 22.dp.toPx()
                 }
@@ -265,16 +265,16 @@ fun RegistrationScreen(
             modifier = Modifier.fillMaxSize()
         )
         
-        // Dark overlay for better text readability
+        // Preserve the artwork while keeping controls legible.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.7f),
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Black.copy(alpha = 0.8f)
+                            Color.Black.copy(alpha = 0.32f),
+                            Color.Black.copy(alpha = 0.48f),
+                            Color.Black.copy(alpha = 0.68f)
                         )
                     )
                 )
@@ -284,6 +284,13 @@ fun RegistrationScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp)
+                .graphicsLayer {
+                    translationX = backgroundTiltX * 12.dp.toPx()
+                    translationY = backgroundTiltY * 9.dp.toPx()
+                    rotationY = backgroundTiltX * 1.8f
+                    rotationX = -backgroundTiltY * 1.4f
+                    cameraDistance = 18f * density
+                }
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -304,41 +311,50 @@ fun RegistrationScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // App Logo/Icon
-            Image(
-                painter = painterResource(id = R.drawable.royal_shield_logo),
-                contentDescription = "Royal Shield Logo",
-                modifier = Modifier.size(120.dp),
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = "Protection Starts Here",
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center
-            )
+            LuxuryRegistrationPanel(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.royal_shield_logo),
+                        contentDescription = "Royal Shield Logo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Powered by AI. Built for your safety.",
+                    color = Color(0xFFFFD66B),
+                    fontSize = 24.sp,
+                    lineHeight = 31.sp,
+                    fontFamily = Orbitron,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            // Security assurances list
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp), 
-                horizontalAlignment = Alignment.Start
-            ) {
-                Text("🔒 Encrypted connection", color = Color.Gray, fontSize = 12.sp)
-                Text("🛡️ Your data is protected", color = Color.Gray, fontSize = 12.sp)
-                Text("✅ Secure authentication", color = Color.Gray, fontSize = 12.sp)
-                Text("🔐 Privacy guaranteed", color = Color.Gray, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Sign up to activate advanced cybersecurity features and personalized protection",
+                    color = Color.White.copy(alpha = 0.82f),
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-            
-            Spacer(modifier = Modifier.height(48.dp))
+
+            Spacer(modifier = Modifier.height(28.dp))
 
             // --- Social Login Buttons ---
 
+            LuxuryRegistrationPanel(modifier = Modifier.fillMaxWidth()) {
             SocialLoginButton(
                 text = "Continue with Phone",
                 icon = Icons.Default.Phone,
@@ -417,9 +433,15 @@ fun RegistrationScreen(
             if (!showEmailForm) {
                 OutlinedButton(
                     onClick = { showEmailForm = true },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .graphicsLayer {
+                            shadowElevation = 12.dp.toPx()
+                            shape = RoundedCornerShape(16.dp)
+                        },
                     shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD86A))
                 ) {
                     Icon(Icons.Default.Email, null, tint = Color.White)
                     Spacer(modifier = Modifier.width(12.dp))
@@ -458,6 +480,7 @@ fun RegistrationScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
+            }
         }
         
         if (isLoading) {
@@ -465,6 +488,38 @@ fun RegistrationScreen(
                 CircularProgressIndicator(color = RoyalGold)
             }
         }
+    }
+}
+
+@Composable
+private fun LuxuryRegistrationPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                shadowElevation = 22.dp.toPx()
+                shape = RoundedCornerShape(30.dp)
+                clip = false
+            }
+            .background(Color.Black.copy(alpha = 0.24f), RoundedCornerShape(30.dp))
+            .border(1.5.dp, Color(0xFFFFD86A), RoundedCornerShape(30.dp))
+            .padding(5.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    1.dp,
+                    Color(0xFFFFC43B).copy(alpha = 0.38f),
+                    RoundedCornerShape(25.dp)
+                )
+                .background(Color(0xFF090704).copy(alpha = 0.18f), RoundedCornerShape(25.dp))
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content
+        )
     }
 }
 
@@ -479,9 +534,16 @@ fun SocialLoginButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .graphicsLayer {
+                shadowElevation = 12.dp.toPx()
+                shape = RoundedCornerShape(16.dp)
+            },
         color = color,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD86A))
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),

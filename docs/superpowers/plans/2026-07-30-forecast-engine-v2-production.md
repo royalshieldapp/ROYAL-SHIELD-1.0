@@ -204,3 +204,4 @@
 - [ ] A persistent, checksummed model artifact and metrics exist for any `READY` response.
 - [ ] Backend and Android tests pass; public and device E2E evidence is recorded.
 - [ ] Every unresolved external provider is reported honestly in the worklog.
+- [ ] Entregar al usuario un reporte de entrenamiento con fuentes y periodo, filas válidas/rechazadas, modelo/versión/checksum, métricas, estado de despliegue y evidencia Android/API. Incluir una guía priorizada para mejorarlo en datos, modelo, operación Render y experiencia Android. No incluir secretos ni datos sensibles.
