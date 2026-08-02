@@ -357,7 +357,7 @@ fun RegistrationScreen(
             LuxuryRegistrationPanel(modifier = Modifier.fillMaxWidth()) {
             SocialLoginButton(
                 text = "Continue with Phone",
-                icon = Icons.Default.Phone,
+                iconRes = R.drawable.ic_registration_phone,
                 color = RoyalGold,
                 textColor = Color.Black
             ) {
@@ -369,7 +369,7 @@ fun RegistrationScreen(
             // Real Google Sign-In button
             SocialLoginButton(
                 text = "Continue with Google",
-                iconRes = R.drawable.ic_google,
+                iconRes = R.drawable.ic_registration_google_play,
                 color = Color.White,
                 textColor = Color.Black
             ) {
@@ -385,7 +385,7 @@ fun RegistrationScreen(
 
             SocialLoginButton(
                 text = "Continue with Apple",
-                iconRes = R.drawable.ic_apple,
+                iconRes = R.drawable.ic_registration_apple,
                 color = Color.Black,
                 textColor = Color.White
             ) {
@@ -398,7 +398,7 @@ fun RegistrationScreen(
 
             SocialLoginButton(
                 text = "Continue with GitHub",
-                icon = Icons.Default.Code,
+                iconRes = R.drawable.ic_registration_git,
                 color = Color(0xFF24292E),
                 textColor = Color.White
             ) {
@@ -411,7 +411,7 @@ fun RegistrationScreen(
             
             SocialLoginButton(
                 text = "Continue with Facebook",
-                iconRes = R.drawable.ic_facebook,
+                iconRes = R.drawable.ic_registration_facebook,
                 color = Color(0xFF1877F2),
                 textColor = Color.White
             ) {
@@ -443,7 +443,12 @@ fun RegistrationScreen(
                     shape = RoundedCornerShape(16.dp),
                     border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD86A))
                 ) {
-                    Icon(Icons.Default.Email, null, tint = Color.White)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_registration_email),
+                        contentDescription = "Email",
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(24.dp)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Continue with Email", color = Color.White)
                 }
@@ -552,8 +557,8 @@ fun SocialLoginButton(
             if (iconRes != null) {
                 Icon(
                     painter = painterResource(id = iconRes),
-                    contentDescription = null,
-                    tint = textColor,
+                    contentDescription = "$text icon",
+                    tint = Color.Unspecified,
                     modifier = Modifier.size(24.dp)
                 )
             } else if (icon != null) {
