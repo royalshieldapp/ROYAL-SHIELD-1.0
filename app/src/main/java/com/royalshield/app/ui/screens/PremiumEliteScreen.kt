@@ -38,6 +38,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.managers.BillingManager
 import com.royalshield.app.ui.theme.RoyalGold
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.RoyalEliteBadgeMode
 import androidx.compose.ui.graphics.luminance
 import com.royalshield.app.ui.viewmodels.PaywallUiState
 import com.royalshield.app.ui.viewmodels.PaywallViewModel
@@ -137,6 +139,18 @@ fun PremiumEliteScreen(
                         val starter = state.starter
                         val gold = state.gold
                         val ultimate = state.ultimate
+
+                        RoyalEliteBadge(
+                            mode = RoyalEliteBadgeMode.PROMOTIONAL,
+                            modifier = Modifier.size(112.dp)
+                        )
+                        Text(
+                            text = "Preview of Royal Elite benefit",
+                            color = RoyalGold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // STARTER - WHITE THEME
                         PlanCard(

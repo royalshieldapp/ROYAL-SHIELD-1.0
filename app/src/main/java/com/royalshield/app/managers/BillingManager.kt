@@ -5,29 +5,23 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.android.billingclient.api.*
+import com.royalshield.app.billing.BillingVerificationResult
+import com.royalshield.app.billing.BillingVerificationDecision
+import com.royalshield.app.billing.BillingVerifier
+import com.royalshield.app.billing.RenderBillingVerifier
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.tasks.await
-import com.royalshield.app.managers.PreferencesManager
-import com.royalshield.app.subscription.EntitlementStore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 
 /**
  * Manager for Google Play Billing
  * Handles the $0.99 paywall for Security Screen
  */
-class BillingManager(private val context: Context) : PurchasesUpdatedListener {
-
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
-    private val auth by lazy { FirebaseAuth.getInstance() }
-
-    // Linked to centralized SUPERPOWERS flag for single-switch control
-    private val isDevMode = EntitlementStore.DEV_SUPERPOWERS
+class BillingManager(
+    private val context: Context,
+    private val billingVerifier: BillingVerifier = RenderBillingVerifier(),
+) : PurchasesUpdatedListener {
 
     private var billingClient: BillingClient? = null
 
@@ -49,7 +43,6 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         const val PRODUCT_GOLD = "lifetime_gold"       // Unified ID
         const val PRODUCT_ULTIMATE = "lifetime_ultimate" // Unified ID
 
-        private const val COLLECTION_PURCHASES = "purchases"
     }
 
     sealed class PurchaseState {
@@ -93,67 +86,13 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
      * DEV MODE: Always returns true for full access
      */
     suspend fun checkPremiumAccess(): Boolean {
-        if (isDevMode) {
-            _hasPremiumAccess.value = true
-            return true
-        }
-
-        return try {
-            val uid = auth.currentUser?.uid ?: return false
-
-            // Verify in Firestore if user has SOLO or DUO plan
-            val userDoc = firestore.collection("users")
-                .document(uid)
-                .get()
-                .await()
-
-            if (userDoc.exists()) {
-                val planTier = userDoc.getString("planTier") ?: "FREE"
-                val premiumExpires = userDoc.getLong("premiumExpiresAt")
-
-                val hasPlan = planTier == "SOLO" || planTier == "DUO" || planTier == "GOLD" || planTier == "ULTIMATE" || planTier == "STARTER"
-
-                val hasPremiumTemp = premiumExpires?.let {
-                    System.currentTimeMillis() < it
-                } ?: false
-
-                val hasAccess = hasPlan || hasPremiumTemp
-                _hasPremiumAccess.value = hasAccess
-                // Also update local cache if we found a specific pack
-                val productId = when(planTier) {
-                    "STARTER" -> PRODUCT_STARTER
-                    "GOLD" -> PRODUCT_GOLD
-                    "ULTIMATE" -> PRODUCT_ULTIMATE
-                    else -> null
-                }
-
-                if (productId != null) {
-                   PreferencesManager.savePurchasedPack(productId)
-                   _currentProduct.value = productId
-                }
-                return hasAccess
-            }
-            false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error verifying premium access", e)
-            _hasPremiumAccess.value = false
-            false
-        }
+        return _hasPremiumAccess.value
     }
 
     /**
      * Queries available products
      */
     suspend fun queryProducts(): List<com.royalshield.app.models.ProductInfo> {
-        if (isDevMode) {
-            kotlinx.coroutines.delay(500) // Simular latencia
-            return listOf(
-                com.royalshield.app.models.ProductInfo(PRODUCT_STARTER, "Starter Pack", "Essential protection", "$9.99", null),
-                com.royalshield.app.models.ProductInfo(PRODUCT_GOLD, "Gold Bundle", "Advanced automation", "$19.99", null),
-                com.royalshield.app.models.ProductInfo(PRODUCT_ULTIMATE, "Ultimate Pack", "Lifetime Elite status", "$39.99", null)
-            )
-        }
-
         return try {
             val productList = listOf(
                 QueryProductDetailsParams.Product.newBuilder()
@@ -204,20 +143,11 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
      * Launches the purchase flow
      */
     fun launchPurchaseFlow(activity: Activity, productInfo: com.royalshield.app.models.ProductInfo) {
-        if (isDevMode) {
-            _purchaseState.value = PurchaseState.Loading
-            // Simular proceso de Google Play
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                kotlinx.coroutines.delay(1000)
-                // Éxito simulado
-                PreferencesManager.savePurchasedPack(productInfo.id)
-                _hasPremiumAccess.value = true
-                _currentProduct.value = productInfo.id
-                _purchaseState.value = PurchaseState.Success(productInfo.id)
-            }
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _purchaseState.value = PurchaseState.Error("Authentication required")
             return
         }
-
         val productDetails = productInfo.originalDetails
         if (productDetails == null) {
             _purchaseState.value = PurchaseState.Error("Product details not available")
@@ -234,6 +164,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
 
         val billingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
+            .setObfuscatedAccountId(BillingVerificationDecision.obfuscatedAccountId(uid))
             .build()
 
         billingClient?.launchBillingFlow(activity, billingFlowParams)
@@ -269,29 +200,47 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
      * Processes a purchase
      */
     private fun handlePurchase(purchase: Purchase) {
-        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            if (!purchase.isAcknowledged) {
-                acknowledgePurchase(purchase)
-            }
-
-            // Identify product
-            val productId = purchase.products.firstOrNull() ?: "unknown"
-
-            // Save locally
-            PreferencesManager.savePurchasedPack(productId)
-
-            // Update user access in Firestore
-            savePurchaseToFirestore(purchase)
-
-            _purchaseState.value = PurchaseState.Success(productId)
-            _hasPremiumAccess.value = true
+        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
+            _purchaseState.value = PurchaseState.Error("Purchase is pending")
+            return
         }
+
+        billingVerifier.verify(purchase) { result ->
+            when (result) {
+                is BillingVerificationResult.Rejected -> {
+                    _hasPremiumAccess.value = false
+                    _currentProduct.value = null
+                    _purchaseState.value = PurchaseState.Error(result.message)
+                }
+                is BillingVerificationResult.Verified -> {
+                    val productId = purchase.products.singleOrNull()
+                    if (productId == null) {
+                        _purchaseState.value = PurchaseState.Error("Invalid product")
+                        return@verify
+                    }
+                    if (!purchase.isAcknowledged && !result.acknowledged) {
+                        acknowledgePurchase(purchase) { acknowledged ->
+                            if (acknowledged) grantVerifiedPurchase(productId)
+                            else _purchaseState.value = PurchaseState.Error("Purchase verified but acknowledgement failed")
+                        }
+                    } else {
+                        grantVerifiedPurchase(productId)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun grantVerifiedPurchase(productId: String) {
+        _currentProduct.value = productId
+        _hasPremiumAccess.value = true
+        _purchaseState.value = PurchaseState.Success(productId)
     }
 
     /**
      * Acknowledges the purchase in Google Play
      */
-    private fun acknowledgePurchase(purchase: Purchase) {
+    private fun acknowledgePurchase(purchase: Purchase, onResult: (Boolean) -> Unit) {
         val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
             .setPurchaseToken(purchase.purchaseToken)
             .build()
@@ -300,55 +249,8 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                 Log.d(TAG, "Purchase acknowledged successfully")
             }
+            onResult(billingResult.responseCode == BillingClient.BillingResponseCode.OK)
         }
-    }
-
-    /**
-     * Saves the purchase to Firestore
-     */
-    private fun savePurchaseToFirestore(purchase: Purchase) {
-        val uid = auth.currentUser?.uid ?: return
-        val productId = purchase.products.firstOrNull() ?: ""
-
-        val purchaseData = mapOf(
-            "uid" to uid,
-            "productId" to productId,
-            "purchaseToken" to purchase.purchaseToken,
-            "purchaseTime" to purchase.purchaseTime,
-            "orderId" to (purchase.orderId ?: ""),
-            "acknowledged" to purchase.isAcknowledged
-        )
-
-        firestore.collection(COLLECTION_PURCHASES)
-            .document("${uid}_${purchase.orderId}")
-            .set(purchaseData)
-            .addOnSuccessListener {
-                Log.d(TAG, "Purchase saved in Firestore")
-
-                // Determine Tier from ID
-                val planTier = when(productId) {
-                    PRODUCT_STARTER -> "STARTER"
-                    PRODUCT_GOLD -> "GOLD"
-                    PRODUCT_ULTIMATE -> "ULTIMATE"
-                    else -> "SOLO"
-                }
-
-                // Update user plan
-                val userUpdates = mapOf(
-                    "planTier" to planTier,
-                    "lastPurchaseAt" to System.currentTimeMillis()
-                )
-
-                firestore.collection("users")
-                    .document(uid)
-                    .update(userUpdates)
-                    .addOnSuccessListener {
-                        Log.d(TAG, "Plan updated to $planTier")
-                    }
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Error saving purchase", e)
-            }
     }
 
     /**
@@ -361,15 +263,10 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                 .build()
         ) { billingResult, purchases ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val hasActivePurchase = purchases.any {
-                    it.purchaseState == Purchase.PurchaseState.PURCHASED
-                }
-                val activeProductId = purchases.firstOrNull {
-                    it.purchaseState == Purchase.PurchaseState.PURCHASED
-                }?.products?.firstOrNull()
-                _hasPremiumAccess.value = if (isDevMode) true else hasActivePurchase
-                _currentProduct.value = if (isDevMode) PRODUCT_ULTIMATE else activeProductId
-
+                _hasPremiumAccess.value = false
+                _currentProduct.value = null
+                purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                    .forEach(::handlePurchase)
                 Log.d(TAG, "Existing purchases: ${purchases.size}")
             }
         }

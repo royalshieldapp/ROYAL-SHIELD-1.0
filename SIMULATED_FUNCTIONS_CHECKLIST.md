@@ -30,9 +30,10 @@ Estado:
   - Archivos: `backend/routes/business.js`, `royal_shield_backend_unified/api/routes/business.py`, `app/src/main/java/com/royalshield/app/data/BusinessRepository.kt`.
   - Meta: guardar lead y notificar por proveedor configurado.
 
-- [ ] Billing/entitlements tiene TODO de consulta real.
+- [!] Billing/entitlements implementado en fuente el 2026-08-13; pendiente de configuración y validación E2E.
   - Archivos: `backend/routes/billing.js`, `royal_shield_backend_unified/api/routes/billing.py`, `app/src/main/java/com/royalshield/app/billing/BillingRepository.kt`.
-  - Meta: validar compras contra Google Play/backend y cachear entitlement seguro.
+  - Implementado: autenticación Firebase, verificación server-side con Google Play, persistencia del hash del token y concesión Android solo tras respuesta verificada.
+  - Pendiente de validación: configurar `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` en Render, desplegar, confirmar IDs activos y ejecutar compra/restauración/cancelación con una build de Internal testing. No se considera una compra E2E verificada todavía.
 
 - [ ] Policy Manager inicia con `getSamplePolicies()`.
   - Archivo: `app/src/main/java/com/royalshield/app/ui/screens/PolicyManagerScreen.kt`.

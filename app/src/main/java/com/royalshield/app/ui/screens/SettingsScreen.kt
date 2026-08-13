@@ -49,6 +49,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.royalshield.app.ui.components.CyberButtonRect
 import com.royalshield.app.ui.theme.RoyalGold
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.RoyalEliteBadgeMode
 import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.managers.PreferencesManager
 import android.widget.Toast
@@ -175,11 +177,14 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Diamond, "Elite", tint = Color(0xFFFFD700))
+                                RoyalEliteBadge(
+                                    mode = RoyalEliteBadgeMode.PROMOTIONAL,
+                                    modifier = Modifier.size(42.dp)
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text("Royal Shield Elite", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
-                                    Text("Manage subscription", color = Color.Gray, fontSize = 12.sp)
+                                    Text("Royal Elite preview", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                                    Text("Explore subscription benefits", color = Color.Gray, fontSize = 12.sp)
                                 }
                             }
                             androidx.compose.foundation.Image(

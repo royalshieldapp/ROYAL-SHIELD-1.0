@@ -11,25 +11,24 @@ class EntitlementStore(context: Context) {
     private val _tier = MutableStateFlow(getSavedTier())
     val tier: StateFlow<SubscriptionTier> = _tier.asStateFlow()
 
-    fun updateTier(newTier: SubscriptionTier) {
-        val current = _tier.value
-        // Only upgrade, never downgrade via simple update (unless explicit reset)
-        // Actually, for restore logic, we might need to overwrite.
-        // Let's rely on the billing repository to determine the *highest* valid entitlement.
-        
-        prefs.edit().putString(KEY_TIER, newTier.name).apply()
+    fun updateVerifiedTier(newTier: SubscriptionTier) {
+        prefs.edit()
+            .putString(KEY_TIER, newTier.name)
+            .putBoolean(KEY_SERVER_VERIFIED, true)
+            .apply()
         _tier.value = newTier
     }
     
     // Explicitly reset (e.g. debug or refund handled manually)
     fun resetTier() {
-        prefs.edit().remove(KEY_TIER).apply()
+        prefs.edit().remove(KEY_TIER).remove(KEY_SERVER_VERIFIED).apply()
         _tier.value = SubscriptionTier.FREE
     }
 
     private fun getSavedTier(): SubscriptionTier {
         // SUPERPOWERS MODE: Force ULTIMATE tier for full access during development
         if (DEV_SUPERPOWERS) return SubscriptionTier.ULTIMATE
+        if (!prefs.getBoolean(KEY_SERVER_VERIFIED, false)) return SubscriptionTier.FREE
 
         val tierName = prefs.getString(KEY_TIER, SubscriptionTier.FREE.name) ?: SubscriptionTier.FREE.name
         return try {
@@ -41,6 +40,7 @@ class EntitlementStore(context: Context) {
 
     companion object {
         private const val KEY_TIER = "subscription_tier_v1"
+        private const val KEY_SERVER_VERIFIED = "subscription_tier_server_verified_v1"
         
         /**
          * Development override. Keep false for normal builds so premium

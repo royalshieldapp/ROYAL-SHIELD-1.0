@@ -26,6 +26,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.features.loyalty.LoyaltyViewModel
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.RoyalEliteBadgeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +85,31 @@ fun LoyaltyProgramScreen(
             ) {
                 // Points Progress Card
                 LoyaltyProgressCard(state.points, gold, deepGold, surfaceColor)
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = surfaceColor),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RoyalEliteBadge(
+                            mode = RoyalEliteBadgeMode.LOCKED,
+                            modifier = Modifier.size(72.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Royal Elite badge locked", color = gold, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Activation requires a verified entitlement.",
+                                color = Color.LightGray,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
 
                 // Tier Info
                 TierSection(state.tier, gold, deepGold)

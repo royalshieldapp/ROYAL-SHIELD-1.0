@@ -53,12 +53,33 @@ Verificar si el trabajo previo de Forecast Engine v2 fue enviado a GitHub y regi
 - Escaneo de marcadores pendientes y comprobación de formato de la especificación.
 - El hook pre-commit ejecutó la compilación Android; resultado: `BUILD SUCCESSFUL`.
 
-## Resultado real y bloqueos
+## Registro histórico — SUPERADO por la auditoría local del 2026-08-13
 
 Resultado: el trabajo central de Forecast Engine v2 sí fue publicado en GitHub, pero permanece en una rama de feature y no hay evidencia de que esté integrado en el repositorio que Render despliega.
 
-Bloqueo para una comparación exacta: falta acceso de lectura al repositorio privado `royalshieldapp/server-beckend` desde el conector disponible o una copia local actualizada de ese repositorio.
+Bloqueo histórico, superado: faltaba acceso de lectura al repositorio privado `royalshieldapp/server-beckend` desde el conector disponible o una copia local actualizada. La auditoría actual dispuso de `D:/APPS/ROYAL SHIELD/server-beckend` y confirmó `main`/`origin/main` en `8df0470`; no reutilizar esta limitación como estado actual.
 
-## Próximo paso
+## Próximo paso histórico — SUPERADO por el plan vigente
 
-El usuario debe revisar y aprobar la especificación escrita. Tras esa revisión se creará el plan de implementación por fases, sin saltar funciones.
+Este paso quedó superado por el plan vigente `docs/superpowers/plans/2026-08-08-geospatial-forecast-engine-production.md`. El siguiente paso actual está registrado en la actualización de baseline: escoger esquema canónico/migración versionada y mantener el contrato `UNAVAILABLE` hasta que existan datos, artefacto y evidencia verificables.
+
+---
+
+## Actualización de baseline (2026-08-13)
+
+### Evidencia sin secretos
+
+- `git -C D:/APPS/ROYAL SHIELD/server-beckend -c safe.directory=D:/APPS/ROYAL SHIELD/server-beckend rev-parse HEAD origin/main` confirmó `8df047007e0cef6a329f12c29499277c328189a9` para ambos valores.
+- `git -C D:/APPS/ROYAL SHIELD/ROYAL_SHIELD_1.0.2_UNIFIED_PUBLISH rev-parse HEAD origin/royalshield-v1.0.2-unified` confirmó `16cd42c3d10c4559b923d2bad64820f6bab10a83` para ambos valores.
+- Se revisaron rutas Forecast, mecanismos de esquema, dependencias, clientes Android, el plan `docs/superpowers/plans/2026-08-08-geospatial-forecast-engine-production.md` y el worktree aislado `C:/tmp/royal-shield-server-backend-forecast`.
+- No se leyeron `.env`, no se expusieron secretos, no se llamaron endpoints ni proveedores y no se ejecutaron DDL, colectores, pruebas o despliegues.
+
+### Estado comprobado y bloqueadores
+
+- Producción registra mapas, hotspots y predicciones; no registra `map-layers`. Sus rutas `/api/v1/predict/*` retornan 503 `UNAVAILABLE` sin score, confianza o metadata fabricada.
+- Mapas, zona, histórico y hotspots conservan eventos vacíos, datos fijos o respuestas no conectadas a persistencia. Los colectores aún pueden producir mocks o reportar inserciones sin escritura durable.
+- La fuente unificada tiene almacenamiento normalizado y entrenamiento, pero no es la producción desplegable. El cliente Android apunta al backend separado y mantiene fallbacks que inventan zonas, hotspots y explicaciones.
+- Producción usa `Base.metadata.create_all()` junto a `schema.sql`; NO VERIFICADO: esquema PostgreSQL real, datos, migración aplicada, proveedor, modelo, artefacto persistente, frescura y E2E Android.
+- El worktree aislado tiene cambios no commit de `artifact_store`, modelo y pruebas; es un prototipo pendiente de revisión, no evidencia de `main` ni de Render.
+
+Resultado: matriz documental creada en `D:/APPS/ROYAL SHIELD/server-beckend/docs/forecast-engine-v2-production-backend-matrix.md`. Sin cambios de runtime, commit, push, deploy, secretos o datos.

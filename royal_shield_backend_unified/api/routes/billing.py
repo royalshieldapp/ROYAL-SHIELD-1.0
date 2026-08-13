@@ -1,232 +1,245 @@
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
-from typing import List, Optional
-import httpx
-import logging
+from __future__ import annotations
+
+import hashlib
 import json
+import logging
 import time
+from datetime import datetime, timezone
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
 from jose import jwt
+from pydantic import BaseModel, Field
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Session
+
+from api.security.firebase_auth import require_firebase_uid
 from config.settings import settings
+from services.geospatial.database.connection import Base, get_db
 
 router = APIRouter(prefix="/api/billing", tags=["Billing"])
 logger = logging.getLogger(__name__)
 
-# Valid product IDs
+PACKAGE_NAME = "com.royalshield.app"
 VALID_PRODUCTS = {
-    'lifetime_starter': {'tier': 'STARTER', 'level': 1},
-    'lifetime_gold': {'tier': 'GOLD', 'level': 2},
-    'lifetime_ultimate': {'tier': 'ULTIMATE', 'level': 3},
-    'security_access_099': {'tier': 'STARTER', 'level': 1}
+    "lifetime_starter": {"tier": "STARTER", "level": 1},
+    "lifetime_gold": {"tier": "GOLD", "level": 2},
+    "lifetime_ultimate": {"tier": "ULTIMATE", "level": 3},
+    "security_access_099": {"tier": "STARTER", "level": 1},
 }
 
+
+class BillingEntitlement(Base):
+    __tablename__ = "billing_entitlements"
+    __table_args__ = (UniqueConstraint("purchase_token_hash", name="uq_billing_purchase_token_hash"),)
+
+    id = Column(Integer, primary_key=True)
+    firebase_uid = Column(String(128), nullable=False, index=True)
+    product_id = Column(String(128), nullable=False)
+    tier = Column(String(32), nullable=False)
+    level = Column(Integer, nullable=False)
+    purchase_token_hash = Column(String(64), nullable=False)
+    acknowledged = Column(Boolean, nullable=False, default=False)
+    verified_at = Column(DateTime(timezone=True), nullable=False)
+    purchase_time = Column(DateTime(timezone=True), nullable=True)
+
+
 class VerifyPayload(BaseModel):
-    purchaseToken: str
-    productId: str
-    packageName: str = "com.royalshield.app"
+    purchaseToken: str = Field(min_length=8, max_length=4096)
+    productId: str = Field(min_length=1, max_length=128)
+    packageName: str = Field(default=PACKAGE_NAME, min_length=1, max_length=255)
+
+
+def _detail(code: str, message: str) -> dict[str, str]:
+    return {"status": "UNAVAILABLE", "code": code, "message": message}
+
 
 async def get_google_access_token(service_account_json: str) -> str:
     try:
         service_account = json.loads(service_account_json)
-    except Exception as e:
-        logger.error(f"[Billing] Failed to parse service account JSON: {e}")
+    except (TypeError, json.JSONDecodeError):
+        logger.error("Billing service-account configuration is not valid JSON")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid service account configuration format."
-        )
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_detail("BILLING_AUTH_ERROR", "Google Play verification is unavailable"),
+        ) from None
 
     client_email = service_account.get("client_email")
     private_key = service_account.get("private_key")
-
     if not client_email or not private_key:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Service account JSON missing email or private key."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_detail("BILLING_AUTH_ERROR", "Google Play verification is unavailable"),
         )
 
     now = int(time.time())
-    payload = {
-        "iss": client_email,
-        "scope": "https://www.googleapis.com/auth/androidpublisher",
-        "aud": "https://oauth2.googleapis.com/token",
-        "iat": now,
-        "exp": now + 3600
-    }
-
-    try:
-        # Sign JWT using RS256 algorithm via python-jose
-        token = jwt.encode(payload, private_key, algorithm="RS256")
-    except Exception as e:
-        logger.error(f"[Billing] JWT signing failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"JWT signing failed: {str(e)}"
-        )
-
+    assertion = jwt.encode(
+        {
+            "iss": client_email,
+            "scope": "https://www.googleapis.com/auth/androidpublisher",
+            "aud": "https://oauth2.googleapis.com/token",
+            "iat": now,
+            "exp": now + 3600,
+        },
+        private_key,
+        algorithm="RS256",
+    )
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
             "https://oauth2.googleapis.com/token",
-            data={
-                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                "assertion": token
-            }
+            data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion},
         )
-
     if response.status_code != 200:
-        logger.error(f"[Billing] OAuth token request failed: {response.text}")
+        logger.error("Google Play OAuth request failed with status %s", response.status_code)
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to authenticate with Google Play API."
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_detail("BILLING_AUTH_ERROR", "Google Play verification is unavailable"),
         )
+    access_token = response.json().get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_detail("BILLING_AUTH_ERROR", "Google Play verification is unavailable"),
+        )
+    return access_token
 
-    return response.json().get("access_token")
+
+async def verify_google_play_purchase(
+    service_account_json: str,
+    package_name: str,
+    product_id: str,
+    purchase_token: str,
+) -> dict:
+    access_token = await get_google_access_token(service_account_json)
+    url = (
+        "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
+        f"{package_name}/purchases/products/{product_id}/tokens/{purchase_token}"
+    )
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(url, headers={"Authorization": f"Bearer {access_token}"})
+
+    if response.status_code == 404:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_detail("PURCHASE_NOT_FOUND", "Google Play did not recognize this purchase"),
+        )
+    if response.status_code in (401, 403):
+        logger.error("Google Play purchase verification authorization failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_detail("BILLING_AUTH_ERROR", "Google Play verification is unavailable"),
+        )
+    if response.status_code != 200:
+        logger.error("Google Play purchase verification failed with status %s", response.status_code)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_detail("BILLING_PROVIDER_ERROR", "Google Play verification is temporarily unavailable"),
+        )
+    return response.json()
+
 
 @router.post("/verify")
-async def verify_purchase(payload: VerifyPayload):
-    if payload.productId not in VALID_PRODUCTS:
+async def verify_purchase(
+    payload: VerifyPayload,
+    firebase_uid: str = Depends(require_firebase_uid),
+    db: Session = Depends(get_db),
+):
+    if payload.packageName != PACKAGE_NAME:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid product ID"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_detail("PACKAGE_MISMATCH", "Purchase does not belong to Royal Shield"),
         )
-
+    product = VALID_PRODUCTS.get(payload.productId)
+    if product is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_detail("PRODUCT_NOT_ALLOWED", "Product is not recognized"),
+        )
     service_account_json = settings.google_play_service_account_json
-
     if not service_account_json:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "error": "Billing verification not configured",
-                "code": "BILLING_NOT_CONFIGURED",
-                "message": "Google Play service account not set. Configure GOOGLE_PLAY_SERVICE_ACCOUNT_JSON."
-            }
+            detail=_detail("BILLING_NOT_CONFIGURED", "Google Play verification is not configured"),
         )
 
-    try:
-        access_token = await get_google_access_token(service_account_json)
-
-        verify_url = (
-            f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
-            f"{payload.packageName}/purchases/products/{payload.productId}/tokens/{payload.purchaseToken}"
-        )
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                verify_url,
-                headers={"Authorization": f"Bearer {access_token}"}
-            )
-
-        if response.status_code == 404:
-            return {
-                "success": True,
-                "valid": False,
-                "entitlement": {"tier": "FREE", "level": 0},
-                "reason": "Purchase token not found"
-            }
-        elif response.status_code in [401, 403]:
-            logger.error(f"[Billing] Google Play Auth error: {response.text}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={
-                    "error": "Billing service authentication error",
-                    "code": "BILLING_AUTH_ERROR"
-                }
-            )
-        elif response.status_code != 200:
-            logger.error(f"[Billing] Google API error: {response.text}")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Failed to verify purchase with Google Play."
-            )
-
-        purchase = response.json()
-        is_valid = purchase.get("purchaseState") == 0  # 0 = purchased
-        is_consumed = purchase.get("consumptionState") == 1
-        is_acknowledged = purchase.get("acknowledgementState") == 1
-
-        product = VALID_PRODUCTS[payload.productId]
-
-        purchase_time_millis = purchase.get("purchaseTimeMillis")
-        purchase_time = (
-            time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(int(purchase_time_millis) / 1000.0))
-            if purchase_time_millis else None
-        )
-
-        return {
-            "success": True,
-            "valid": is_valid,
-            "entitlement": {
-                "tier": product["tier"],
-                "level": product["level"],
-                "productId": payload.productId,
-                "purchaseState": "PURCHASED" if is_valid else "INVALID",
-                "acknowledged": is_acknowledged,
-                "consumed": is_consumed
-            },
-            "purchaseTime": purchase_time
-        }
-
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        logger.error(f"[Billing] Verification exception: {e}")
+    token_hash = hashlib.sha256(payload.purchaseToken.encode("utf-8")).hexdigest()
+    existing = db.query(BillingEntitlement).filter_by(purchase_token_hash=token_hash).one_or_none()
+    if existing and existing.firebase_uid != firebase_uid:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to verify purchase"
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_detail("PURCHASE_TOKEN_ALREADY_CLAIMED", "Purchase is already linked to another account"),
         )
 
-@router.get("/status/{userId}")
-def get_user_status(userId: str):
-    # TODO: Query database for user's entitlement
-    # For now, return free tier as default
+    purchase = await verify_google_play_purchase(
+        service_account_json,
+        payload.packageName,
+        payload.productId,
+        payload.purchaseToken,
+    )
+    expected_account_id = hashlib.sha256(firebase_uid.encode("utf-8")).hexdigest()
+    if purchase.get("obfuscatedExternalAccountId") != expected_account_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_detail("PURCHASE_ACCOUNT_MISMATCH", "Purchase is not linked to this account"),
+        )
+    if purchase.get("purchaseState") != 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_detail("PURCHASE_NOT_ACTIVE", "Purchase is not completed and active"),
+        )
+    if purchase.get("consumptionState") == 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_detail("PURCHASE_ALREADY_CONSUMED", "Purchase has already been consumed"),
+        )
+
+    purchase_time = None
+    if purchase.get("purchaseTimeMillis"):
+        purchase_time = datetime.fromtimestamp(int(purchase["purchaseTimeMillis"]) / 1000, tz=timezone.utc)
+    verified_at = datetime.now(timezone.utc)
+    entitlement = existing or BillingEntitlement(purchase_token_hash=token_hash)
+    entitlement.firebase_uid = firebase_uid
+    entitlement.product_id = payload.productId
+    entitlement.tier = product["tier"]
+    entitlement.level = product["level"]
+    entitlement.acknowledged = purchase.get("acknowledgementState") == 1
+    entitlement.verified_at = verified_at
+    entitlement.purchase_time = purchase_time
+    db.add(entitlement)
+    db.commit()
+
     return {
-        "success": True,
-        "userId": userId,
+        "status": "READY",
         "entitlement": {
-            "tier": "FREE",
-            "level": 0,
-            "features": {
-                "urlScan": True,
-                "fileScan": False,
-                "aiAssistant": False,
-                "vpn": False,
-                "advancedSecurity": False,
-                "prioritySupport": False
-            }
+            "tier": product["tier"],
+            "level": product["level"],
+            "productId": payload.productId,
+            "verified": True,
+            "acknowledged": entitlement.acknowledged,
         },
-        "message": "Database not connected — returning default free tier"
+        "verifiedAt": verified_at.isoformat(),
     }
+
+
+@router.get("/status")
+def get_user_status(
+    firebase_uid: str = Depends(require_firebase_uid),
+):
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=_detail(
+            "BILLING_STATUS_REQUIRES_REVERIFICATION",
+            "Restore purchases through Google Play to refresh entitlement",
+        ),
+    )
+
 
 @router.get("/products")
 def get_products():
     return {
-        "success": True,
+        "status": "READY",
         "products": [
-            {
-                "id": "lifetime_starter",
-                "name": "Starter Shield",
-                "tier": "STARTER",
-                "type": "lifetime",
-                "features": ["URL Scanning", "Basic AI Assistant", "SOS Alerts"]
-            },
-            {
-                "id": "lifetime_gold",
-                "name": "Gold Shield",
-                "tier": "GOLD",
-                "type": "lifetime",
-                "features": ["All Starter features", "File Scanning", "VPN Access", "Advanced AI", "Sound Detection"]
-            },
-            {
-                "id": "lifetime_ultimate",
-                "name": "Ultimate Shield",
-                "tier": "ULTIMATE",
-                "type": "lifetime",
-                "features": ["All Gold features", "Security Camera", "XDR Dashboard", "Priority Support", "OpenClaw Access"]
-            },
-            {
-                "id": "security_access_099",
-                "name": "Security Access",
-                "tier": "STARTER",
-                "type": "one-time",
-                "features": ["Basic security features access"]
-            }
-        ]
+            {"id": product_id, "tier": data["tier"], "type": "one-time"}
+            for product_id, data in VALID_PRODUCTS.items()
+        ],
     }

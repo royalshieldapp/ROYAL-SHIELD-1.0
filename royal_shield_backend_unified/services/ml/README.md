@@ -1,5 +1,27 @@
 # Machine Learning Models - Usage Guide
 
+## CISA KEV: evaluation and safe training gate
+
+`scripts/train_cisa_kev_model.py` creates a versioned local eligibility report
+from an explicitly supplied CSV. It uses `event_time` only for a chronological
+holdout; it is never a model feature. A report with `UNAVAILABLE` creates no
+model or performance scores when classes or temporal validation are insufficient.
+
+```powershell
+cd royal_shield_backend_unified
+python scripts/train_cisa_kev_model.py --input D:\Downloads\cyber_training_cisa_kev_2026_07.csv --output-dir .\artifacts\cisa-kev
+```
+
+Exit code `2` means the dataset was evaluated but cannot train an honest model.
+The report is written to the supplied output directory using the dataset SHA-256. It
+does not enable an endpoint, UI result, or protection claim.
+
+`scripts/train_kev_volume_model.py` is a distinct, truthful objective: it
+forecasts the next seven days of CISA KEV catalog additions from prior daily
+addition counts. It does not classify whether an individual CVE will be
+exploited. It writes `READY`, `DEGRADED`, or `UNAVAILABLE`, a chronological
+holdout metric versus a naive baseline, and a SHA-256 for any persisted artifact.
+
 ## 🤖 Overview
 
 Royal Shield ML system includes:
