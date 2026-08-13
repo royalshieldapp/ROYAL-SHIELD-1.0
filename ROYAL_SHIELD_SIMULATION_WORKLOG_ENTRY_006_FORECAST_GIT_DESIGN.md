@@ -6,6 +6,11 @@ Fecha/hora: 2026-07-30 (America/New_York)
 
 Verificar si el trabajo previo de Forecast Engine v2 fue enviado a GitHub y registrar las decisiones de arquitectura y fuentes aprobadas por el usuario antes de implementar cambios.
 
+## Convenciones de estado y abreviaciones
+
+- 🟢 READY: disponible y verificado; 🟡 DEGRADED: disponible con limitación explícita; 🔴 UNAVAILABLE: no disponible de forma honesta; 🔵 evidencia; 🟣 modelo/IA; 🟠 riesgo; ⚫ pendiente externo; 🛡️ seguridad; 🧪 pruebas; 🚀 despliegue.
+- API (Application Programming Interface, interfaz de programación de aplicaciones); HTTP (Hypertext Transfer Protocol, protocolo de transferencia de hipertexto); DDL (Data Definition Language, lenguaje de definición de datos); E2E (end-to-end, de extremo a extremo); SHA-256 (Secure Hash Algorithm de 256 bits, algoritmo de hash seguro de 256 bits).
+
 ## Hallazgos verificados
 
 - La rama local activa es `royalshield-v1.0.2-unified`.
@@ -47,7 +52,7 @@ Verificar si el trabajo previo de Forecast Engine v2 fue enviado a GitHub y regi
 
 - `git status --short --branch`
 - Revisión de contención del commit Forecast en la rama remota.
-- Comparación GitHub `master...royalshield-v1.0.2-unified`.
+- Comparación histórica de GitHub entre `master` y `royalshield-v1.0.2-unified`.
 - Lectura remota de un archivo central de Forecast Engine v2.
 - Comparación con el repositorio, commit y rutas observados en el servicio activo de Render.
 - Escaneo de marcadores pendientes y comprobación de formato de la especificación.
@@ -65,7 +70,7 @@ Este paso quedó superado por el plan vigente `docs/superpowers/plans/2026-08-08
 
 ---
 
-## Actualización de baseline (2026-08-13)
+## 🔵 Actualización de baseline (2026-08-13)
 
 ### Evidencia sin secretos
 
@@ -74,7 +79,7 @@ Este paso quedó superado por el plan vigente `docs/superpowers/plans/2026-08-08
 - Se revisaron rutas Forecast, mecanismos de esquema, dependencias, clientes Android, el plan `docs/superpowers/plans/2026-08-08-geospatial-forecast-engine-production.md` y el worktree aislado `C:/tmp/royal-shield-server-backend-forecast`.
 - No se leyeron `.env`, no se expusieron secretos, no se llamaron endpoints ni proveedores y no se ejecutaron DDL, colectores, pruebas o despliegues.
 
-### Estado comprobado y bloqueadores
+### 🟠 Estado comprobado y bloqueadores
 
 - Producción registra mapas, hotspots y predicciones; no registra `map-layers`. Sus rutas `/api/v1/predict/*` retornan 503 `UNAVAILABLE` sin score, confianza o metadata fabricada.
 - Mapas, zona, histórico y hotspots conservan eventos vacíos, datos fijos o respuestas no conectadas a persistencia. Los colectores aún pueden producir mocks o reportar inserciones sin escritura durable.
