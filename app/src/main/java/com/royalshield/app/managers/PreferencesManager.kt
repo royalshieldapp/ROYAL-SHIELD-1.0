@@ -660,8 +660,18 @@ object PreferencesManager {
         return if (isInitialized()) prefs.getBoolean(KEY_DISCOUNT_APPLIED, false) else false
     }
 
-    fun setSystemArmed(enabled: Boolean) {
-        if (isInitialized()) prefs.edit().putBoolean(KEY_SYSTEM_ARMED, enabled).apply()
+    fun setSystemArmed(enabled: Boolean, context: android.content.Context? = null) {
+        if (isInitialized()) {
+            prefs.edit().putBoolean(KEY_SYSTEM_ARMED, enabled).apply()
+            context?.let { ctx ->
+                val automation = com.royalshield.app.SecurityAutomation(ctx)
+                if (enabled) {
+                    automation.startSafePathMonitoring()
+                } else {
+                    automation.stopSafePathMonitoring()
+                }
+            }
+        }
     }
 
     fun isSystemArmed(): Boolean {

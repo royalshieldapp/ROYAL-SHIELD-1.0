@@ -14,6 +14,7 @@ from config.settings import settings
 from services.data_ingestion.cyber_collectors import refresh_cyber_intelligence
 from services.data_ingestion.storage import CyberThreatRecord
 from services.geospatial.database.connection import SessionLocal
+from api.contracts.status import unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,6 @@ async def get_threats(
             .all()
         )
 
-    # Mock threat data — in production, query from
-    # AlienVault OTX, AbuseIPDB, or internal threat DB
     threats = [ThreatData(
         id=f"{record.provider}:{record.external_id}",
         type=record.title,
@@ -79,6 +78,13 @@ async def get_threats(
         indicatorType=record.indicator_type,
         lastSeen=record.last_seen.isoformat(),
     ) for record in records]
+
+    if not threats:
+        raise HTTPException(
+            status_code=503,
+            detail=unavailable("THREAT_DATA_NOT_VERIFIED").model_dump(mode="json"),
+        )
+
     return ThreatsResponse(threats=threats, total=len(threats))
 
 

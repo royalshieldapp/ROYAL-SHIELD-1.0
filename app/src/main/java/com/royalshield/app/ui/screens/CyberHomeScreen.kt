@@ -65,7 +65,9 @@ import com.royalshield.app.ui.theme.*
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.features.threatmap.LiveCyberThreatMap
+import com.royalshield.app.features.threatmap.ThreatMapUiState
 import com.royalshield.app.features.threatmap.ThreatMapViewModel
+import com.royalshield.app.data.AvailabilityState
 
 @Composable
 fun CyberHomeScreen(
@@ -76,12 +78,15 @@ fun CyberHomeScreen(
     onNavigateToVoiceScam: () -> Unit = {},
     onNavigateToXdr: () -> Unit = {},
     onNavigateToIntel: () -> Unit = {},
-    onNavigateToNetworkToolkit: () -> Unit = {}
+    onNavigateToNetworkToolkit: () -> Unit = {},
+    threatMapAvailability: AvailabilityState = AvailabilityState.Unavailable("STATUS_UNVERIFIED"),
+    onRefreshAvailability: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    val threatMapViewModel: ThreatMapViewModel = viewModel()
-    val threatMapState by threatMapViewModel.uiState.collectAsState()
+    val threatMapViewModel: ThreatMapViewModel? =
+        if (threatMapAvailability is AvailabilityState.Ready) viewModel() else null
+    val threatMapState = threatMapViewModel?.uiState?.collectAsState()?.value ?: ThreatMapUiState()
 
     // Vulnerability Analysis State
     val vulnerabilities by VulnerabilityManager.vulnerabilities.collectAsState()
@@ -212,7 +217,7 @@ fun CyberHomeScreen(
                          isArmed = isSystemArmed,
                          onToggle = {
                              val targetState = !isSystemArmed
-                             PreferencesManager.setSystemArmed(targetState)
+                             PreferencesManager.setSystemArmed(targetState, context)
                              isSystemArmed = targetState
                          }
                      )
@@ -295,38 +300,46 @@ fun CyberHomeScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Metrics Section
-                Text(
-                    "REAL-TIME METRICS",
-                    color = RoyalGold,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                if (threatMapAvailability is AvailabilityState.Ready && threatMapViewModel != null) {
+                    Text(
+                        "REAL-TIME METRICS",
+                        color = RoyalGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween // Space them evenly
-                ) {
-                    CyberMetricCard("Events", threatMapState.events.size.toString(), NeonRed)
-                    CyberMetricCard("Target", threatMapState.primaryTarget, CyberCyan)
-                    CyberMetricCard("Alerts", threatMapState.alertCount.toString(), RoyalGold)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        CyberMetricCard("Events", threatMapState.events.size.toString(), NeonRed)
+                        CyberMetricCard("Target", threatMapState.primaryTarget, CyberCyan)
+                        CyberMetricCard("Alerts", threatMapState.alertCount.toString(), RoyalGold)
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    LiveCyberThreatMap(
+                        state = threatMapState,
+                        onRefresh = threatMapViewModel::refresh,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                    )
+                } else {
+                    UnavailableFeatureCard(
+                        moduleName = "Threat Map",
+                        state = threatMapAvailability,
+                        onRetry = onRefreshAvailability,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                LiveCyberThreatMap(
-                    state = threatMapState,
-                    onRefresh = threatMapViewModel::refresh,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 

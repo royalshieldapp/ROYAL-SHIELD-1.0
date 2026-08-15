@@ -3,11 +3,14 @@ package com.royalshield.app.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.royalshield.app.ui.components.BottomNavItem
+import com.royalshield.app.ui.components.FeatureAvailabilityGate
 import com.royalshield.app.ui.screens.*
+import com.royalshield.app.ui.viewmodels.FeatureAvailabilityViewModel
 
 @Composable
 fun RoyalShieldNavGraph(
@@ -16,6 +19,9 @@ fun RoyalShieldNavGraph(
     showAds: Boolean,
     onTriggerSOS: () -> Unit
 ) {
+    val featureAvailabilityViewModel: FeatureAvailabilityViewModel = viewModel()
+    val featureAvailability by featureAvailabilityViewModel.availability.collectAsState()
+
     NavHost(
         navController = navController,
         startDestination = BottomNavItem.Home.route
@@ -51,7 +57,11 @@ fun RoyalShieldNavGraph(
         }
 
         composable(BottomNavItem.GlobalMap.route) {
-            RoyalMapScreen(onBack = { navController.popBackStack() })
+            RoyalMapScreen(
+                onBack = { navController.popBackStack() },
+                forecastAvailability = featureAvailability.forecast,
+                threatMapAvailability = featureAvailability.threatMap,
+            )
         }
 
         composable(BottomNavItem.CyberMap.route) {
@@ -63,7 +73,9 @@ fun RoyalShieldNavGraph(
                 onNavigateToVoiceScam = { navController.navigate("voice_scam") },
                 onNavigateToXdr = { navController.navigate("xdr_dashboard") },
                 onNavigateToIntel = { navController.navigate("intel_hub") },
-                onNavigateToNetworkToolkit = { navController.navigate("network_toolkit") }
+                onNavigateToNetworkToolkit = { navController.navigate("network_toolkit") },
+                threatMapAvailability = featureAvailability.threatMap,
+                onRefreshAvailability = featureAvailabilityViewModel::refresh,
             )
         }
 
@@ -74,10 +86,17 @@ fun RoyalShieldNavGraph(
 
 
         composable(BottomNavItem.Automation.route) {
-            AutomationScreen(
+            FeatureAvailabilityGate(
+                moduleName = "Automations",
+                state = featureAvailability.automations,
                 onBack = { navController.popBackStack() },
-                onBusinessClick = { navController.navigate("business") }
-            )
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                AutomationScreen(
+                    onBack = { navController.popBackStack() },
+                    onBusinessClick = { navController.navigate("business") }
+                )
+            }
         }
 
         composable(BottomNavItem.Settings.route) {
@@ -164,10 +183,28 @@ fun RoyalShieldNavGraph(
                 onNavigateToIntelHub = { navController.navigate("intel_hub") }
             )
         }
-        composable("reports_center") { ReportsCenterScreen(onBack = { navController.popBackStack() }) }
+        composable("reports_center") {
+            FeatureAvailabilityGate(
+                moduleName = "Reports",
+                state = featureAvailability.reports,
+                onBack = { navController.popBackStack() },
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                ReportsCenterScreen(onBack = { navController.popBackStack() })
+            }
+        }
         composable("compliance_monitor") { ComplianceMonitorScreen(onBack = { navController.popBackStack() }) }
         composable("audit_logs") { AuditLogsScreen(onBack = { navController.popBackStack() }) }
-        composable("policy_manager") { PolicyManagerScreen(onBack = { navController.popBackStack() }) }
+        composable("policy_manager") {
+            FeatureAvailabilityGate(
+                moduleName = "Policies",
+                state = featureAvailability.policies,
+                onBack = { navController.popBackStack() },
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                PolicyManagerScreen(onBack = { navController.popBackStack() })
+            }
+        }
 
         composable("xdr_dashboard") {
              XdrScreen(onBack = { navController.popBackStack() })
@@ -178,15 +215,26 @@ fun RoyalShieldNavGraph(
         }
 
         composable("vpn") {
-            VpnScreen(
+            FeatureAvailabilityGate(
+                moduleName = "VPN",
+                state = featureAvailability.vpn,
                 onBack = { navController.popBackStack() },
-                billingManager = billingManager,
-                onNavigateToPremium = { navController.navigate("subscription") }
-            )
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                VpnScreen(
+                    onBack = { navController.popBackStack() },
+                    billingManager = billingManager,
+                    onNavigateToPremium = { navController.navigate("subscription") }
+                )
+            }
         }
 
         composable("tracking_shield") {
-            RoyalMapScreen(onBack = { navController.popBackStack() })
+            RoyalMapScreen(
+                onBack = { navController.popBackStack() },
+                forecastAvailability = featureAvailability.forecast,
+                threatMapAvailability = featureAvailability.threatMap,
+            )
         }
 
         composable("timeline") {

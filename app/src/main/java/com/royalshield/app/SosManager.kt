@@ -2,6 +2,7 @@ package com.royalshield.app
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
@@ -44,7 +45,20 @@ object SosManager {
         }
 
         if (allContacts.isEmpty()) {
-            Toast.makeText(context, "No Emergency Contacts Configured!", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context,
+                "¡No tienes contactos de emergencia! Toca el icono de persona (👤) arriba a la derecha para agregarlos.",
+                Toast.LENGTH_LONG
+            ).show()
+            try {
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    putExtra("navigate_to", "contacts")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e("SosManager", "Failed to auto-open contacts screen", e)
+            }
             return
         }
 

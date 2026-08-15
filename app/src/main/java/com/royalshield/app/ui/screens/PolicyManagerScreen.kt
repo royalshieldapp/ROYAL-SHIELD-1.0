@@ -45,9 +45,15 @@ enum class PolicyScope {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PolicyManagerScreen(onBack: () -> Unit) {
-    var policies by remember { mutableStateOf(getSamplePolicies()) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var policies by remember { mutableStateOf(loadSavedPolicies(context)) }
     var selectedPolicy by remember { mutableStateOf<SecurityPolicy?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
+
+    fun updatePolicies(newPolicies: List<SecurityPolicy>) {
+        policies = newPolicies
+        savePolicies(context, newPolicies)
+    }
     
     Scaffold(
         topBar = {
@@ -123,9 +129,9 @@ fun PolicyManagerScreen(onBack: () -> Unit) {
                     PolicyCard(
                         policy = policy,
                         onToggle = { enabled ->
-                            policies = policies.map {
+                            updatePolicies(policies.map {
                                 if (it.id == policy.id) it.copy(isEnabled = enabled) else it
-                            }
+                            })
                         },
                         onClick = { selectedPolicy = policy }
                     )
@@ -231,7 +237,7 @@ fun PolicyManagerScreen(onBack: () -> Unit) {
                                 0,
                                 emptyList()
                             )
-                            policies = policies + newPolicy
+                            updatePolicies(policies + newPolicy)
                             showCreateDialog= false
                             policyName = ""
                         }
@@ -349,55 +355,38 @@ fun PolicyTemplate(title: String, description: String, onClick: () -> Unit) {
     }
 }
 
-fun getSamplePolicies(): List<SecurityPolicy> {
-    return listOf(
-        SecurityPolicy(
-            "1",
-            "Block Social Media at Work",
-            "Blocks Facebook, Instagram, Twitter during 9-5",
-            PolicyScope.OFFICE_NETWORK,
-            true,
-            24,
-            listOf(
-                PolicyRule("Time is 09:00-17:00 AND Network is Office", "Block social media domains"),
-                PolicyRule("User attempts to access blocked site", "Show warning and log event")
-            )
-        ),
-        SecurityPolicy(
-            "2",
-            "Auto-Enable VPN on Public WiFi",
-            "Automatically connects VPN when detecting public networks",
-            PolicyScope.ALL_DEVICES,
-            true,
-            45,
-            listOf(
-                PolicyRule("WiFi is public/unsecured", "Enable VPN connection"),
-                PolicyRule("VPN connection fails", "Block internet access and alert user")
-            )
-        ),
-        SecurityPolicy(
-            "3",
-            "Enforce MFA for Finance Apps",
-            "Requires multi-factor authentication for banking and finance apps",
-            PolicyScope.SPECIFIC_USERS,
-            true,
-            15,
-            listOf(
-                PolicyRule("User opens finance app", "Require biometric authentication"),
-                PolicyRule("3 failed auth attempts", "Lock app for 30 minutes")
-            )
-        ),
-        SecurityPolicy(
-            "4",
-            "Data Loss Prevention",
-            "Prevents copying sensitive data to clipboard or external apps",
-            PolicyScope.ALL_DEVICES,
-            false,
-            45,
-            listOf(
-                PolicyRule("Sensitive data detected in clipboard", "Clear clipboard and alert"),
-                PolicyRule("Attempt to share file externally", "Require admin approval")
-            )
-        )
+private fun loadSavedPolicies(context: android.content.Context): List<SecurityPolicy> {
+    val prefs = context.getSharedPreferences("royal_policies_pref", android.content.Context.MODE_PRIVATE)
+    val json = prefs.getString("policies_json", null)
+    if (json.isNullOrBlank()) {
+        return defaultSecurityPolicies()
+    }
+    return try {
+        val gson = com.google.gson.Gson()
+        val array = gson.fromJson(json, Array<SecurityPolicy>::class.java)
+        val stored = array?.toList() ?: defaultSecurityPolicies()
+        val verified = removeLegacySamplePolicies(stored)
+        if (verified.size != stored.size) savePolicies(context, verified)
+        verified
+    } catch (e: Exception) {
+        defaultSecurityPolicies()
+    }
+}
+
+private fun savePolicies(context: android.content.Context, policies: List<SecurityPolicy>) {
+    val prefs = context.getSharedPreferences("royal_policies_pref", android.content.Context.MODE_PRIVATE)
+    val json = com.google.gson.Gson().toJson(policies)
+    prefs.edit().putString("policies_json", json).apply()
+}
+
+fun defaultSecurityPolicies(): List<SecurityPolicy> = emptyList()
+
+fun removeLegacySamplePolicies(policies: List<SecurityPolicy>): List<SecurityPolicy> {
+    val legacySamples = setOf(
+        "1" to "Block Social Media at Work",
+        "2" to "Auto-Enable VPN on Public WiFi",
+        "3" to "Enforce MFA for Finance Apps",
+        "4" to "Data Loss Prevention",
     )
+    return policies.filterNot { it.id to it.name in legacySamples }
 }

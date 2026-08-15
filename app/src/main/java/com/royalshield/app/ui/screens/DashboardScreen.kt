@@ -660,7 +660,7 @@ fun DashboardScreen(
                         confirmButton = {
                             TextButton(onClick = {
                                 val targetState = !isArmed
-                                PreferencesManager.setSystemArmed(targetState)
+                                PreferencesManager.setSystemArmed(targetState, context)
                                 isArmed = targetState
                                 lockIconRes = if (targetState) RoyalIcons.LockGreenLarge else RoyalIcons.LockRedLarge
                                 showArmedDialog = false

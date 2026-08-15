@@ -54,11 +54,13 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import com.royalshield.app.R
 import com.royalshield.app.data.MapReminder
+import com.royalshield.app.data.AvailabilityState
 import com.royalshield.app.features.trackingshield.TrackingShieldViewModel
 import com.royalshield.app.features.trackingshield.data.GpsMode
 import com.royalshield.app.features.trackingshield.data.TrackingMode
 import com.royalshield.app.managers.PreferencesManager
 import com.royalshield.app.ui.theme.RoyalGold
+import com.royalshield.app.ui.components.verifiedItems
 import com.royalshield.app.ui.viewmodels.GlobalMapViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,6 +77,8 @@ private val MapRed = Color(0xFFFF3B30)
 @Composable
 fun RoyalMapScreen(
     onBack: () -> Unit = {},
+    forecastAvailability: AvailabilityState = AvailabilityState.Unavailable("STATUS_UNVERIFIED"),
+    threatMapAvailability: AvailabilityState = AvailabilityState.Unavailable("STATUS_UNVERIFIED"),
     trackingVm: TrackingShieldViewModel = viewModel(),
     globalVm: GlobalMapViewModel = viewModel()
 ) {
@@ -136,8 +140,11 @@ fun RoyalMapScreen(
     val mapStyle = remember {
         runCatching { MapStyleOptions.loadRawResourceStyle(context, R.raw.royal_grayscale_map_style) }.getOrNull()
     }
-    val mapSignals = remember(trackingState.mapLayers) {
-        trackingState.mapLayers.map { it.toRoyalMapSignal() }.ifEmpty { royalMapSignals() }
+    val mapSignals = remember(trackingState.mapLayers, threatMapAvailability) {
+        verifiedItems(
+            threatMapAvailability,
+            trackingState.mapLayers.map { it.toRoyalMapSignal() },
+        )
     }
     val mapSignalIcons = remember(context, mapSignals, isGoogleMapLoaded) {
         if (!isGoogleMapLoaded) {
@@ -251,7 +258,7 @@ fun RoyalMapScreen(
                 )
             }
 
-            trackingState.hotspots.forEach { hotspot ->
+            verifiedItems(forecastAvailability, trackingState.hotspots).forEach { hotspot ->
                 val center = LatLng(hotspot.center.lat, hotspot.center.lng)
                 val color = when (hotspot.riskLevel.uppercase()) {
                     "CRITICAL", "HIGH" -> MapRed
@@ -330,7 +337,11 @@ fun RoyalMapScreen(
                 val target = currentLocation ?: trackingState.child?.latLng ?: defaultCenter
                 scope.launch { cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(target, 16f), 600) }
             },
-            forecast = forecastSummary(trackingState.hotspots),
+            forecast = if (forecastAvailability is AvailabilityState.Ready) {
+                forecastSummary(trackingState.hotspots)
+            } else {
+                "Unavailable"
+            },
             lastGpsUpdate = lastGpsUpdate
         )
 
@@ -343,20 +354,29 @@ fun RoyalMapScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             RoyalMapTabs(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
-            MapSignalLayerPanel(
-                showCameras = showCameras,
-                showPolice = showPolice,
-                showSpeed = showSpeed,
-                onToggleCameras = { toggleSignalLayer("Camera", showCameras) { showCameras = it } },
-                onTogglePolice = { toggleSignalLayer("Police", showPolice) { showPolice = it } },
-                onToggleSpeed = { toggleSignalLayer("Speed", showSpeed) { showSpeed = it } },
-                showProtest = showProtest,
-                showTheft = showTheft,
-                showCyber = showCyber,
-                onToggleProtest = { toggleSignalLayer("Protest", showProtest) { showProtest = it } },
-                onToggleTheft = { toggleSignalLayer("Theft", showTheft) { showTheft = it } },
-                onToggleCyber = { toggleSignalLayer("Cyber", showCyber) { showCyber = it } }
-            )
+            if (threatMapAvailability is AvailabilityState.Ready) {
+                MapSignalLayerPanel(
+                    showCameras = showCameras,
+                    showPolice = showPolice,
+                    showSpeed = showSpeed,
+                    onToggleCameras = { toggleSignalLayer("Camera", showCameras) { showCameras = it } },
+                    onTogglePolice = { toggleSignalLayer("Police", showPolice) { showPolice = it } },
+                    onToggleSpeed = { toggleSignalLayer("Speed", showSpeed) { showSpeed = it } },
+                    showProtest = showProtest,
+                    showTheft = showTheft,
+                    showCyber = showCyber,
+                    onToggleProtest = { toggleSignalLayer("Protest", showProtest) { showProtest = it } },
+                    onToggleTheft = { toggleSignalLayer("Theft", showTheft) { showTheft = it } },
+                    onToggleCyber = { toggleSignalLayer("Cyber", showCyber) { showCyber = it } }
+                )
+            } else {
+                Text(
+                    "Advanced map intelligence unavailable",
+                    color = RoyalGold,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
             AnimatedVisibility(visible = selectedTab == RoyalMapTab.CONTROL, enter = fadeIn(), exit = fadeOut()) {
                 RoyalMapControlPanel(
                     trackingState = trackingState,
@@ -396,7 +416,8 @@ fun RoyalMapScreen(
                 SafeRecommendationsPanel(
                     currentLocation = currentLocation,
                     reminders = reminders,
-                    hotspotCount = trackingState.hotspots.count { it.riskLevel.uppercase() in listOf("HIGH", "CRITICAL") }
+                    hotspotCount = verifiedItems(forecastAvailability, trackingState.hotspots)
+                        .count { it.riskLevel.uppercase() in listOf("HIGH", "CRITICAL") }
                 )
             }
             AnimatedVisibility(visible = selectedTab == RoyalMapTab.HISTORY || showTimeline, enter = fadeIn(), exit = fadeOut()) {
@@ -477,112 +498,6 @@ private data class RoyalMapSignal(
     val color: Color,
     val iconRes: Int
 )
-
-private fun royalMapSignals(): List<RoyalMapSignal> {
-    val baseLat = 25.7617
-    val baseLng = -80.1918
-    return listOf(
-        RoyalMapSignal(
-            id = "cam-downtown-01",
-            type = RoyalMapSignalType.CAMERA,
-            title = "Traffic Camera",
-            snippet = "Downtown monitoring point",
-            position = LatLng(baseLat + 0.0042, baseLng - 0.0037),
-            radiusMeters = 90.0,
-            hue = BitmapDescriptorFactory.HUE_AZURE,
-            color = MapCyan,
-            iconRes = R.drawable.pin_surveillance_map
-        ),
-        RoyalMapSignal(
-            id = "cam-brickell-02",
-            type = RoyalMapSignalType.CAMERA,
-            title = "Security Camera",
-            snippet = "Camera coverage sector",
-            position = LatLng(baseLat - 0.0061, baseLng + 0.0045),
-            radiusMeters = 85.0,
-            hue = BitmapDescriptorFactory.HUE_AZURE,
-            color = MapCyan,
-            iconRes = R.drawable.pin_surveillance_map
-        ),
-        RoyalMapSignal(
-            id = "police-core-01",
-            type = RoyalMapSignalType.POLICE,
-            title = "Police Unit",
-            snippet = "Patrol presence reported",
-            position = LatLng(baseLat + 0.0076, baseLng + 0.0062),
-            radiusMeters = 130.0,
-            hue = BitmapDescriptorFactory.HUE_BLUE,
-            color = Color(0xFF4DA3FF),
-            iconRes = R.drawable.pin_police_map
-        ),
-        RoyalMapSignal(
-            id = "police-west-02",
-            type = RoyalMapSignalType.POLICE,
-            title = "Police Station",
-            snippet = "Nearby response point",
-            position = LatLng(baseLat - 0.0094, baseLng - 0.0084),
-            radiusMeters = 160.0,
-            hue = BitmapDescriptorFactory.HUE_BLUE,
-            color = Color(0xFF4DA3FF),
-            iconRes = R.drawable.pin_police_map
-        ),
-        RoyalMapSignal(
-            id = "speed-us1-01",
-            type = RoyalMapSignalType.SPEED,
-            title = "Speed Zone",
-            snippet = "High-speed traffic corridor",
-            position = LatLng(baseLat + 0.0018, baseLng + 0.0115),
-            radiusMeters = 115.0,
-            hue = BitmapDescriptorFactory.HUE_ORANGE,
-            color = RoyalGold,
-            iconRes = R.drawable.pin_speed_map
-        ),
-        RoyalMapSignal(
-            id = "speed-i95-02",
-            type = RoyalMapSignalType.SPEED,
-            title = "Speed Trap",
-            snippet = "Radar enforcement area",
-            position = LatLng(baseLat - 0.0112, baseLng + 0.0122),
-            radiusMeters = 120.0,
-            hue = BitmapDescriptorFactory.HUE_ORANGE,
-            color = RoyalGold,
-            iconRes = R.drawable.pin_speed_map
-        ),
-        RoyalMapSignal(
-            id = "protest-downtown-01",
-            type = RoyalMapSignalType.PROTEST,
-            title = "Forecast Protest",
-            snippet = "OSINT watch area",
-            position = LatLng(baseLat + 0.006, baseLng - 0.006),
-            radiusMeters = 140.0,
-            hue = BitmapDescriptorFactory.HUE_ORANGE,
-            color = Color(0xFFFFA726),
-            iconRes = R.drawable.pin_protest_map
-        ),
-        RoyalMapSignal(
-            id = "theft-brickell-01",
-            type = RoyalMapSignalType.THEFT,
-            title = "Theft Hotspot",
-            snippet = "Crime forecast watch area",
-            position = LatLng(baseLat - 0.005, baseLng + 0.007),
-            radiusMeters = 130.0,
-            hue = BitmapDescriptorFactory.HUE_VIOLET,
-            color = Color(0xFFB27CFF),
-            iconRes = R.drawable.pin_thief_map
-        ),
-        RoyalMapSignal(
-            id = "cyber-core-01",
-            type = RoyalMapSignalType.CYBER,
-            title = "Cyber Threat",
-            snippet = "Threat intelligence signal",
-            position = LatLng(baseLat + 0.003, baseLng + 0.009),
-            radiusMeters = 120.0,
-            hue = BitmapDescriptorFactory.HUE_GREEN,
-            color = MapGreen,
-            iconRes = R.drawable.pin_hacker_map
-        )
-    )
-}
 
 private fun com.royalshield.app.features.riskprediction.data.remote.MapLayerPoint.toRoyalMapSignal(): RoyalMapSignal {
     val signalType = when (type.lowercase()) {
