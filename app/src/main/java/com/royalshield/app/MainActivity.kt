@@ -48,6 +48,8 @@ import com.royalshield.app.managers.PreferencesManager
 import com.royalshield.app.ui.screens.PremiumEliteScreen
 import com.royalshield.app.ui.screens.RegistrationScreen
 import com.royalshield.app.ui.screens.PhoneAuthScreen
+import com.royalshield.app.ui.screens.SecuritySetupScreen
+import com.royalshield.app.securitysetup.EncryptedSecuritySetupStore
 import com.royalshield.app.services.RoyalShieldService
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
@@ -116,13 +118,19 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class AppState {
-    SPLASH, PREMIUM_PROMO, REGISTRATION, PHONE_AUTH, MAIN
+    SPLASH, PREMIUM_PROMO, REGISTRATION, PHONE_AUTH, SECURITY_SETUP, MAIN
 }
 
 @Composable
 fun AppMainFlow() {
     var currentState by remember { mutableStateOf(AppState.SPLASH) }
     val context = LocalContext.current
+    val securitySetupStore = remember(context) { EncryptedSecuritySetupStore(context) }
+
+    fun postAuthState(): AppState {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return AppState.REGISTRATION
+        return if (securitySetupStore.needsSetup(uid)) AppState.SECURITY_SETUP else AppState.MAIN
+    }
 
     // Initialize BillingManager
     val billingManager = remember { BillingManager(context) }
@@ -136,17 +144,13 @@ fun AppMainFlow() {
     Crossfade(targetState = currentState, label = "AppFlow") { state ->
         when (state) {
             AppState.SPLASH -> SplashScreen {
-                currentState = if (FirebaseAuth.getInstance().currentUser == null) {
-                    AppState.REGISTRATION
-                } else {
-                    AppState.MAIN
-                }
+                currentState = AppState.REGISTRATION
             }
             AppState.PREMIUM_PROMO -> PremiumEliteScreen(
                 billingManager = billingManager,
-                onContinue = { currentState = AppState.MAIN },
+                onContinue = { currentState = postAuthState() },
                 onPurchaseSuccess = {
-                    currentState = AppState.MAIN
+                    currentState = postAuthState()
                 }
             )
             AppState.REGISTRATION -> RegistrationScreen(
@@ -157,6 +161,18 @@ fun AppMainFlow() {
                 onBack = { currentState = AppState.REGISTRATION },
                 onAuthSuccess = { currentState = AppState.PREMIUM_PROMO }
             )
+            AppState.SECURITY_SETUP -> {
+                val uid = FirebaseAuth.getInstance().currentUser?.uid
+                if (uid == null) {
+                    LaunchedEffect(Unit) { currentState = AppState.REGISTRATION }
+                } else {
+                    SecuritySetupScreen(
+                        uid = uid,
+                        store = securitySetupStore,
+                        onComplete = { currentState = AppState.MAIN },
+                    )
+                }
+            }
             AppState.MAIN -> RoyalShieldApp(billingManager)
         }
     }

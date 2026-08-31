@@ -6,8 +6,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import java.text.Normalizer
-import java.util.regex.Pattern
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -78,6 +77,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.ui.dashboard.models.ActionItem
 import com.royalshield.app.ui.dashboard.models.Severity
 import com.royalshield.app.ui.dashboard.DashboardViewModel
+import com.royalshield.app.ui.dashboard.DashboardAgentCenter
+import com.royalshield.app.QrScannerActivity
+import com.royalshield.app.ui.components.RoyalSecurityOrb
+import com.royalshield.app.ui.components.RoyalSecurityOrbState
+import com.royalshield.app.ui.voice.VoiceCommandRouter
+import com.royalshield.app.ui.voice.VoiceDestination
 
 
 enum class CarouselType { ALERT, PROMO, INFO, SUBSCRIPTION }
@@ -599,308 +604,31 @@ fun DashboardScreen(
                         PreferencesManager.unregisterListener(listener)
                     }
                 }
-                var showArmedDialog by remember { mutableStateOf(false) }
-
-                if (showArmedDialog) {
-                    val statusColor = if (isArmed) Color(0xFF00FF94) else Color(0xFFFF3B30)
-                    val statusItems = listOf(
-                        "Real-time Threat Detection",
-                        "Network Traffic Analysis",
-                        "File System Watcher",
-                        "Malware Scanner",
-                        "Privacy Guard",
-                        "VPN Shield"
-                    )
-                    AlertDialog(
-                        onDismissRequest = { showArmedDialog = false },
-                        title = {
-                            Text(
-                                if (isArmed) "System Armed" else "System Disarmed",
-                                color = statusColor,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                        },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = if (isArmed)
-                                        "Your device is protected by Royal Shield active monitoring:"
-                                    else
-                                        "Active monitoring is disabled. Enable it to secure your device:",
-                                    color = if (isLight) Color.Black.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.7f),
-                                    fontSize = 13.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                statusItems.forEach { item ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        modifier = Modifier.padding(vertical = 3.dp)
-                                    ) {
-                                        Canvas(modifier = Modifier.size(8.dp)) {
-                                            if (isArmed) {
-                                                drawCircle(color = Color(0xFF00FF94))
-                                            } else {
-                                                drawCircle(
-                                                    color = Color(0xFFFF3B30),
-                                                    style = Stroke(width = 1.5.dp.toPx())
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = if (isArmed) item else "$item (Inactive)",
-                                            color = if (isLight) Color.Black.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.85f),
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                val targetState = !isArmed
-                                PreferencesManager.setSystemArmed(targetState, context)
-                                isArmed = targetState
-                                lockIconRes = if (targetState) RoyalIcons.LockGreenLarge else RoyalIcons.LockRedLarge
-                                showArmedDialog = false
-                            }) {
-                                Text(
-                                    if (isArmed) "DISARM" else "ARM",
-                                    color = if (isArmed) Color(0xFFFF3B30) else Color(0xFF00FF94),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showArmedDialog = false }) {
-                                Text("CLOSE", color = RoyalGold)
-                            }
-                        },
-                        containerColor = if (isLight) Color.White else Color(0xFF1E1E1E),
-                        textContentColor = if (isLight) Color.Black else Color.White
-                    )
-                }
-
-                // ARMED STATUS (Lock) - Restructured for perfect centering and SYSTEM SECURITY header
+                // The security agent owns armed-state, voice, and chat controls.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
-                        .height(230.dp)
+                        .height(286.dp)
                         .clip(RoundedCornerShape(30.dp))
-                        .clickable { showArmedDialog = true }
                         .background(Color(0xFF0F0F13).copy(alpha = 0.4f))
                         .border(1.dp, RoyalGold.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                 ) {
                     GoldenSecurityWave(modifier = Modifier.matchParentSize())
                     SystemSecurityParticles(modifier = Modifier.matchParentSize())
 
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                    val rotatingColor = RoyalGold
-
-                    val rotationTransition = rememberInfiniteTransition(label = "lock_rotation")
-                    val angle by rotationTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(3000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ), label = "angle"
+                    DashboardAgentCenter(
+                        armed = isArmed,
+                        onSetArmed = { targetState ->
+                            PreferencesManager.setSystemArmed(targetState, context)
+                            isArmed = targetState
+                            lockIconRes = if (targetState) RoyalIcons.LockGreenLarge else RoyalIcons.LockRedLarge
+                        },
+                        onVoiceClick = { showVoiceAssistant = true },
+                        onChatClick = { showTextAssistant = true },
+                        modifier = Modifier.fillMaxSize().padding(18.dp),
                     )
 
-                    // Title
-                    Text(
-                        text = "SYSTEM SECURITY",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Premium multi-ring pulsating circle + padlock
-                    Box(
-                        modifier = Modifier.size(140.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Background Hex Grid / Shield Status (Visual Effect)
-                        ShieldStatusBackground(modifier = Modifier.fillMaxSize().alpha(0.3f))
-
-                        // Pulsating ring animations (3 concentric rings at different speeds)
-                        val ringTransition = rememberInfiniteTransition(label = "ring_pulse")
-                        val ring1Alpha by ringTransition.animateFloat(
-                            initialValue = 0.15f, targetValue = 0.45f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(2000, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ), label = "ring1"
-                        )
-                        val ring2Alpha by ringTransition.animateFloat(
-                            initialValue = 0.35f, targetValue = 0.12f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(2800, easing = LinearOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ), label = "ring2"
-                        )
-                        val ring3Alpha by ringTransition.animateFloat(
-                            initialValue = 0.08f, targetValue = 0.3f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(3500, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ), label = "ring3"
-                        )
-                        val glowPulse by ringTransition.animateFloat(
-                            initialValue = 0.05f, targetValue = 0.25f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(2400, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ), label = "glow"
-                        )
-
-                        // Radial glow pulse (outermost wave effect)
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val center = Offset(size.width / 2f, size.height / 2f)
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        rotatingColor.copy(alpha = glowPulse),
-                                        rotatingColor.copy(alpha = glowPulse * 0.4f),
-                                        Color.Transparent
-                                    ),
-                                    center = center,
-                                    radius = size.minDimension / 2f
-                                )
-                            )
-                        }
-
-                        // Outer ring (largest, slowest pulse)
-                        Canvas(modifier = Modifier.size(130.dp)) {
-                            drawCircle(
-                                color = rotatingColor.copy(alpha = ring3Alpha),
-                                style = Stroke(width = 1.5.dp.toPx())
-                            )
-                        }
-
-                        // Middle ring
-                        Canvas(modifier = Modifier.size(112.dp)) {
-                            drawCircle(
-                                color = rotatingColor.copy(alpha = ring2Alpha),
-                                style = Stroke(width = 2.dp.toPx())
-                            )
-                        }
-
-                        // Inner ring (smallest, fastest pulse)
-                        Canvas(modifier = Modifier.size(96.dp)) {
-                            drawCircle(
-                                color = rotatingColor.copy(alpha = ring1Alpha),
-                                style = Stroke(width = 2.5.dp.toPx())
-                            )
-                        }
-
-                        // Gradient rotating arc (enhanced)
-                        Canvas(modifier = Modifier.size(120.dp)) {
-                            rotate(angle) {
-                                drawArc(
-                                    brush = Brush.sweepGradient(
-                                        colors = listOf(
-                                            Color.Transparent,
-                                            rotatingColor.copy(alpha = 0.3f),
-                                            rotatingColor,
-                                            rotatingColor.copy(alpha = 0.3f),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    startAngle = 0f,
-                                    sweepAngle = 280f,
-                                    useCenter = false,
-                                    style = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                                )
-                            }
-                        }
-
-                        // Gold orbiting particles preserve the premium black-and-gold identity.
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val center = Offset(size.width / 2f, size.height / 2f)
-                            val particleCount = 18
-                            for (index in 0 until particleCount) {
-                                val orbitRadius = if (index % 2 == 0) {
-                                    size.minDimension * 0.43f
-                                } else {
-                                    size.minDimension * 0.36f
-                                }
-                                val particleAngle = Math.toRadians(
-                                    (angle + (index * 360f / particleCount) + (index % 3) * 18f).toDouble()
-                                )
-                                val x = center.x + kotlin.math.cos(particleAngle).toFloat() * orbitRadius
-                                val y = center.y + kotlin.math.sin(particleAngle).toFloat() * orbitRadius
-                                val pulse = when (index % 3) {
-                                    0 -> ring1Alpha
-                                    1 -> ring2Alpha
-                                    else -> ring3Alpha
-                                }
-                                drawCircle(
-                                    color = rotatingColor.copy(alpha = (pulse + 0.18f).coerceAtMost(0.7f)),
-                                    radius = (1.4.dp + (index % 3).dp).toPx(),
-                                    center = Offset(x, y)
-                                )
-                            }
-                        }
-
-                        // Inner glow fill circle
-                        Box(
-                            modifier = Modifier
-                                .size(82.dp)
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            rotatingColor.copy(alpha = 0.12f),
-                                            rotatingColor.copy(alpha = 0.04f),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    CircleShape
-                                )
-                                .border(1.dp, rotatingColor.copy(alpha = ring1Alpha * 0.6f), CircleShape)
-                        )
-
-                        // Padlock Image - Perfectly centered
-                        Image(
-                            painter = painterResource(id = lockIconRes),
-                            contentDescription = "ArmedStatus",
-                            modifier = Modifier.size(38.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // ARMED Text with Gold Lux Frame
-                    com.royalshield.app.ui.components.GoldLuxFrame {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Canvas(modifier = Modifier.size(8.dp)) {
-                                drawCircle(
-                                    color = if (isArmed) Color(0xFF00FF94) else Color(0xFFFF3B30)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isArmed) "SYSTEM ARMED" else "SYSTEM DISARMED",
-                                color = if (isArmed) Color(0xFF00FF94) else Color(0xFFFF3B30),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp
-                            )
-                        }
-                    }
-                    }
                 }
 
                 // Quick Actions
@@ -981,44 +709,6 @@ fun DashboardScreen(
                         )
                     }
 
-                    // Text chat button beside the existing voice assistant.
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .offset(x = (-44).dp)
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF11131A))
-                            .border(1.dp, RoyalGold, CircleShape)
-                            .clickable { showTextAssistant = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Chat,
-                            contentDescription = "Text Assistant",
-                            tint = RoyalGold,
-                            modifier = Modifier.size(21.dp)
-                        )
-                    }
-
-                    // Floating Mic Button â€” separated, aligned to end with offset
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .offset(x = 8.dp)
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFFFD700)) // Gold
-                            .clickable { showVoiceAssistant = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Voice Assistant",
-                            tint = Color.Black,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
                 }
 
                 if (showTextAssistant) {
@@ -1032,97 +722,21 @@ fun DashboardScreen(
                         onDismiss = { showVoiceAssistant = false },
                         onVoiceCommand = { command ->
                             showVoiceAssistant = false
-                            // Normalize text to lowercase and remove accents/diacritics
-                            val tempNormalized = Normalizer.normalize(command, Normalizer.Form.NFD)
-                            val pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+")
-                            val normalized = pattern.matcher(tempNormalized).replaceAll("").lowercase().trim()
-
-                            val fileScanKeywords = listOf(
-                                "scan", "escanear", "escaner", "analizar", "analisis", "buscar virus",
-                                "chequear", "comprobar", "iniciar analisis", "escanear archivos",
-                                "escanear dispositivo", "scan device", "file scan", "malware scan",
-                                "run scan", "check device", "check for malware", "start scan", "scan files"
-                            )
-                            val settingsKeywords = listOf(
-                                "settings", "go to settings", "show settings", "open settings", "preferences",
-                                "configure", "configuration", "ajustes", "configuracion", "abrir configuracion",
-                                "ir a ajustes", "preferencias", "opciones"
-                            )
-                            val vpnKeywords = listOf(
-                                "vpn", "connect vpn", "start vpn", "enable vpn", "virtual private network",
-                                "open vpn", "protect network", "conectar vpn", "abrir vpn", "iniciar vpn",
-                                "activar vpn", "red privada virtual"
-                            )
-                            val sosKeywords = listOf(
-                                "sos", "emergency", "alert", "panic", "help", "send alert", "send emergency",
-                                "panic button", "emergencia", "alerta", "panico", "auxilio", "ayuda",
-                                "boton de panico", "enviar alerta"
-                            )
-                            val mapKeywords = listOf(
-                                "map", "show map", "global map", "threat map", "view map", "live map",
-                                "mapa", "ver mapa", "mostrar mapa", "mapa global", "mapa de amenazas"
-                            )
-                            val automationKeywords = listOf(
-                                "automation", "smart home", "home automation", "automations", "iot",
-                                "automatizacion", "casa inteligente", "automatizaciones", "domotica"
-                            )
-                            val aiHubKeywords = listOf(
-                                "ai assistant", "ai hub", "neural hub", "chat with ai", "assistant",
-                                "ai chatbot", "artificial intelligence", "asistente", "ia", "asistente de ia",
-                                "chat con ia", "inteligencia artificial", "hub de ia"
-                            )
-                            val solutionEngineKeywords = listOf(
-                                "solution engine", "resolution engine", "resolucion", "solucion",
-                                "motor de solucion", "motor de resolucion", "resolver", "fix issues"
-                            )
-                            val securityCameraKeywords = listOf(
-                                "security cam", "camera", "security camera", "cam", "video surveillance",
-                                "surveillance", "camara", "camara de seguridad", "vigilancia", "camara de vigilancia"
-                            )
-                            val soundDetectionKeywords = listOf(
-                                "audio guard", "sound detection", "listen", "mic guard", "microphone",
-                                "sound guard", "proteccion de audio", "deteccion de sonido", "microfono"
-                            )
-                            val trackingShieldKeywords = listOf(
-                                "tracking shield", "track shield", "location tracking", "anti tracking",
-                                "prevent tracking", "proteccion de rastreo", "escudo de rastreo", "evitar rastreo",
-                                "antirastreo", "antirrastreo"
-                            )
-                            val galleryKeywords = listOf(
-                                "gallery", "vault gallery", "secure gallery", "photos", "videos",
-                                "galeria", "galeria segura", "fotos"
-                            )
-                            val coursesKeywords = listOf(
-                                "academy", "courses", "learn", "security tips", "training",
-                                "academia", "cursos", "aprender", "consejos de seguridad", "entrenamiento"
-                            )
-
-                            if (fileScanKeywords.any { normalized.contains(it) }) {
-                                onNavigateToFileScan()
-                            } else if (vpnKeywords.any { normalized.contains(it) }) {
-                                onNavigateToVpn()
-                            } else if (sosKeywords.any { normalized.contains(it) }) {
-                                onNavigateToSOS()
-                            } else if (mapKeywords.any { normalized.contains(it) }) {
-                                onNavigateToMap()
-                            } else if (settingsKeywords.any { normalized.contains(it) }) {
-                                onNavigateToSettings()
-                            } else if (automationKeywords.any { normalized.contains(it) }) {
-                                onNavigateToAutomation()
-                            } else if (aiHubKeywords.any { normalized.contains(it) }) {
-                                onNavigateToAiHub()
-                            } else if (solutionEngineKeywords.any { normalized.contains(it) }) {
-                                onNavigateToSolutionEngine()
-                            } else if (securityCameraKeywords.any { normalized.contains(it) }) {
-                                onNavigateToSecurityCamera()
-                            } else if (soundDetectionKeywords.any { normalized.contains(it) }) {
-                                onNavigateToSoundDetection()
-                            } else if (trackingShieldKeywords.any { normalized.contains(it) }) {
-                                onNavigateToTrackingShield()
-                            } else if (galleryKeywords.any { normalized.contains(it) }) {
-                                onNavigateToGallery()
-                            } else if (coursesKeywords.any { normalized.contains(it) }) {
-                                onNavigateToCourses()
+                            when (VoiceCommandRouter.resolve(command)) {
+                                VoiceDestination.FILE_SCAN -> onNavigateToFileScan()
+                                VoiceDestination.PHISHING -> onNavigateToPhishing()
+                                VoiceDestination.QR_SCANNER -> context.startActivity(Intent(context, QrScannerActivity::class.java))
+                                VoiceDestination.VPN -> onNavigateToVpn()
+                                VoiceDestination.SOS -> onNavigateToSOS()
+                                VoiceDestination.MAP -> onNavigateToMap()
+                                VoiceDestination.SETTINGS -> onNavigateToSettings()
+                                VoiceDestination.AUTOMATION -> onNavigateToAutomation()
+                                VoiceDestination.AI_CHAT -> showTextAssistant = true
+                                VoiceDestination.UNKNOWN -> Toast.makeText(
+                                    context,
+                                    "No reconocí esa función. Intenta decir VPN, QR, phishing, SOS o ajustes.",
+                                    Toast.LENGTH_LONG,
+                                ).show()
                             }
                         }
                     )
