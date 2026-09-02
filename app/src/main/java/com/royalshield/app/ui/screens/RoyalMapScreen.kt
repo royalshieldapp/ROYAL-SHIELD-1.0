@@ -8,8 +8,11 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.location.Geocoder
+import android.location.LocationManager
 import android.net.Uri
+import android.os.Build
 import android.os.Looper
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -104,26 +107,46 @@ fun RoyalMapScreen(
     var lastGpsUpdate by remember { mutableStateOf("--") }
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var isSystemLocationEnabled by remember { mutableStateOf(isDeviceLocationEnabled(context)) }
     var hasLocationPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED
         )
+    }
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        isSystemLocationEnabled = isDeviceLocationEnabled(context)
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        hasLocationPermission = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        hasLocationPermission = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
 
-    LaunchedEffect(Unit) {
-        if (!hasLocationPermission) {
+    LaunchedEffect(isSystemLocationEnabled, hasLocationPermission) {
+        if (isSystemLocationEnabled && !hasLocationPermission) {
             permissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
+        }
+    }
+
+    LaunchedEffect(isSystemLocationEnabled, hasLocationPermission) {
+        if (isSystemLocationEnabled && hasLocationPermission) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location ?: return@addOnSuccessListener
+                currentLocation = LatLng(location.latitude, location.longitude)
+                lastGpsUpdate = java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                    .format(java.util.Date(location.time))
+            }
         }
     }
 
@@ -185,7 +208,7 @@ fun RoyalMapScreen(
         }
     }
 
-    if (hasLocationPermission) {
+    if (hasLocationPermission && isSystemLocationEnabled) {
         DisposableEffect(fusedLocationClient) {
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3500L)
                 .setMinUpdateIntervalMillis(1800L)
@@ -215,7 +238,7 @@ fun RoyalMapScreen(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
-                isMyLocationEnabled = hasLocationPermission,
+                isMyLocationEnabled = hasLocationPermission && isSystemLocationEnabled,
                 mapStyleOptions = mapStyle,
                 mapType = MapType.NORMAL,
                 isBuildingEnabled = is3D
@@ -344,6 +367,34 @@ fun RoyalMapScreen(
             },
             lastGpsUpdate = lastGpsUpdate
         )
+
+        val locationStatus = resolveMapLocationStatus(
+            locationEnabled = isSystemLocationEnabled,
+            hasPermission = hasLocationPermission,
+            hasFix = currentLocation != null,
+        )
+        AnimatedVisibility(
+            visible = locationStatus != MapLocationStatus.AVAILABLE,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 88.dp, start = 12.dp, end = 12.dp),
+        ) {
+            MapLocationStatusCard(
+                status = locationStatus,
+                onEnableLocation = {
+                    locationSettingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                },
+                onGrantPermission = {
+                    permissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ),
+                    )
+                },
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -558,6 +609,55 @@ private fun SignalCircle(signal: RoyalMapSignal) {
         strokeColor = signal.color.copy(alpha = 0.82f),
         strokeWidth = 2.5f
     )
+}
+
+private fun isDeviceLocationEnabled(context: android.content.Context): Boolean {
+    val manager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as LocationManager
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        manager.isLocationEnabled
+    } else {
+        runCatching {
+            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }.getOrDefault(false)
+    }
+}
+
+@Composable
+private fun MapLocationStatusCard(
+    status: MapLocationStatus,
+    onEnableLocation: () -> Unit,
+    onGrantPermission: () -> Unit,
+) {
+    val message = when (status) {
+        MapLocationStatus.LOCATION_OFF -> "Location is off. Enable it to show your real device point."
+        MapLocationStatus.PERMISSION_REQUIRED -> "Location permission is required to show your device point."
+        MapLocationStatus.WAITING_FOR_FIX -> "Waiting for a real GPS fix…"
+        MapLocationStatus.AVAILABLE -> return
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MapPanel),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, RoyalGold.copy(alpha = 0.62f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Default.LocationOff, contentDescription = null, tint = RoyalGold)
+            Text(message, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            when (status) {
+                MapLocationStatus.LOCATION_OFF -> TextButton(onClick = onEnableLocation) {
+                    Text("ENABLE", color = RoyalGold, fontWeight = FontWeight.Bold)
+                }
+                MapLocationStatus.PERMISSION_REQUIRED -> TextButton(onClick = onGrantPermission) {
+                    Text("GRANT", color = RoyalGold, fontWeight = FontWeight.Bold)
+                }
+                else -> Unit
+            }
+        }
+    }
 }
 
 @Composable
