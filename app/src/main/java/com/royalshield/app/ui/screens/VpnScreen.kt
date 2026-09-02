@@ -10,6 +10,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +38,8 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -103,13 +106,9 @@ private fun VpnServerProfile.toVpnServer(): VpnServer {
     )
 }
 
-private val staticServers = listOf(
-    VpnServer("Zurich", "CH", "CH", "ch-zurich"),
-    VpnServer("New York", "US", "US", "us-east"),
-    VpnServer("London", "UK", "UK", "uk-london"),
-    VpnServer("Frankfurt", "DE", "DE", "de-frankfurt"),
-    VpnServer("Tokyo", "JP", "JP", "jp-tokyo")
-)
+fun selectVerifiedVpnServer(current: VpnServer?, returned: List<VpnServer>): VpnServer? =
+    current?.takeIf { selected -> returned.any { it.configId == selected.configId } }
+        ?: returned.firstOrNull()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,8 +136,8 @@ fun VpnScreen(
     var isFetchingConfig by remember { mutableStateOf(false) }
     var vpnNotice by remember { mutableStateOf<String?>(null) }
     var backendAvailable by remember { mutableStateOf<Boolean?>(null) }
-    var serverOptions by remember { mutableStateOf(staticServers) }
-    var selectedServer by remember { mutableStateOf(staticServers.first()) }
+    var serverOptions by remember { mutableStateOf(emptyList<VpnServer>()) }
+    var selectedServer by remember { mutableStateOf<VpnServer?>(null) }
     var showServerSelector by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(VpnTab.WorldMap) }
 
@@ -156,9 +155,10 @@ fun VpnScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
+            val server = selectedServer ?: return@rememberLauncherForActivityResult
             scope.launch {
                 isFetchingConfig = true
-                val res = vpnProfileRepository.getVpnConfig(selectedServer.configId)
+                val res = vpnProfileRepository.getVpnConfig(server.configId)
                 isFetchingConfig = false
                 res.onSuccess { config ->
                     vpnManager.connect(config)
@@ -170,9 +170,14 @@ fun VpnScreen(
     }
 
     fun requestVpnConnection() {
+        val server = selectedServer
+        if (server == null) {
+            vpnNotice = "No verified VPN server is available."
+            return
+        }
         scope.launch {
             isFetchingConfig = true
-            val res = vpnProfileRepository.getVpnConfig(selectedServer.configId)
+            val res = vpnProfileRepository.getVpnConfig(server.configId)
             isFetchingConfig = false
             res.onSuccess { config ->
                 vpnNotice = null
@@ -202,12 +207,16 @@ fun VpnScreen(
         vpnProfileRepository.getVpnServers()
             .onSuccess { servers ->
                 val mappedServers = servers.map { it.toVpnServer() }
-                if (mappedServers.isNotEmpty()) {
-                    serverOptions = mappedServers
-                    if (serverOptions.none { it.configId == selectedServer.configId }) {
-                        selectedServer = mappedServers.first()
-                    }
+                serverOptions = mappedServers
+                selectedServer = selectVerifiedVpnServer(selectedServer, mappedServers)
+                if (mappedServers.isEmpty()) {
+                    backendAvailable = false
+                    vpnNotice = "The VPN service returned no verified servers."
+                    vpnManager.setMissingConfig()
                 }
+            }.onFailure { error ->
+                backendAvailable = false
+                handleVpnFailure(error)
             }
         isFetchingConfig = false
     }
@@ -240,25 +249,31 @@ fun VpnScreen(
                     AurumSegmentedTabs(selectedTab = selectedTab, onSelected = { selectedTab = it })
                     Spacer(modifier = Modifier.height(30.dp))
                     if (selectedTab == VpnTab.WorldMap) {
-                        AurumWorldMapCard(selectedServer = selectedServer)
+                        selectedServer?.let { AurumWorldMapCard(selectedServer = it) }
+                            ?: AurumVpnUnavailableServerCard()
                     } else {
-                        AurumServerListCard(
-                            serverOptions = serverOptions,
-                            selectedServer = selectedServer,
-                            onSelect = { selectedServer = it }
-                        )
+                        selectedServer?.let {
+                            AurumServerListCard(
+                                serverOptions = serverOptions,
+                                selectedServer = it,
+                                onSelect = { server -> selectedServer = server }
+                            )
+                        } ?: AurumVpnUnavailableServerCard()
                     }
                     Spacer(modifier = Modifier.height(24.dp))
-                    AurumSelectedServerCard(
-                        selectedServer = selectedServer,
-                        vpnState = vpnState,
-                        enabled = backendAvailable == true,
-                        onClick = { showServerSelector = true }
-                    )
+                    selectedServer?.let {
+                        AurumSelectedServerCard(
+                            selectedServer = it,
+                            vpnState = vpnState,
+                            enabled = backendAvailable == true,
+                            onClick = { showServerSelector = true }
+                        )
+                    } ?: AurumVpnUnavailableServerCard(compact = true)
                     Spacer(modifier = Modifier.height(42.dp))
                     AurumPowerButton(
                         vpnState = vpnState,
-                        enabled = !isFetchingConfig,
+                        enabled = !isFetchingConfig && (vpnState is VpnState.Connected ||
+                            (backendAvailable == true && selectedServer != null)),
                         onClick = {
                             if (backendAvailable != true && vpnState !is VpnState.Connected) {
                                 vpnNotice = "Contacting the Royal VPN service..."
@@ -322,7 +337,7 @@ fun VpnScreen(
                         )
                         AurumMetricCard(
                             label = "PING",
-                            value = if (vpnState is VpnState.Connected) "28 ms" else "--",
+                            value = "--",
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -348,7 +363,7 @@ fun VpnScreen(
                         serverOptions.forEach { server ->
                             AurumServerRow(
                                 server = server,
-                                selected = server.configId == selectedServer.configId,
+                                selected = server.configId == selectedServer?.configId,
                                 onClick = {
                                     selectedServer = server
                                     showServerSelector = false
@@ -463,6 +478,33 @@ private fun AurumTabButton(text: String, selected: Boolean, onClick: () -> Unit,
 }
 
 @Composable
+private fun AurumVpnUnavailableServerCard(compact: Boolean = false) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (compact) 92.dp else 210.dp),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AurumPanelSoft),
+        border = BorderStroke(1.dp, AurumStroke),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("NO VERIFIED SERVER", color = AurumGoldSoft, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Royal Shield will not display or use fallback VPN nodes.",
+                color = AurumMuted,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
 private fun AurumWorldMapCard(selectedServer: VpnServer) {
     Box(
         modifier = Modifier
@@ -569,7 +611,7 @@ private fun AurumSelectedServerCard(
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                if (vpnState is VpnState.Connected) "28ms" else "--",
+                "--",
                 color = AurumGold,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold

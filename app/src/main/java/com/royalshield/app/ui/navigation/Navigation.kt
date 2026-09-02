@@ -237,18 +237,11 @@ fun RoyalShieldNavGraph(
         }
 
         composable("vpn") {
-            FeatureAvailabilityGate(
-                moduleName = "VPN",
-                state = featureAvailability.vpn,
+            VpnScreen(
                 onBack = { navController.popBackStack() },
-                onRetry = featureAvailabilityViewModel::refresh,
-            ) {
-                VpnScreen(
-                    onBack = { navController.popBackStack() },
-                    billingManager = billingManager,
-                    onNavigateToPremium = { navController.navigate("subscription") }
-                )
-            }
+                billingManager = billingManager,
+                onNavigateToPremium = { navController.navigate("subscription") }
+            )
         }
 
         composable("tracking_shield") {
