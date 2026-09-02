@@ -70,6 +70,28 @@ class RoyalSecurityOrbMotionTest {
     }
 
     @Test
+    fun proceduralFluidMorphIsContinuousAndClosesItsLoop() {
+        val angle = 1.17f
+        val start = resolveOrbFluidRadius(RoyalSecurityOrbState.ACTIVE, angle, phase = 0f)
+        val end = resolveOrbFluidRadius(RoyalSecurityOrbState.ACTIVE, angle, phase = 1f)
+        val before = resolveOrbFluidRadius(RoyalSecurityOrbState.ACTIVE, angle, phase = 0.420f)
+        val after = resolveOrbFluidRadius(RoyalSecurityOrbState.ACTIVE, angle, phase = 0.421f)
+
+        assertEquals(start, end, 0.0001f)
+        assertTrue(kotlin.math.abs(after - before) < 0.01f)
+        assertNotEquals(before, after)
+    }
+
+    @Test
+    fun listeningMorphHasMoreFluidDeformationThanActive() {
+        val angle = 2.31f
+        val active = resolveOrbFluidRadius(RoyalSecurityOrbState.ACTIVE, angle, phase = 0.37f)
+        val listening = resolveOrbFluidRadius(RoyalSecurityOrbState.LISTENING, angle, phase = 0.37f)
+
+        assertTrue(kotlin.math.abs(listening - 0.76f) > kotlin.math.abs(active - 0.76f))
+    }
+
+    @Test
     fun reducedMotionFreezesPlasmaAndMagneticRings() {
         val motion = resolveOrbPlasmaMotion(
             state = RoyalSecurityOrbState.LISTENING,
