@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -49,6 +48,7 @@ fun DashboardAgentCenter(
     onSetArmed: (Boolean) -> Unit,
     onVoiceClick: () -> Unit,
     onChatClick: () -> Unit,
+    onSetupClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var confirmDisarm by remember { mutableStateOf(false) }
@@ -100,6 +100,9 @@ fun DashboardAgentCenter(
                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(19.dp))
                 Text("  CHAT", fontWeight = FontWeight.Bold)
             }
+        }
+        TextButton(onClick = onSetupClick) {
+            Text("SECURITY SETUP", color = RoyalGold, fontWeight = FontWeight.Bold)
         }
     }
 

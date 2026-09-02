@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.royalshield.app.securitysetup.SecurityFeature
 import com.royalshield.app.securitysetup.SecuritySetupSession
 import com.royalshield.app.securitysetup.SecuritySetupStore
+import com.royalshield.app.securitysetup.securitySetupStartingPreferences
 import com.royalshield.app.ui.components.RoyalSecurityOrb
 import com.royalshield.app.ui.components.RoyalSecurityOrbState
 import com.royalshield.app.ui.theme.RoyalGold
@@ -46,8 +47,16 @@ fun SecuritySetupScreen(
     uid: String,
     store: SecuritySetupStore,
     onComplete: () -> Unit,
+    reviewExisting: Boolean = false,
 ) {
-    val session = remember(uid) { SecuritySetupSession(store.load(uid)) }
+    val session = remember(uid, reviewExisting) {
+        SecuritySetupSession(
+            securitySetupStartingPreferences(
+                saved = store.load(uid),
+                reviewExisting = reviewExisting,
+            ),
+        )
+    }
     var currentFeature by remember(uid) { mutableStateOf(session.currentFeature) }
     var showSmsDisclosure by remember { mutableStateOf(false) }
 
@@ -79,12 +88,12 @@ fun SecuritySetupScreen(
     if (showSmsDisclosure) {
         AlertDialog(
             onDismissRequest = { showSmsDisclosure = false },
-            title = { Text("Protección automática contra phishing por SMS") },
+            title = { Text("Automatic SMS phishing protection") },
             text = {
                 Text(
-                    "Royal Shield accederá a los SMS recibidos para identificar enlaces y patrones sospechosos. " +
-                        "El mensaje no se usará para publicidad ni se venderá. Solo una URL extraída podrá enviarse " +
-                        "al análisis avanzado de VirusTotal. Puedes revocar el permiso cuando quieras."
+                    "Royal Shield accesses received SMS messages to identify suspicious links and patterns. " +
+                        "Messages are not sold or used for advertising. Only an extracted URL may be sent for " +
+                        "advanced VirusTotal analysis. You can revoke permission at any time."
                 )
             },
             confirmButton = {
@@ -93,34 +102,34 @@ fun SecuritySetupScreen(
                     smsPermissionLauncher.launch(
                         arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS)
                     )
-                }) { Text("Aceptar y continuar") }
+                }) { Text("ACCEPT AND CONTINUE") }
             },
             dismissButton = {
                 TextButton(onClick = {
                     showSmsDisclosure = false
                     recordChoice(false)
-                }) { Text("Ahora no") }
+                }) { Text("NOT NOW") }
             },
         )
     }
 
     val copy = when (currentFeature) {
         SecurityFeature.VPN -> Triple(
-            "¿Quieres configurar la VPN?",
-            "Ayuda a proteger el tráfico compatible, especialmente en Wi-Fi público.",
-            "No garantiza anonimato total ni elimina todos los riesgos.",
+            "Do you want to configure the VPN?",
+            "It helps protect compatible traffic, especially on public Wi-Fi.",
+            "It does not guarantee total anonymity or eliminate every risk.",
         )
         SecurityFeature.SMS_PHISHING -> Triple(
-            "¿Quieres activar la protección automática contra phishing por SMS?",
-            "Analiza enlaces y patrones sospechosos para advertirte antes de abrirlos.",
-            "Requiere acceso a SMS y la aprobación correspondiente de Google Play.",
+            "Do you want to enable automatic SMS phishing protection?",
+            "It analyzes suspicious links and patterns to warn you before opening them.",
+            "It requires SMS access and the corresponding Google Play approval.",
         )
         SecurityFeature.QR_SCANNER -> Triple(
-            "¿Quieres activar el escáner seguro de códigos QR?",
-            "Permite revisar el destino de un QR antes de abrirlo.",
-            "Ningún análisis puede garantizar que todos los destinos sean seguros.",
+            "Do you want to enable the secure QR scanner?",
+            "It lets you inspect a QR destination before opening it.",
+            "No scan can guarantee that every destination is safe.",
         )
-        null -> Triple("Configuración completa", "", "")
+        null -> Triple("Security setup complete", "", "")
     }
 
     Column(
@@ -149,7 +158,7 @@ fun SecuritySetupScreen(
                 onClick = { recordChoice(false) },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(24.dp),
-            ) { Text("Ahora no") }
+            ) { Text("NOT NOW") }
             Button(
                 onClick = {
                     when (currentFeature) {
@@ -162,7 +171,7 @@ fun SecuritySetupScreen(
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = RoyalGold, contentColor = Color.Black),
                 shape = RoundedCornerShape(24.dp),
-            ) { Text("Activar", fontWeight = FontWeight.Bold) }
+            ) { Text("ENABLE", fontWeight = FontWeight.Bold) }
         }
     }
 }

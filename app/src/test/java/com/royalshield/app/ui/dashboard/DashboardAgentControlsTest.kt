@@ -34,4 +34,15 @@ class DashboardAgentControlsTest {
         assertFalse(source.contains("Floating Chat Button"))
         assertFalse(source.contains("Floating Mic Button"))
     }
+
+    @Test
+    fun agentCenterExposesTheRealSecuritySetupQuestions() {
+        val controls = File("src/main/java/com/royalshield/app/ui/dashboard/DashboardAgentControls.kt").readText()
+        val navigation = File("src/main/java/com/royalshield/app/ui/navigation/Navigation.kt").readText()
+
+        assertTrue(controls.contains("onSetupClick"))
+        assertTrue(controls.contains("SECURITY SETUP"))
+        assertTrue(navigation.contains("composable(\"security_agent_setup\")"))
+        assertTrue(navigation.contains("reviewExisting = true"))
+    }
 }

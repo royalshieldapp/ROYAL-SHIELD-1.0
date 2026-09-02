@@ -75,4 +75,23 @@ class SecuritySetupStoreTest {
 
         assertEquals(SecurityFeature.QR_SCANNER, session.currentFeature)
     }
+
+    @Test
+    fun `review mode starts again at vpn without deleting saved choices`() {
+        val saved = SecuritySetupPreferences(
+            uid = "uid-a",
+            completed = true,
+            vpnEnabled = true,
+            smsPhishingEnabled = false,
+            qrScannerEnabled = true,
+        )
+
+        val startingPreferences = securitySetupStartingPreferences(saved, reviewExisting = true)
+        val session = SecuritySetupSession(startingPreferences)
+
+        assertEquals(SecurityFeature.VPN, session.currentFeature)
+        assertEquals(true, saved.vpnEnabled)
+        assertEquals(false, saved.smsPhishingEnabled)
+        assertEquals(true, saved.qrScannerEnabled)
+    }
 }

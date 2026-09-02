@@ -136,6 +136,7 @@ fun DashboardScreen(
     onNavigateToSoundDetection: () -> Unit = {},
     onNavigateToSecurityCamera: () -> Unit = {},
     onNavigateToSolutionEngine: () -> Unit = {},
+    onReviewSecuritySetup: () -> Unit = {},
     billingManager: BillingManager
 ) {
     val scrollState = rememberScrollState()
@@ -626,6 +627,7 @@ fun DashboardScreen(
                         },
                         onVoiceClick = { showVoiceAssistant = true },
                         onChatClick = { showTextAssistant = true },
+                        onSetupClick = onReviewSecuritySetup,
                         modifier = Modifier.fillMaxSize().padding(18.dp),
                     )
 

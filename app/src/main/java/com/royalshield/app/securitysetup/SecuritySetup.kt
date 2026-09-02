@@ -42,3 +42,12 @@ data class SecuritySetupPreferences(
     fun hasEveryChoice(): Boolean =
         vpnEnabled != null && smsPhishingEnabled != null && qrScannerEnabled != null
 }
+
+fun securitySetupStartingPreferences(
+    saved: SecuritySetupPreferences,
+    reviewExisting: Boolean,
+): SecuritySetupPreferences = if (reviewExisting) {
+    SecuritySetupPreferences(uid = saved.uid)
+} else {
+    saved
+}

@@ -3,6 +3,9 @@ package com.royalshield.app.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -11,6 +14,8 @@ import com.royalshield.app.ui.components.BottomNavItem
 import com.royalshield.app.ui.components.FeatureAvailabilityGate
 import com.royalshield.app.ui.screens.*
 import com.royalshield.app.ui.viewmodels.FeatureAvailabilityViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.royalshield.app.securitysetup.EncryptedSecuritySetupStore
 
 @Composable
 fun RoyalShieldNavGraph(
@@ -48,6 +53,7 @@ fun RoyalShieldNavGraph(
                 onNavigateToSoundDetection = { navController.navigate("sound_detection") },
                 onNavigateToSecurityCamera = { navController.navigate("security_camera") },
                 onNavigateToSolutionEngine = { navController.navigate("solution_engine") },
+                onReviewSecuritySetup = { navController.navigate("security_agent_setup") },
                 billingManager = billingManager
             )
         }
@@ -191,6 +197,22 @@ fun RoyalShieldNavGraph(
                 onRetry = featureAvailabilityViewModel::refresh,
             ) {
                 ReportsCenterScreen(onBack = { navController.popBackStack() })
+            }
+        }
+
+        composable("security_agent_setup") {
+            val context = LocalContext.current
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+            if (uid == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                val setupStore = remember(context) { EncryptedSecuritySetupStore(context) }
+                SecuritySetupScreen(
+                    uid = uid,
+                    store = setupStore,
+                    reviewExisting = true,
+                    onComplete = { navController.popBackStack() },
+                )
             }
         }
         composable("compliance_monitor") { ComplianceMonitorScreen(onBack = { navController.popBackStack() }) }
