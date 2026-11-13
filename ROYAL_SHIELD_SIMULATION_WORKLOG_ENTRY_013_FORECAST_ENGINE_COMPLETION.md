@@ -23,3 +23,11 @@ Un resultado `READY` requiere fuente real, registros durables, artefacto persist
 ## Evidencia de ejecución
 
 Pendiente de completar durante esta sesión.
+
+## Actualización 2026-08-16
+
+- Backend de producción trabajado localmente en `C:/tmp/royal-shield-server-backend-forecast`, sin commit/push/deploy.
+- Entrenamiento temporal + baseline/XGBoost + corrida durable: REAL local; 14 pruebas enfocadas y 78 de regresión aprobadas antes del lote API.
+- API Forecast: REAL fail-closed local; 422 para entrada inválida y 503 `UNAVAILABLE` sin score cuando falta evidencia; 7 pruebas enfocadas aprobadas.
+- Android: eliminado fallback de tres hotspots simulados en Tracking Shield; pruebas de verdad de Risk Map/Tracking `BUILD SUCCESSFUL`.
+- Datos PostgreSQL reales, artefacto persistente activo, métricas reales, Render público y dispositivo: NO CONFIGURADOS o NO VERIFICADOS. No declarar READY/E2E.

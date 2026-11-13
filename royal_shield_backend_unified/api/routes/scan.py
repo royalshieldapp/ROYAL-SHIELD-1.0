@@ -2,7 +2,7 @@
 Security Scan API Routes
 Ported from Node.js backend - VirusTotal URL/file hash scanning
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, HttpUrl
 from typing import Optional, Dict
 from datetime import datetime, timezone
@@ -11,6 +11,7 @@ import os
 import logging
 
 from services.data_ingestion.storage import store_cyber_threats
+from api.security.firebase_auth import require_firebase_uid
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,10 @@ class FileHashResponse(BaseModel):
 # --- Endpoints ---
 
 @router.post("/url", response_model=UrlScanResponse)
-async def scan_url(request: UrlScanRequest):
+async def scan_url(
+    request: UrlScanRequest,
+    _firebase_uid: str = Depends(require_firebase_uid),
+):
     """
     Submit a URL for VirusTotal scanning.
 
@@ -120,7 +124,10 @@ async def scan_url(request: UrlScanRequest):
 
 
 @router.get("/result/{analysis_id}", response_model=ScanResultResponse)
-async def get_scan_result(analysis_id: str):
+async def get_scan_result(
+    analysis_id: str,
+    _firebase_uid: str = Depends(require_firebase_uid),
+):
     """
     Poll VirusTotal for scan result of a previously submitted URL.
 

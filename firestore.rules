@@ -1,0 +1,143 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. User documents and subcollections - isolated strictly to owner
+    // Subcollections include:
+    // users/{uid}/intel/data/monitors
+    // users/{uid}/intel/data/iocs
+    // users/{uid}/intel/data/alerts
+    // users/{uid}/settings/appSettings
+    // users/{uid}/ir/data/incidents
+    // users/{uid}/threats
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /{subcollection=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // 2. Referrals - owner-scoped, immutable authority fields
+    match /referrals/{referralId} {
+      allow read: if isAuthenticated() && (
+        resource.data.referrerUid == request.auth.uid || 
+        resource.data.referredUid == request.auth.uid
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.referrerUid == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.referrerUid == request.auth.uid &&
+        request.resource.data.referrerUid == resource.data.referrerUid;
+      allow delete: if false;
+    }
+
+    // 3. Referral Invites (Duo Shield)
+    match /invites/{inviteCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+        request.resource.data.inviterUid == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      allow update: if isAuthenticated() && (
+        // Inviter can manage/expire their invite
+        (resource.data.inviterUid == request.auth.uid && 
+         request.resource.data.inviterUid == resource.data.inviterUid) ||
+        // Friend claims a pending invite
+        (resource.data.status == 'PENDING' && 
+         request.resource.data.status == 'CLAIMED' && 
+         request.resource.data.claimedByUid == request.auth.uid && 
+         request.resource.data.inviterUid == resource.data.inviterUid) ||
+        // Inviter or friend activates a claimed invite
+        (resource.data.status == 'CLAIMED' && 
+         request.resource.data.status == 'ACTIVATED' && 
+         request.auth.uid in [resource.data.inviterUid, resource.data.claimedByUid] && 
+         request.resource.data.inviterUid == resource.data.inviterUid)
+      );
+      allow delete: if false;
+    }
+
+    // 4. Duo Requests
+    match /duo_requests/{duoRequestId} {
+      allow read: if isAuthenticated() && 
+        request.auth.uid in [resource.data.inviterUid, resource.data.friendUid];
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.friendUid && 
+        request.resource.data.status == 'WAITING_ACTIVATION';
+      allow update: if isAuthenticated() && 
+        request.auth.uid in [resource.data.inviterUid, resource.data.friendUid] && 
+        request.resource.data.inviterUid == resource.data.inviterUid && 
+        request.resource.data.friendUid == resource.data.friendUid;
+      allow delete: if false;
+    }
+
+    // 5. Campaigns - readable by authenticated users, server/admin managed
+    match /campaigns/{campaignId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // 6. Campaign Claims - user creates own claim, immutable once recorded
+    match /campaign_claims/{claimId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 7. UI Promotions - promotional banners managed server-side
+    match /ui_promotions/{promoId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // 8. Incident Reports (Enterprise Core / IR Repository) - reporter-scoped
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated() && resource.data.reportedBy == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.reportedBy == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.reportedBy == request.auth.uid && 
+        request.resource.data.reportedBy == resource.data.reportedBy;
+      allow delete: if isAuthenticated() && resource.data.reportedBy == request.auth.uid;
+    }
+
+    // 9. SOS Emergency Alerts - user created, confidential, immutable
+    match /sos_alerts/{alertId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 10. Contact Reports - user submitted safety reports
+    match /contact_reports/{reportId} {
+      allow read: if isAuthenticated() && resource.data.reportedBy == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.reportedBy == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 11. Blocked Contacts - user-owned privacy list
+    match /blocked_contacts/{blockId} {
+      allow read: if isAuthenticated() && resource.data.blockedBy == request.auth.uid;
+      allow create, update: if isAuthenticated() && request.resource.data.blockedBy == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.blockedBy == request.auth.uid;
+    }
+
+    // 12. Threat Intelligence Items - Read-only for authenticated users
+    match /threat_intel/{intelId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // 13. Default deny for any unspecified path
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -135,30 +135,8 @@ fun DidAgentDialog(
 
     fun processCommand(spokenText: String) {
         agentStatus = "Command: \"$spokenText\""
-        isProcessing = true
-        
-        // Let the Dashboard handle navigation if it matches a keyword
+        isProcessing = false
         onVoiceCommand(spokenText)
-        
-        // Also get an AI response
-        scope.launch {
-            agentStatus = "Thinking..."
-            aiManager.analyzeThreat("Voice Command: $spokenText") { response ->
-                isProcessing = false
-                val safeResponse = response ?: "I couldn't process that command."
-                agentStatus = safeResponse
-                tts?.speak(safeResponse, TextToSpeech.QUEUE_FLUSH, null, null)
-                
-                // Try to generate video in background
-                scope.launch {
-                    val agentId = PreferencesManager.getDidAgentId() ?: "v2_agt_6s8X40sT"
-                    val talkId = DidManager.createAgentTalk(agentId, safeResponse)
-                    if (talkId != null) {
-                        pollForVideo(talkId)
-                    }
-                }
-            }
-        }
     }
 
     fun startListening() {
@@ -218,36 +196,15 @@ fun DidAgentDialog(
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.9f))
         ) {
-            if (videoUrl != null) {
-                AndroidView(
-                    factory = { ctx ->
-                        VideoView(ctx).apply {
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            setOnCompletionListener { 
-                                videoUrl = null 
-                                agentStatus = "Tap mic to speak"
-                            }
-                            setOnPreparedListener { mp ->
-                                mp.start()
-                            }
-                        }
-                    },
-                    update = { view ->
-                        view.setVideoURI(Uri.parse(videoUrl))
-                        view.start()
-                    },
-                    modifier = Modifier.fillMaxSize()
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                RoyalSecurityOrb(
+                    state = if (isListening) RoyalSecurityOrbState.LISTENING else RoyalSecurityOrbState.ACTIVE,
+                    modifier = Modifier.size(260.dp),
+                    onClick = { if (!isProcessing) startListening() },
                 )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                   AnimatedWaveformRing(isActive = isListening || isProcessing)
-                }
             }
 
             Column(

@@ -11,14 +11,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -62,18 +64,28 @@ class PrivacyAdvisorActivity : ComponentActivity() {
     }
 }
 
+enum class PrivacyFilter(val label: String) {
+    ALL("All"),
+    HIGH_RISK("High Risk"),
+    CAMERA_MIC("Camera/Mic"),
+    LOCATION("Location"),
+    SMS_CONTACTS("SMS/Contacts")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrivacyAdvisorScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    var scanTrigger by remember { mutableIntStateOf(0) }
     var apps by remember { mutableStateOf<List<PrivacyApp>>(emptyList()) }
     var hasStartedScan by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var scanProgress by remember { mutableFloatStateOf(0f) }
     var currentAppName by remember { mutableStateOf("Ready to start privacy scan...") }
+    var selectedFilter by remember { mutableStateOf(PrivacyFilter.ALL) }
 
-    LaunchedEffect(hasStartedScan) {
-        if (!hasStartedScan) return@LaunchedEffect
+    LaunchedEffect(scanTrigger) {
+        if (scanTrigger == 0) return@LaunchedEffect
         isLoading = true
         scanProgress = 0f
         currentAppName = "Initializing privacy scan..."
@@ -85,6 +97,28 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                 }
             }
             isLoading = false
+        }
+    }
+
+    val filteredApps = remember(apps, selectedFilter) {
+        when (selectedFilter) {
+            PrivacyFilter.ALL -> apps
+            PrivacyFilter.HIGH_RISK -> apps.filter { it.riskLevel == RiskLevel.HIGH }
+            PrivacyFilter.CAMERA_MIC -> apps.filter { app ->
+                app.permissions.any { perm ->
+                    perm.contains("CAMERA", ignoreCase = true) || perm.contains("AUDIO", ignoreCase = true)
+                }
+            }
+            PrivacyFilter.LOCATION -> apps.filter { app ->
+                app.permissions.any { perm ->
+                    perm.contains("LOCATION", ignoreCase = true)
+                }
+            }
+            PrivacyFilter.SMS_CONTACTS -> apps.filter { app ->
+                app.permissions.any { perm ->
+                    perm.contains("SMS", ignoreCase = true) || perm.contains("CONTACTS", ignoreCase = true) || perm.contains("CALL_LOG", ignoreCase = true)
+                }
+            }
         }
     }
 
@@ -104,7 +138,14 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        }
+                    },
+                    actions = {
+                        if (!isLoading && hasStartedScan) {
+                            IconButton(onClick = { scanTrigger++ }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Rescan", tint = RoyalGold)
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -139,7 +180,10 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Button(
-                            onClick = { hasStartedScan = true },
+                            onClick = {
+                                hasStartedScan = true
+                                scanTrigger++
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(54.dp),
@@ -219,6 +263,24 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                                             fontWeight = FontWeight.Black
                                         )
                                     }
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    OutlinedButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(Intent(Settings.ACTION_PRIVACY_SETTINGS))
+                                            } catch (e: Exception) {
+                                                try {
+                                                    context.startActivity(Intent(Settings.ACTION_SETTINGS))
+                                                } catch (ignored: Exception) {}
+                                            }
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RoyalGold),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, RoyalGold.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("PRIVACY SETTINGS", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                             Spacer(modifier = Modifier.height(16.dp))
@@ -230,11 +292,80 @@ fun PrivacyAdvisorScreen(onBack: () -> Unit) {
                                 letterSpacing = 1.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Filter Chips Row
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(PrivacyFilter.values()) { filter ->
+                                    val isSelected = filter == selectedFilter
+                                    val count = when (filter) {
+                                        PrivacyFilter.ALL -> apps.size
+                                        PrivacyFilter.HIGH_RISK -> apps.count { it.riskLevel == RiskLevel.HIGH }
+                                        PrivacyFilter.CAMERA_MIC -> apps.count { app ->
+                                            app.permissions.any { it.contains("CAMERA", ignoreCase = true) || it.contains("AUDIO", ignoreCase = true) }
+                                        }
+                                        PrivacyFilter.LOCATION -> apps.count { app ->
+                                            app.permissions.any { it.contains("LOCATION", ignoreCase = true) }
+                                        }
+                                        PrivacyFilter.SMS_CONTACTS -> apps.count { app ->
+                                            app.permissions.any { it.contains("SMS", ignoreCase = true) || it.contains("CONTACTS", ignoreCase = true) || it.contains("CALL_LOG", ignoreCase = true) }
+                                        }
+                                    }
+                                    Surface(
+                                        modifier = Modifier.clickable { selectedFilter = filter },
+                                        color = if (isSelected) RoyalGold else Color.Black.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(20.dp),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isSelected) RoyalGold else RoyalGold.copy(alpha = 0.35f)
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "${filter.label} ($count)",
+                                            color = if (isSelected) Color.Black else Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        items(apps) { app ->
-                            PrivacyAppCard(app)
+                        if (filteredApps.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, RoyalGold.copy(alpha = 0.2f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No apps found under the \"${selectedFilter.label}\" category.",
+                                            color = Color.LightGray,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(filteredApps, key = { it.packageName }) { app ->
+                                PrivacyAppCard(
+                                    app = app,
+                                    onUninstallRequested = { uninstalledApp ->
+                                        apps = apps.filter { it.packageName != uninstalledApp.packageName }
+                                    }
+                                )
+                            }
                         }
                         
                         item { Spacer(modifier = Modifier.height(100.dp)) }
@@ -444,7 +575,10 @@ private fun PrivacyAdvisorScanVisual(
 }
 
 @Composable
-fun PrivacyAppCard(app: PrivacyApp) {
+fun PrivacyAppCard(
+    app: PrivacyApp,
+    onUninstallRequested: ((PrivacyApp) -> Unit)? = null
+) {
     val context = LocalContext.current
     
     Card(
@@ -505,7 +639,44 @@ fun PrivacyAppCard(app: PrivacyApp) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // Action Buttons
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            val uninstallIntent = Intent(Intent.ACTION_DELETE).apply {
+                                data = Uri.parse("package:${app.packageName}")
+                            }
+                            context.startActivity(uninstallIntent)
+                            onUninstallRequested?.invoke(app)
+                        } catch (e: Exception) {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", app.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonRed),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonRed.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(34.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Uninstall",
+                        tint = NeonRed,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("UNINSTALL", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonRed)
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
                 OutlinedButton(
                     onClick = {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -514,9 +685,12 @@ fun PrivacyAppCard(app: PrivacyApp) {
                         context.startActivity(intent)
                     },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = RoyalGold),
-                    modifier = Modifier.height(36.dp)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, RoyalGold.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(34.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    Text("MANAGE", fontSize = 12.sp)
+                    Text("MANAGE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = RoyalGold)
                 }
             }
         }

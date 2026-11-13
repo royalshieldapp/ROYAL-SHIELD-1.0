@@ -3,6 +3,7 @@ package com.royalshield.app.ui.screens
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.*
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -41,13 +43,81 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.royalshield.app.R
 import com.royalshield.app.ui.components.RoyalGradientBackground
 import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.ui.theme.RoyalGold
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
+
+internal fun solutionEngineUnavailablePresentation() =
+    "UNAVAILABLE: verified Solution Engine telemetry is not configured."
+
+internal fun solutionEngineNodeStatusPresentation(status: NodeStatus) = status.name
+
+fun getDrawableForName(name: String): Int? {
+    return when (name.lowercase().trim()) {
+        // Main nodes
+        "device core" -> R.drawable.ic_solution_device_core
+        "files scanner" -> R.drawable.ic_solution_files_scanner
+        "permission monitor" -> R.drawable.ic_solution_permission_monitor
+        "vpn shield" -> R.drawable.ic_solution_vpn_shield
+        "app lock" -> R.drawable.ic_solution_app_lock
+        "data vault" -> R.drawable.ic_solution_data_vault
+        "threat engine" -> R.drawable.ic_solution_threat_engine
+        "fix center" -> R.drawable.ic_solution_patch_fix
+
+        // Sub-nodes of Device Core
+        "cpu temp guard" -> R.drawable.ic_solution_telemetry_pulse
+        "syslog sentinel" -> R.drawable.ic_solution_workflow_engine
+        "integrity auditor" -> R.drawable.ic_solution_integrity_auditor
+        "kernel shield" -> R.drawable.ic_solution_firewall
+
+        // Sub-nodes of Files Scanner
+        "signatures db" -> R.drawable.ic_solution_data_vault
+        "realtime watcher" -> R.drawable.ic_solution_telemetry_pulse
+        "quarantine zone" -> R.drawable.ic_solution_threat_engine
+        "hash calculator" -> R.drawable.ic_solution_ai_heuristics
+
+        // Sub-nodes of Permission Monitor
+        "cam guard" -> R.drawable.ic_solution_permission_monitor
+        "mic sentinel" -> R.drawable.ic_solution_permission_monitor
+        "gps tracker" -> R.drawable.ic_solution_vpn_shield
+        "overlay blocker" -> R.drawable.ic_solution_app_lock
+
+        // Sub-nodes of VPN Shield
+        "tunnel encryptor" -> R.drawable.ic_solution_app_lock
+        "dns leak guard" -> R.drawable.ic_solution_vpn_shield
+        "kill switch" -> R.drawable.ic_solution_firewall
+        "port scanner" -> R.drawable.ic_solution_quick_scan
+
+        // Sub-nodes of App Lock
+        "biometric gate" -> R.drawable.ic_solution_app_lock
+        "pin auth portal" -> R.drawable.ic_solution_app_lock
+        "task monitor" -> R.drawable.ic_solution_workflow_engine
+        "process sandbox" -> R.drawable.ic_solution_workflow_engine
+
+        // Sub-nodes of Data Vault
+        "sql cipher" -> R.drawable.ic_solution_data_vault
+        "keyring manager" -> R.drawable.ic_solution_app_lock
+        "backup guard" -> R.drawable.ic_solution_integrity_auditor
+        "read auditor" -> R.drawable.ic_solution_files_scanner
+
+        // Sub-nodes of Threat Engine
+        "heuristics ai" -> R.drawable.ic_solution_ai_heuristics
+        "network analyzer" -> R.drawable.ic_solution_vpn_shield
+        "process watcher" -> R.drawable.ic_solution_telemetry_pulse
+        "risk classifier" -> R.drawable.ic_solution_threat_engine
+
+        // Sub-nodes of Fix Center
+        "patch coordinator" -> R.drawable.ic_solution_patch_fix
+        "perm revoker" -> R.drawable.ic_solution_repair_tool
+        "vpn reconnector" -> R.drawable.ic_solution_optimizer
+        "cache optimizer" -> R.drawable.ic_solution_optimizer
+
+        else -> null
+    }
+}
 
 fun getIconForName(name: String): ImageVector? {
     return when (name.lowercase().trim()) {
@@ -125,8 +195,7 @@ private fun SubNodeIconGrid(node: EngineNode) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 rowItems.forEach { subNode ->
-                    val isWarning = subNode.status.equals("WARNING", ignoreCase = true)
-                    val accent = if (isWarning) Color(0xFFFF5252) else CyberCyan
+                    val accent = RoyalGold
                     Row(
                         modifier = Modifier
                             .weight(1f)
@@ -144,8 +213,15 @@ private fun SubNodeIconGrid(node: EngineNode) {
                                 .border(1.dp, accent.copy(alpha = 0.45f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
+                            val drawableRes = getDrawableForName(subNode.name)
                             val icon = getIconForName(subNode.name)
-                            if (icon != null) {
+                            if (drawableRes != null) {
+                                Image(
+                                    painter = painterResource(id = drawableRes),
+                                    contentDescription = subNode.name,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else if (icon != null) {
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = subNode.name,
@@ -197,7 +273,7 @@ private fun SubNodeIconGrid(node: EngineNode) {
 data class SubNode(
     val name: String,
     val description: String,
-    var status: String = "NOMINAL"
+    var status: String = "UNAVAILABLE"
 )
 
 data class EngineNode(
@@ -206,21 +282,17 @@ data class EngineNode(
     val angle: Double, // Position on circle
     val description: String,
     val subNodes: List<SubNode>,
-    var status: NodeStatus = NodeStatus.NOMINAL
+    var status: NodeStatus = NodeStatus.UNAVAILABLE
 )
 
-enum class NodeStatus { NOMINAL, WARNING, ACTIVE_SCAN }
+enum class NodeStatus { UNAVAILABLE }
 
 @Composable
 fun SolutionEngineScreen(
     onBack: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var isScanning by remember { mutableStateOf(false) }
-    var showFlowAnimation by remember { mutableStateOf(false) }
-    var activeNodeIndex by remember { mutableIntStateOf(-1) }
     var selectedNodeIndex by remember { mutableIntStateOf(0) }
-    var currentLog by remember { mutableStateOf("Ready for telemetry scanning...") }
+    val currentLog = solutionEngineUnavailablePresentation()
     var showLegendDialog by remember { mutableStateOf(false) }
     var showSubFlowDialog by remember { mutableStateOf(false) }
     var is3DMode by remember { mutableStateOf(true) }
@@ -236,7 +308,7 @@ fun SolutionEngineScreen(
                     SubNode("Integrity Auditor", "Verifies OS partition hash check"),
                     SubNode("Kernel Shield", "Protects core memory registers")
                 ),
-                NodeStatus.NOMINAL
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "Files Scanner", "FS", 45.0, "Scans internal storage for malicious APKs & files",
@@ -246,27 +318,27 @@ fun SolutionEngineScreen(
                     SubNode("Quarantine Zone", "Isolates infected directories"),
                     SubNode("Hash Calculator", "Computes file SHA-256 signatures")
                 ),
-                NodeStatus.NOMINAL
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "Permission Monitor", "PM", 90.0, "Audits background camera, mic & location permissions",
                 listOf(
-                    SubNode("Cam Guard", "Detects unauthorized background camera access", "WARNING"),
-                    SubNode("Mic Sentinel", "Detects background microphone recording", "WARNING"),
+                    SubNode("Cam Guard", "Detects unauthorized background camera access"),
+                    SubNode("Mic Sentinel", "Detects background microphone recording"),
                     SubNode("GPS Tracker", "Audits location leakage in background"),
                     SubNode("Overlay Blocker", "Detects display overlap hijacking attempts")
                 ),
-                NodeStatus.WARNING
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "VPN Shield", "VP", 135.0, "Analyzes active VPN tunnel state & DNS leakage",
                 listOf(
                     SubNode("Tunnel Encryptor", "AES-256 data packet encryption"),
-                    SubNode("DNS Leak Guard", "Verifies secure resolver routing", "WARNING"),
+                    SubNode("DNS Leak Guard", "Verifies secure resolver routing"),
                     SubNode("Kill Switch", "Blocks internet if VPN connection drops"),
                     SubNode("Port Scanner", "Blocks suspicious incoming connections")
                 ),
-                NodeStatus.WARNING
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "App Lock", "AL", 180.0, "Ensures sensitive apps remain encrypted & locked",
@@ -276,7 +348,7 @@ fun SolutionEngineScreen(
                     SubNode("Task Monitor", "Blocks app switcher exposure"),
                     SubNode("Process Sandbox", "Restricts cross-app memory reading")
                 ),
-                NodeStatus.NOMINAL
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "Data Vault", "DV", 225.0, "Monitors encrypted database integrity",
@@ -286,7 +358,7 @@ fun SolutionEngineScreen(
                     SubNode("Backup Guard", "Validates external storage backups"),
                     SubNode("Read Auditor", "Logs read/write access logs")
                 ),
-                NodeStatus.NOMINAL
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "Threat Engine", "TE", 270.0, "Real-time AI behavioral heuristic processor",
@@ -296,7 +368,7 @@ fun SolutionEngineScreen(
                     SubNode("Process Watcher", "Monitors active CPU tasks for anomalies"),
                     SubNode("Risk Classifier", "Assigns danger score based on metrics")
                 ),
-                NodeStatus.NOMINAL
+                NodeStatus.UNAVAILABLE
             ),
             EngineNode(
                 "Fix Center", "FC", 315.0, "Central coordination module for security updates",
@@ -306,7 +378,7 @@ fun SolutionEngineScreen(
                     SubNode("VPN Reconnector", "Restores active VPN tunnel"),
                     SubNode("Cache Optimizer", "Deletes temporary threat definitions")
                 ),
-                NodeStatus.NOMINAL
+                NodeStatus.UNAVAILABLE
             )
         )
     }
@@ -320,63 +392,6 @@ fun SolutionEngineScreen(
             repeatMode = RepeatMode.Reverse
         ), label = "gridPulse"
     )
-    val flowPhase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ), label = "flowPhase"
-    )
-
-    fun runSequentialScan() {
-        if (isScanning) return
-        isScanning = true
-        showFlowAnimation = true
-        scope.launch {
-            for (i in nodes.indices) {
-                activeNodeIndex = i
-                selectedNodeIndex = i
-                nodes[i].status = NodeStatus.ACTIVE_SCAN
-                currentLog = "Scanning node [${nodes[i].name}] - Running neural heuristics..."
-                delay(800)
-                
-                // Keep Warning status for Permission Monitor and VPN Shield to show Fix Center capability
-                if (nodes[i].name == "Permission Monitor") {
-                    nodes[i].status = NodeStatus.WARNING
-                    nodes[i].subNodes[0].status = "WARNING"
-                    nodes[i].subNodes[1].status = "WARNING"
-                    currentLog = "Node [${nodes[i].name}] scan completed: WARNING detected (Action Required)."
-                } else if (nodes[i].name == "VPN Shield") {
-                    nodes[i].status = NodeStatus.WARNING
-                    nodes[i].subNodes[1].status = "WARNING"
-                    currentLog = "Node [${nodes[i].name}] scan completed: WARNING detected (Action Required)."
-                } else {
-                    nodes[i].status = NodeStatus.NOMINAL
-                    nodes[i].subNodes.forEach { it.status = "NOMINAL" }
-                    currentLog = "Node [${nodes[i].name}] scan completed: NOMINAL. Secure."
-                }
-                delay(200)
-            }
-            activeNodeIndex = -1
-            isScanning = false
-            currentLog = "System scan finished. Review flagged nodes in Fix Center."
-        }
-    }
-
-    fun applyFixes() {
-        scope.launch {
-            currentLog = "Fix Center resolving risks... Reconfiguring sandbox policies..."
-            delay(1000)
-            for (i in nodes.indices) {
-                if (nodes[i].status == NodeStatus.WARNING) {
-                    nodes[i].status = NodeStatus.NOMINAL
-                    nodes[i].subNodes.forEach { it.status = "NOMINAL" }
-                }
-            }
-            currentLog = "All flagged issues resolved. Solution Engine confirms 100% nominal state."
-        }
-    }
-
     RoyalGradientBackground(containerColor = Color(0xFF030610)) {
         Column(
             modifier = Modifier
@@ -443,43 +458,53 @@ fun SolutionEngineScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
-                    onClick = { runSequentialScan() },
-                    enabled = !isScanning,
+                    onClick = {},
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.PlayArrow, null, tint = Color.Black)
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_solution_quick_scan),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Run Scan", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Scan Unavailable", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
-                    onClick = { showFlowAnimation = !showFlowAnimation },
+                    onClick = {},
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (showFlowAnimation) RoyalGold else Color.White.copy(alpha = 0.1f)
+                        containerColor = Color.White.copy(alpha = 0.1f)
                     ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1.2f)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_solution_optimizer),
                         contentDescription = null,
-                        tint = if (showFlowAnimation) Color.Black else Color.White
+                        modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Protection Flow", color = if (showFlowAnimation) Color.Black else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Live Flow Unavailable", color = Color.White.copy(alpha = 0.65f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
-                    onClick = { applyFixes() },
+                    onClick = {},
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.BugReport, null, tint = Color.White)
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_solution_patch_fix),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Fix Issues", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Fix Unavailable", color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -534,31 +559,6 @@ fun SolutionEngineScreen(
                                 )
                             }
 
-                            // Protection Flow connection paths
-                            if (showFlowAnimation) {
-                                val nodesCount = nodes.size
-                                for (i in 0 until nodesCount) {
-                                    val currentAngleRad = Math.toRadians(nodes[i].angle)
-                                    val nextAngleRad = Math.toRadians(nodes[(i + 1) % nodesCount].angle)
-                                    
-                                    val startX = center.x + 100.dp.toPx() * cos(currentAngleRad).toFloat()
-                                    val startY = center.y + 100.dp.toPx() * sin(currentAngleRad).toFloat()
-                                    val endX = center.x + 100.dp.toPx() * cos(nextAngleRad).toFloat()
-                                    val endY = center.y + 100.dp.toPx() * sin(nextAngleRad).toFloat()
-                                    
-                                    // Animated dashed connection lines
-                                    drawLine(
-                                        color = if (nodes[i].status == NodeStatus.WARNING) Color(0xFFFF5252).copy(alpha = 0.7f) else CyberCyan.copy(alpha = 0.7f),
-                                        start = Offset(startX, startY),
-                                        end = Offset(endX, endY),
-                                        strokeWidth = 2.dp.toPx(),
-                                        pathEffect = PathEffect.dashPathEffect(
-                                            intervals = floatArrayOf(20f, 10f),
-                                            phase = -flowPhase * 2f
-                                        )
-                                    )
-                                }
-                            }
                         }
 
                         // Render central shield anchor node
@@ -579,11 +579,10 @@ fun SolutionEngineScreen(
                                 .border(1.dp, RoyalGold.copy(alpha = 0.6f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Grid4x4,
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_solution_workflow_engine),
                                 contentDescription = "Shield Matrix Core",
-                                tint = RoyalGold,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(34.dp)
                             )
                         }
 
@@ -595,17 +594,8 @@ fun SolutionEngineScreen(
                             val xOffset = radiusPx * cos(angleRad).toFloat()
                             val yOffset = radiusPx * sin(angleRad).toFloat()
 
-                            val borderTint = when (node.status) {
-                                NodeStatus.NOMINAL -> CyberCyan.copy(alpha = 0.5f)
-                                NodeStatus.WARNING -> Color(0xFFFF5252).copy(alpha = 0.8f)
-                                NodeStatus.ACTIVE_SCAN -> RoyalGold
-                            }
-
-                            val glowBg = when (node.status) {
-                                NodeStatus.NOMINAL -> CyberCyan.copy(alpha = 0.1f)
-                                NodeStatus.WARNING -> Color(0xFFFF5252).copy(alpha = 0.15f)
-                                NodeStatus.ACTIVE_SCAN -> RoyalGold.copy(alpha = 0.25f)
-                            }
+                            val borderTint = RoyalGold.copy(alpha = 0.75f)
+                            val glowBg = RoyalGold.copy(alpha = 0.08f)
 
                             val nodeSize = if (is3DMode) 64.dp else 48.dp
                             val shape = if (is3DMode) RoundedCornerShape(12.dp) else CircleShape
@@ -614,7 +604,7 @@ fun SolutionEngineScreen(
                                 modifier = Modifier
                                     .offset(x = xOffset, y = yOffset)
                                     .size(nodeSize)
-                                    .scale(if (index == activeNodeIndex) 1.2f else 1.0f)
+                                    .scale(if (index == selectedNodeIndex) 1.2f else 1.0f)
                                     .background(glowBg, shape)
                                     .border(1.5.dp, borderTint, shape)
                                     .clip(shape)
@@ -627,7 +617,8 @@ fun SolutionEngineScreen(
                                     .clickable { selectedNodeIndex = index },
                                 contentAlignment = Alignment.Center
                             ) {
-                                val iconTint = if (node.status == NodeStatus.WARNING) Color(0xFFFF5252) else Color.White
+                                val iconTint = Color.White
+                                val drawableRes = getDrawableForName(node.name)
                                 val icon = getIconForName(node.name)
                                 
                                 if (is3DMode) {
@@ -636,7 +627,13 @@ fun SolutionEngineScreen(
                                         verticalArrangement = Arrangement.Center,
                                         modifier = Modifier.padding(4.dp)
                                     ) {
-                                        if (icon != null) {
+                                        if (drawableRes != null) {
+                                            Image(
+                                                painter = painterResource(id = drawableRes),
+                                                contentDescription = node.name,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        } else if (icon != null) {
                                             Icon(
                                                 imageVector = icon,
                                                 contentDescription = node.name,
@@ -657,21 +654,22 @@ fun SolutionEngineScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             node.subNodes.forEach { sub ->
-                                                val dotColor = if (sub.status == "WARNING") {
-                                                    Color(0xFFFF5252)
-                                                } else {
-                                                    CyberCyan
-                                                }
                                                 Box(
                                                     modifier = Modifier
                                                         .size(4.dp)
-                                                        .background(dotColor, CircleShape)
+                                                        .background(RoyalGold, CircleShape)
                                                 )
                                             }
                                         }
                                     }
                                 } else {
-                                    if (icon != null) {
+                                    if (drawableRes != null) {
+                                        Image(
+                                            painter = painterResource(id = drawableRes),
+                                            contentDescription = node.name,
+                                            modifier = Modifier.size(30.dp)
+                                        )
+                                    } else if (icon != null) {
                                         Icon(
                                             imageVector = icon,
                                             contentDescription = node.name,
@@ -775,16 +773,8 @@ fun SolutionEngineScreen(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.8.sp
                             )
-                            val statusText = when (selectedNode.status) {
-                                NodeStatus.NOMINAL -> "SECURE / NOMINAL"
-                                NodeStatus.WARNING -> "ATTENTION REQUIRED"
-                                NodeStatus.ACTIVE_SCAN -> "SCANNING..."
-                            }
-                            val statusColor = when (selectedNode.status) {
-                                NodeStatus.NOMINAL -> CyberCyan
-                                NodeStatus.WARNING -> Color(0xFFFF5252)
-                                NodeStatus.ACTIVE_SCAN -> RoyalGold
-                            }
+                            val statusText = solutionEngineNodeStatusPresentation(selectedNode.status)
+                            val statusColor = RoyalGold
                             Text(
                                 text = statusText,
                                 color = statusColor,
@@ -805,60 +795,28 @@ fun SolutionEngineScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Recommend Action Block (Fix Center details)
-                        if (selectedNode.status == NodeStatus.WARNING) {
-                            Surface(
-                                color = Color(0xFFFF5252).copy(alpha = 0.08f),
-                                border = BorderStroke(1.dp, Color(0xFFFF5252).copy(alpha = 0.25f)),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+                        Surface(
+                            color = RoyalGold.copy(alpha = 0.05f),
+                            border = BorderStroke(1.dp, RoyalGold.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFF5252),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (selectedNode.name == "VPN Shield") {
-                                            "Active VPN connection recommended to prevent data interception."
-                                        } else {
-                                            "Grant missing permissions to allow continuous background telemetry."
-                                        },
-                                        color = Color.White.copy(alpha = 0.85f),
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-                        } else {
-                            Surface(
-                                color = CyberCyan.copy(alpha = 0.05f),
-                                border = BorderStroke(1.dp, CyberCyan.copy(alpha = 0.15f)),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = CyberCyan,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Node is fully operational. Sandbox integrity and security scores are nominal.",
-                                        color = Color.White.copy(alpha = 0.85f),
-                                        fontSize = 11.sp
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = RoyalGold,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = solutionEngineUnavailablePresentation(),
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 11.sp
+                                )
                             }
                         }
 
@@ -876,7 +834,7 @@ fun SolutionEngineScreen(
                         ) {
                             Icon(Icons.Default.AutoAwesome, null, tint = Color.Black)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Dive into ${selectedNode.name} Flow", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("View ${selectedNode.name} Details", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -924,8 +882,15 @@ fun SolutionEngineScreen(
                                             .border(1.dp, CyberCyan, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
+                                        val drawableRes = getDrawableForName(node.name)
                                         val icon = getIconForName(node.name)
-                                        if (icon != null) {
+                                        if (drawableRes != null) {
+                                            Image(
+                                                painter = painterResource(id = drawableRes),
+                                                contentDescription = node.name,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        } else if (icon != null) {
                                             Icon(
                                                 imageVector = icon,
                                                 contentDescription = node.name,
@@ -1105,8 +1070,15 @@ fun SolutionEngineScreen(
                                             .border(1.5.dp, CyberCyan, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
+                                        val parentDrawable = getDrawableForName(selectedNode.name)
                                         val icon = getIconForName(selectedNode.name)
-                                        if (icon != null) {
+                                        if (parentDrawable != null) {
+                                            Image(
+                                                painter = painterResource(id = parentDrawable),
+                                                contentDescription = selectedNode.name,
+                                                modifier = Modifier.size(34.dp)
+                                            )
+                                        } else if (icon != null) {
                                             Icon(
                                                 imageVector = icon,
                                                 contentDescription = selectedNode.name,
@@ -1158,8 +1130,15 @@ fun SolutionEngineScreen(
                                                 .clickable { selectedSubNodeIndex = i },
                                             contentAlignment = Alignment.Center
                                         ) {
+                                            val subDrawable = getDrawableForName(subNode.name)
                                             val subIcon = getIconForName(subNode.name)
-                                            if (subIcon != null) {
+                                            if (subDrawable != null) {
+                                                Image(
+                                                    painter = painterResource(id = subDrawable),
+                                                    contentDescription = subNode.name,
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            } else if (subIcon != null) {
                                                 Icon(
                                                     imageVector = subIcon,
                                                     contentDescription = subNode.name,
@@ -1210,12 +1189,12 @@ fun SolutionEngineScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .size(6.dp)
-                                                    .background(Color.Green, CircleShape)
+                                                    .background(RoyalGold, CircleShape)
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = "STATUS: ${selectedSubNode.status}",
-                                                color = Color.Green,
+                                                color = RoyalGold,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -1234,8 +1213,8 @@ fun SolutionEngineScreen(
                                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
                             ) {
                                 Text(
-                                    text = "Sub-flow analyzer online. Direct tunnel connection nominal. Encrypting telemetry streams...",
-                                    color = Color.Green.copy(alpha = 0.8f),
+                                    text = solutionEngineUnavailablePresentation(),
+                                    color = RoyalGold.copy(alpha = 0.8f),
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
                                     modifier = Modifier.padding(12.dp)

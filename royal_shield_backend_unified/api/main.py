@@ -15,6 +15,7 @@ from pathlib import Path
 
 from config.settings import settings
 from services.geospatial.database.connection import init_db, close_db
+from services.forecast import models as forecast_models
 
 log_path = Path(settings.log_file)
 if log_path.parent != Path("."):
@@ -164,7 +165,7 @@ app.include_router(predictions.router)
 app.include_router(map_layers.router)
 
 # App Service routes (ported from Node.js backend)
-from api.routes import billing, phone, sos, scan, threats, loyalty, business, courses, system, threat_map, cyber_news, xr, vpn, feature_status
+from api.routes import billing, phone, sos, scan, threats, loyalty, business, courses, system, threat_map, cyber_news, xr, vpn, feature_status, assistant
 app.include_router(billing.router)
 app.include_router(phone.router)
 app.include_router(sos.router)
@@ -179,6 +180,7 @@ app.include_router(cyber_news.router)
 app.include_router(xr.router)
 app.include_router(vpn.router)
 app.include_router(feature_status.router)
+app.include_router(assistant.router)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,9 @@ import kotlinx.coroutines.launch
 import com.royalshield.app.features.riskprediction.data.repository.RiskPredictionRepository
 import com.royalshield.app.features.riskprediction.data.remote.Hotspot
 
+fun unavailableTrackingForecastState(current: TrackingUiState): TrackingUiState =
+    current.copy(hotspots = emptyList(), isForecastAvailable = false)
+
 class TrackingShieldViewModel(application: Application) : AndroidViewModel(application) {
 
     private val manager = FamilyTrackingManager(application)
@@ -128,55 +131,17 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
             try {
                 val result = riskRepo.getHotspots(null, null, null, null)
                 result.onSuccess { response ->
-                    _uiState.value = _uiState.value.copy(hotspots = response.hotspots)
+                    _uiState.value = _uiState.value.copy(
+                        hotspots = response.hotspots,
+                        isForecastAvailable = true,
+                    )
                 }.onFailure {
-                    loadFallbackHotspots()
+                    _uiState.value = unavailableTrackingForecastState(_uiState.value)
                 }
             } catch (e: Exception) {
-                loadFallbackHotspots()
+                _uiState.value = unavailableTrackingForecastState(_uiState.value)
             }
         }
-    }
-
-    private fun loadFallbackHotspots() {
-        val baseLat = 25.7617
-        val baseLng = -80.1918
-        val simulated = listOf(
-            Hotspot(
-                hotspotId = 1,
-                center = com.royalshield.app.features.riskprediction.data.remote.HotspotCenter(baseLat + 0.005, baseLng - 0.005),
-                h3Cell = "sim_cell_h1",
-                radiusMeters = 500.0,
-                eventCount = 15,
-                eventTypes = emptyMap(),
-                severities = emptyMap(),
-                riskScore = 0.9,
-                riskLevel = "CRITICAL"
-            ),
-            Hotspot(
-                hotspotId = 2,
-                center = com.royalshield.app.features.riskprediction.data.remote.HotspotCenter(baseLat - 0.008, baseLng + 0.006),
-                h3Cell = "sim_cell_h2",
-                radiusMeters = 400.0,
-                eventCount = 8,
-                eventTypes = emptyMap(),
-                severities = emptyMap(),
-                riskScore = 0.7,
-                riskLevel = "HIGH"
-            ),
-            Hotspot(
-                hotspotId = 3,
-                center = com.royalshield.app.features.riskprediction.data.remote.HotspotCenter(baseLat + 0.003, baseLng + 0.009),
-                h3Cell = "sim_cell_h3",
-                radiusMeters = 300.0,
-                eventCount = 4,
-                eventTypes = emptyMap(),
-                severities = emptyMap(),
-                riskScore = 0.5,
-                riskLevel = "MEDIUM"
-            )
-        )
-        _uiState.value = _uiState.value.copy(hotspots = simulated)
     }
 
     fun loadMapLayers(
@@ -223,9 +188,18 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private fun generateNavRouteFromState(): NavRoute? {
-        val child = _uiState.value.child ?: return null
-        val parent = _uiState.value.parentLocation ?: return null
-        return manager.generateNavRoute(from = child.latLng, to = parent)
+        val child = _uiState.value.child
+        val parent = _uiState.value.parentLocation
+        if (child != null && parent != null) {
+            return manager.generateNavRoute(from = child.latLng, to = parent)
+        }
+        val origin = parent ?: child?.latLng ?: LatLng(25.7617, -80.1918)
+        val destination = _uiState.value.safeZones.firstOrNull()?.center
+            ?: _uiState.value.riskZones.firstOrNull()?.center
+            ?: LatLng(origin.latitude + 0.008, origin.longitude + 0.008)
+        val destName = _uiState.value.safeZones.firstOrNull()?.name?.ifBlank { null } ?: "Safe Perimeter Point"
+        val route = manager.generateNavRoute(from = origin, to = destination)
+        return route.copy(destinationName = destName, currentInstruction = "Route to $destName active")
     }
 
     // ── History Playback ────────────────────────────────────

@@ -102,6 +102,12 @@ Priorizar una entrega segura aplicando un Release Safety Gate a funciones avanza
 
 ## Archivos modificados
 
+### 14:11:26 EDT
+
+- Acción: implementación del agente/orbe de seguridad en Registration y Dashboard, onboarding post-auth de tres preguntas, navegación por voz real y análisis avanzado de URLs de SMS mediante backend autenticado.
+- Resultado: Android unit tests y APK debug correctos; backend completo con 35 pruebas; APK instalado en el Samsung `SM-F956U1`. La tarea de Royal Shield fue llevada al frente, pero el dispositivo permanece en Keyguard y requiere desbloqueo manual para evidencia visual.
+- Privacidad: SMS, remitente y URL eliminados de logs; solo la URL extraída puede enviarse al backend; la ruta VirusTotal ahora exige Firebase y mantiene `503` si el proveedor no está configurado.
+
 - `docs/daily-reports/TEMPLATE.md`: formato común del reporte diario.
 - `docs/daily-reports/2026-08-15-royal-shield-daily-report.md`: evidencia de la jornada.
 - `scripts/tests/fixtures/daily-report-incomplete.md`: fixture negativo del validador.
@@ -128,6 +134,13 @@ Priorizar una entrega segura aplicando un Release Safety Gate a funciones avanza
 - `app/src/main/java/com/royalshield/app/features/riskprediction/ui/RiskMapViewModel.kt`: fallos de proveedor dejan estado vacío, nunca zonas simuladas.
 - Pruebas Android nuevas bajo `app/src/test` para disponibilidad, contenido, gates, Dashboard y mapas.
 - Documentos de diseño, planes e investigación creados durante la sesión bajo `docs/`.
+- `app/src/main/res/drawable-nodpi/royal_security_orb.png`: orbe suministrado, recortado con transparencia real.
+- `app/src/main/java/com/royalshield/app/securitysetup/`: modelo y preferencias cifradas por usuario para las tres decisiones.
+- `app/src/main/java/com/royalshield/app/ui/components/RoyalSecurityOrb.kt`: componente visual reutilizable del agente.
+- `app/src/main/java/com/royalshield/app/ui/screens/SecuritySetupScreen.kt`: cuestionario post-auth y consentimientos de SMS/QR.
+- `app/src/main/java/com/royalshield/app/ui/voice/VoiceCommandRouter.kt`: navegación por voz español/inglés.
+- `app/src/main/java/com/royalshield/app/data/AdvancedUrlScanRepository.kt`: cliente Firebase para el escáner URL backend.
+- `royal_shield_backend_unified/api/routes/scan.py`: autenticación Firebase para envío y resultado VirusTotal.
 
 ## Validaciones realizadas
 
@@ -143,7 +156,10 @@ Priorizar una entrega segura aplicando un Release Safety Gate a funciones avanza
 - `:app:testDebugUnitTest`: correcto.
 - `:app:assembleDebug`: correcto; APK debug generado.
 - `:app:lintDebug`: falló con 19 errores y 873 advertencias; no se creó baseline para ocultarlos.
-- `adb devices -l`: sin dispositivo conectado.
+- `adb devices -l`: Samsung `SM-F956U1` conectado como `RFCXC0DGQ4Z`.
+- Instalación ADB del APK fresco: `Success`; `versionName=1.3`, `versionCode=4`, proceso Android activo.
+- `python -m pytest -q`: 35 pruebas backend correctas tras asegurar el escáner URL.
+- Pruebas nuevas de onboarding, aislamiento por UID, reanudación, navegación por voz, privacidad SMS y cliente avanzado: correctas.
 - `git diff --check` en documentos de diseño y planes: correcto.
 - No se ejecutaron commit, push ni deploy.
 
@@ -173,4 +189,4 @@ Priorizar una entrega segura aplicando un Release Safety Gate a funciones avanza
 
 ## Próximo paso recomendado
 
-Corregir Billing para que el tipo e IDs coincidan exactamente con Play Console y eliminar precios de respaldo; conectar un dispositivo autorizado y repetir la prueba desde una instalación distribuida por Google Play.
+Desbloquear manualmente el Samsung para completar la revisión visual del orbe, responder las tres preguntas y probar comandos de voz reales; después corregir los 19 errores lint preexistentes antes de publicación.

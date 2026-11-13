@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,12 +29,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,7 +49,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.GoogleAuthProvider
+import com.royalshield.app.auth.googleAuthErrorMessage
 import com.royalshield.app.ui.theme.*
 import com.royalshield.app.R
 import com.royalshield.app.ui.components.RoyalGoldButton
@@ -182,12 +189,18 @@ fun RegistrationScreen(
     onNavigateToPhoneAuth: () -> Unit
 ) {
     val context = LocalContext.current
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var showEmailForm by remember { mutableStateOf(false) }
+    var showLockedOrbDialog by rememberSaveable { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val (backgroundTiltX, backgroundTiltY) = rememberRegistrationTilt()
+    val parallax = registrationParallax(backgroundTiltX, backgroundTiltY)
+    val reducedMotion = remember(context) {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) <= 0f
+    }
 
     // Firebase Auth instance
     val auth = remember {
@@ -227,7 +240,21 @@ fun RegistrationScreen(
                         onRegistrationSuccess()
                     } catch (e: Exception) {
                         isLoading = false
-                        Toast.makeText(context, "Auth error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        val errorCode = (e as? FirebaseAuthException)?.errorCode
+                        val configurationMissing = e.message?.contains(
+                            "CONFIGURATION_NOT_FOUND",
+                            ignoreCase = true,
+                        ) == true
+                        android.util.Log.e(
+                            "RegistrationScreen",
+                            "Firebase Google auth failed: code=${errorCode ?: "UNKNOWN"}, " +
+                                "configurationMissing=$configurationMissing, type=${e.javaClass.simpleName}",
+                        )
+                        Toast.makeText(
+                            context,
+                            googleAuthErrorMessage(errorCode, e.message),
+                            Toast.LENGTH_LONG,
+                        ).show()
                     }
                 }
             } else {
@@ -252,10 +279,10 @@ fun RegistrationScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    scaleX = 1.08f
-                    scaleY = 1.08f
-                    translationX = backgroundTiltX * 28.dp.toPx()
-                    translationY = backgroundTiltY * 22.dp.toPx()
+                    scaleX = 1.12f
+                    scaleY = 1.12f
+                    translationX = parallax.backgroundXdp.dp.toPx()
+                    translationY = parallax.backgroundYdp.dp.toPx()
                 }
         )
 
@@ -285,81 +312,43 @@ fun RegistrationScreen(
                 .fillMaxSize()
                 .padding(24.dp)
                 .graphicsLayer {
-                    translationX = backgroundTiltX * 12.dp.toPx()
-                    translationY = backgroundTiltY * 9.dp.toPx()
-                    rotationY = backgroundTiltX * 1.8f
-                    rotationX = -backgroundTiltY * 1.4f
-                    cameraDistance = 18f * density
+                    translationX = parallax.controlsXdp.dp.toPx()
+                    translationY = parallax.controlsYdp.dp.toPx()
                 }
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Skip for Testing
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = { 
-                    Toast.makeText(context, "Skipping registration (Testing Mode)", Toast.LENGTH_SHORT).show()
-                    onRegistrationSuccess() 
-                }) {
-                    Text("SKIP >>", color = RoyalGold, fontWeight = FontWeight.Bold)
-                }
-            }
-            
             Spacer(modifier = Modifier.height(24.dp))
             
-            LuxuryRegistrationPanel(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.royal_shield_logo),
-                        contentDescription = "Royal Shield Logo",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                    )
-                }
+            RegistrationOrbHero(
+                reducedMotion = reducedMotion,
+                onLockedInfo = { showLockedOrbDialog = true },
+            )
 
-                Text(
-                    text = "Powered by AI. Built for your safety.",
-                    color = Color(0xFFFFD66B),
-                    fontSize = 24.sp,
-                    lineHeight = 31.sp,
-                    fontFamily = Orbitron,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "Sign up to activate advanced cybersecurity features and personalized protection",
-                    color = Color.White.copy(alpha = 0.82f),
-                    fontSize = 14.sp,
-                    lineHeight = 21.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // --- Social Login Buttons ---
 
             LuxuryRegistrationPanel(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Choose how to continue",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             SocialLoginButton(
                 text = "Continue with Phone",
-                iconRes = R.drawable.ic_registration_phone,
+                iconRes = R.drawable.ic_registration_phone_gold,
                 color = RoyalGold,
-                textColor = Color.Black
+                textColor = Color.Black,
+                enabled = RegistrationProvider.PHONE.isAvailable,
             ) {
                 onNavigateToPhoneAuth()
             }
@@ -371,7 +360,8 @@ fun RegistrationScreen(
                 text = "Continue with Google",
                 iconRes = R.drawable.ic_registration_google_play,
                 color = Color.White,
-                textColor = Color.Black
+                textColor = Color.Black,
+                enabled = RegistrationProvider.GOOGLE.isAvailable,
             ) {
                 isLoading = true
                 // Sign out first to always show the account picker
@@ -381,102 +371,57 @@ fun RegistrationScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            SocialLoginButton(
-                text = "Continue with Apple",
-                iconRes = R.drawable.ic_registration_apple,
-                color = Color.Black,
-                textColor = Color.White
-            ) {
-                isLoading = true
-                Toast.makeText(context, "Redirecting to Apple ID...", Toast.LENGTH_SHORT).show()
-                onRegistrationSuccess()
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "COMING SOON",
+                color = RoyalGold.copy(alpha = 0.80f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+            )
 
-            SocialLoginButton(
-                text = "Continue with GitHub",
-                iconRes = R.drawable.ic_registration_git,
-                color = Color(0xFF24292E),
-                textColor = Color.White
-            ) {
-                isLoading = true
-                Toast.makeText(context, "Redirecting to GitHub...", Toast.LENGTH_SHORT).show()
-                onRegistrationSuccess()
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            SocialLoginButton(
-                text = "Continue with Facebook",
-                iconRes = R.drawable.ic_registration_facebook,
-                color = Color(0xFF1877F2),
-                textColor = Color.White
-            ) {
-                isLoading = true
-                Toast.makeText(context, "Redirecting to Facebook...", Toast.LENGTH_SHORT).show()
-                onRegistrationSuccess()
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.1f))
-                Text(" OR ", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp))
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.1f))
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            if (!showEmailForm) {
-                OutlinedButton(
-                    onClick = { showEmailForm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .graphicsLayer {
-                            shadowElevation = 12.dp.toPx()
-                            shape = RoundedCornerShape(16.dp)
-                        },
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD86A))
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_registration_email),
-                        contentDescription = "Email",
-                        tint = Color.Unspecified,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Continue with Email", color = Color.White)
-                }
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-            
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "Already have an account? ",
-                    color = Color.Gray,
-                    fontSize = 14.sp
+                ComingSoonProviderChip(
+                    text = "Apple — COMING SOON",
+                    iconRes = R.drawable.ic_registration_apple,
+                    enabled = RegistrationProvider.APPLE.isAvailable,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "Sign In",
-                    color = RoyalGold,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { 
-                        Toast.makeText(context, "Switching to Login...", Toast.LENGTH_SHORT).show()
-                    }
+                ComingSoonProviderChip(
+                    text = "GitHub — COMING SOON",
+                    iconRes = R.drawable.ic_registration_git_gold,
+                    enabled = RegistrationProvider.GITHUB.isAvailable,
+                    modifier = Modifier.weight(1f),
                 )
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ComingSoonProviderChip(
+                    text = "Facebook — COMING SOON",
+                    iconRes = R.drawable.ic_registration_facebook_gold,
+                    enabled = RegistrationProvider.FACEBOOK.isAvailable,
+                    modifier = Modifier.weight(1f),
+                )
+                ComingSoonProviderChip(
+                    text = "Email — COMING SOON",
+                    iconRes = R.drawable.ic_registration_email_gold,
+                    enabled = RegistrationProvider.EMAIL.isAvailable,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
             
             Text(
                 text = "By signing up, you agree to our Terms of Service and Privacy Policy",
@@ -492,6 +437,26 @@ fun RegistrationScreen(
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = RoyalGold)
             }
+        }
+
+        if (showLockedOrbDialog) {
+            AlertDialog(
+                onDismissRequest = { showLockedOrbDialog = false },
+                containerColor = Color(0xFF100D07),
+                titleContentColor = RoyalGold,
+                textContentColor = Color.White,
+                title = { Text("Security Agent Locked") },
+                text = {
+                    Text(
+                        "Continue with Phone or Google to begin setup. Feature availability depends on your plan, device permissions, and configured services."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showLockedOrbDialog = false }) {
+                        Text("GOT IT", color = RoyalGold)
+                    }
+                },
+            )
         }
     }
 }
@@ -529,49 +494,141 @@ private fun LuxuryRegistrationPanel(
 }
 
 @Composable
+private fun ComingSoonProviderChip(
+    text: String,
+    iconRes: Int,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = {},
+        enabled = enabled,
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .semantics {
+                contentDescription = "$text provider, disabled"
+            },
+        color = Color.Black.copy(alpha = 0.36f),
+        contentColor = Color.White.copy(alpha = 0.62f),
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            RoyalGold.copy(alpha = 0.28f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(22.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = text.substringBefore(" —"),
+                    color = Color.White.copy(alpha = 0.66f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                Text(
+                    text = "COMING SOON",
+                    color = RoyalGold.copy(alpha = 0.54f),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun SocialLoginButton(
     text: String,
     icon: ImageVector? = null,
     iconRes: Int? = null,
     color: Color,
     textColor: Color,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val layout = registrationSocialButtonLayout()
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
+            .fillMaxWidth(layout.widthFraction)
+            .height(layout.heightDp.dp)
             .graphicsLayer {
                 shadowElevation = 12.dp.toPx()
                 shape = RoundedCornerShape(16.dp)
             },
-        color = color,
+        color = Color.Transparent,
         shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD86A))
+        border = null,
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(if (enabled) 1f else 0.52f),
         ) {
-            if (iconRes != null) {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = "$text icon",
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(24.dp)
-                )
-            } else if (icon != null) {
-                Icon(icon, null, tint = textColor, modifier = Modifier.size(24.dp))
-            }
+            Image(
+                painter = painterResource(R.drawable.bg_button_gold),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier.fillMaxSize(),
+            )
             Text(
                 text = text,
                 color = textColor,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.Center),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = layout.labelFontSizeSp.sp,
+                maxLines = 1,
+                softWrap = false,
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = layout.horizontalPaddingDp.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight()
+                        .width(layout.leadingSlotWidthDp.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (iconRes != null) {
+                        Icon(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = "$text icon",
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(layout.iconSizeDp.dp),
+                        )
+                    } else if (icon != null) {
+                        Icon(
+                            icon,
+                            contentDescription = "$text icon",
+                            tint = Color.Black,
+                            modifier = Modifier.size(layout.iconSizeDp.dp),
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(layout.trailingSlotWidthDp.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {}
+            }
         }
     }
 }

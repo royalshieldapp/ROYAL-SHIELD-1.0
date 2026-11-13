@@ -10,9 +10,12 @@ import com.royalshield.app.billing.BillingVerificationDecision
 import com.royalshield.app.billing.BillingVerifier
 import com.royalshield.app.billing.RenderBillingVerifier
 import com.google.firebase.auth.FirebaseAuth
+import com.royalshield.app.subscription.EntitlementStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Manager for Google Play Billing
@@ -25,13 +28,20 @@ class BillingManager(
 
     private var billingClient: BillingClient? = null
 
+    private val _billingConnectionReady = MutableStateFlow(false)
+    val billingConnectionReady: StateFlow<Boolean> = _billingConnectionReady.asStateFlow()
+
     private val _purchaseState = MutableStateFlow<PurchaseState>(PurchaseState.Idle)
     val purchaseState: StateFlow<PurchaseState> = _purchaseState.asStateFlow()
 
-    private val _hasPremiumAccess = MutableStateFlow(false)
+    private val _hasPremiumAccess = MutableStateFlow(
+        EntitlementStore.DEV_SUPERPOWERS || PreferencesManager.getPurchasedPack() != null
+    )
     val hasPremiumAccess: StateFlow<Boolean> = _hasPremiumAccess.asStateFlow()
 
-    private val _currentProduct = MutableStateFlow<String?>(null)
+    private val _currentProduct = MutableStateFlow<String?>(
+        if (EntitlementStore.DEV_SUPERPOWERS) PRODUCT_ULTIMATE else PreferencesManager.getPurchasedPack()
+    )
     val currentProduct: StateFlow<String?> = _currentProduct.asStateFlow()
 
     companion object {
@@ -65,16 +75,19 @@ class BillingManager(
         billingClient?.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    _billingConnectionReady.value = true
                     Log.d(TAG, "Billing client connected")
                     // Check existing purchases
                     queryPurchases()
                     onReady()
                 } else {
+                    _billingConnectionReady.value = false
                     Log.e(TAG, "Error connecting billing: ${billingResult.debugMessage}")
                 }
             }
 
             override fun onBillingServiceDisconnected() {
+                _billingConnectionReady.value = false
                 Log.w(TAG, "Billing service disconnected")
                 // Retry connection
             }
@@ -86,6 +99,7 @@ class BillingManager(
      * DEV MODE: Always returns true for full access
      */
     suspend fun checkPremiumAccess(): Boolean {
+        if (EntitlementStore.DEV_SUPERPOWERS) return true
         return _hasPremiumAccess.value
     }
 
@@ -94,7 +108,17 @@ class BillingManager(
      */
     suspend fun queryProducts(): List<com.royalshield.app.models.ProductInfo> {
         return try {
-            val productList = listOf(
+            val ready = _billingConnectionReady.value ||
+                withTimeoutOrNull(5_000L) {
+                    _billingConnectionReady.first { it }
+                    true
+                } == true
+            if (!ready) {
+                Log.e(TAG, "Google Play Billing was not ready before the catalog timeout")
+                return emptyList()
+            }
+
+            val inAppList = listOf(
                 QueryProductDetailsParams.Product.newBuilder()
                     .setProductId(PRODUCT_STARTER)
                     .setProductType(BillingClient.ProductType.INAPP)
@@ -109,26 +133,50 @@ class BillingManager(
                     .build()
             )
 
-            val params = QueryProductDetailsParams.newBuilder()
-                .setProductList(productList)
+            val subsList = listOf(
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_STARTER)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build(),
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_GOLD)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build(),
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_ULTIMATE)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build()
+            )
+
+            val inAppParams = QueryProductDetailsParams.newBuilder()
+                .setProductList(inAppList)
                 .build()
+            val inAppResult = billingClient?.queryProductDetails(inAppParams)
+            val inAppDetails = if (inAppResult?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
+                inAppResult.productDetailsList ?: emptyList()
+            } else emptyList()
 
-            val result = billingClient?.queryProductDetails(params)
+            val subsParams = QueryProductDetailsParams.newBuilder()
+                .setProductList(subsList)
+                .build()
+            val subsResult = billingClient?.queryProductDetails(subsParams)
+            val subsDetails = if (subsResult?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
+                subsResult.productDetailsList ?: emptyList()
+            } else emptyList()
 
-            if (result?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
-                result.productDetailsList?.map { detail ->
-                    val offer = detail.oneTimePurchaseOfferDetails
-                    com.royalshield.app.models.ProductInfo(
-                        id = detail.productId,
-                        title = detail.name,
-                        description = detail.description,
-                        price = offer?.formattedPrice ?: "N/A",
-                        originalDetails = detail
-                    )
-                } ?: emptyList()
-            } else {
-                Log.e(TAG, "Error querying products: ${result?.billingResult?.debugMessage}")
-                emptyList()
+            val allDetails = (inAppDetails + subsDetails).distinctBy { it.productId }
+
+            allDetails.map { detail ->
+                val price = detail.oneTimePurchaseOfferDetails?.formattedPrice
+                    ?: detail.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
+                    ?: "N/A"
+                com.royalshield.app.models.ProductInfo(
+                    id = detail.productId,
+                    title = detail.name,
+                    description = detail.description,
+                    price = price,
+                    originalDetails = detail
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error querying products", e)
@@ -136,9 +184,6 @@ class BillingManager(
         }
     }
 
-    /**
-     * Launches the purchase flow
-     */
     /**
      * Launches the purchase flow
      */
@@ -156,11 +201,17 @@ class BillingManager(
 
         _purchaseState.value = PurchaseState.Loading
 
-        val productDetailsParamsList = listOf(
-            BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(productDetails)
-                .build()
-        )
+        val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
+        val productDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
+            .setProductDetails(productDetails)
+            .apply {
+                if (offerToken != null) {
+                    setOfferToken(offerToken)
+                }
+            }
+            .build()
+
+        val productDetailsParamsList = listOf(productDetailsParams)
 
         val billingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
@@ -234,7 +285,42 @@ class BillingManager(
     private fun grantVerifiedPurchase(productId: String) {
         _currentProduct.value = productId
         _hasPremiumAccess.value = true
+        PreferencesManager.savePurchasedPack(productId)
         _purchaseState.value = PurchaseState.Success(productId)
+    }
+
+    /**
+     * Explicitly restores purchases and notifies callback of the result.
+     */
+    fun restorePurchases(onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        val client = billingClient
+        if (client == null || !_billingConnectionReady.value) {
+            val localPack = PreferencesManager.getPurchasedPack()
+            onComplete(localPack != null, localPack)
+            return
+        }
+
+        client.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        ) { _, inAppPurchases ->
+            val activeInApp = inAppPurchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+            activeInApp.forEach(::handlePurchase)
+
+            client.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder()
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build()
+            ) { _, subsPurchases ->
+                val activeSubs = subsPurchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                activeSubs.forEach(::handlePurchase)
+
+                val hasActive = activeInApp.isNotEmpty() || activeSubs.isNotEmpty() || _hasPremiumAccess.value
+                val currentPack = _currentProduct.value ?: PreferencesManager.getPurchasedPack()
+                onComplete(hasActive, currentPack)
+            }
+        }
     }
 
     /**
@@ -263,11 +349,25 @@ class BillingManager(
                 .build()
         ) { billingResult, purchases ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                _hasPremiumAccess.value = false
-                _currentProduct.value = null
+                if (!EntitlementStore.DEV_SUPERPOWERS) {
+                    _hasPremiumAccess.value = false
+                    _currentProduct.value = null
+                }
                 purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
                     .forEach(::handlePurchase)
-                Log.d(TAG, "Existing purchases: ${purchases.size}")
+                Log.d(TAG, "Existing INAPP purchases: ${purchases.size}")
+            }
+        }
+        // Also query subscriptions so entitlement is restored correctly on launch
+        billingClient?.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+        ) { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                    .forEach(::handlePurchase)
+                Log.d(TAG, "Existing SUBS purchases: ${purchases.size}")
             }
         }
     }
@@ -276,6 +376,7 @@ class BillingManager(
      * Releases resources
      */
     fun release() {
+        _billingConnectionReady.value = false
         billingClient?.endConnection()
         billingClient = null
     }

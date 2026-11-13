@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -74,17 +75,36 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.royalshield.app.R
 import com.royalshield.app.managers.AiManager
 import com.royalshield.app.ui.theme.RoyalGold
 import kotlinx.coroutines.launch
 
 private enum class ResolutionStatus { INITIAL, ANALYZING, RESULTS, FAILED }
 
-private data class ResolutionCategory(val name: String, val description: String, val icon: ImageVector, val prompt: String)
+internal fun solutionEngineGuidanceServicePresentation() =
+    "Availability checked on request"
+
+internal fun solutionEngineGuidanceStages() = listOf(
+    "Understanding the reported issue",
+    "Reviewing reported details",
+    "Matching available Royal Shield tools",
+    "Evaluating reported risk",
+    "Preparing recommended actions"
+)
+
+private data class ResolutionCategory(
+    val name: String,
+    val description: String,
+    val icon: ImageVector,
+    val prompt: String,
+    val drawableRes: Int? = null
+)
 
 @Composable
 fun SolutionEngineResolutionScreen(
@@ -106,16 +126,16 @@ fun SolutionEngineResolutionScreen(
     var stage by remember { mutableStateOf(0) }
     val categories = remember {
         listOf(
-            ResolutionCategory("Malware", "Suspicious app or file", Icons.Default.BugReport, "Threat Intelligence"),
-            ResolutionCategory("Suspicious SMS", "Unsafe message or link", Icons.Default.Sms, "Suspicious SMS"),
-            ResolutionCategory("Scam Call", "Caller requests sensitive data", Icons.Default.Call, "Scam Call"),
-            ResolutionCategory("Network Risk", "Unsafe Wi-Fi or connection", Icons.Default.Wifi, "Network Risk"),
-            ResolutionCategory("Privacy", "Permissions or tracking", Icons.Default.PrivacyTip, "Privacy"),
-            ResolutionCategory("Data Breach", "Account or identity exposure", Icons.Default.Report, "Data Breach"),
-            ResolutionCategory("Lost Device", "Device recovery support", Icons.Default.PhoneAndroid, "Lost Device"),
-            ResolutionCategory("Emergency", "Immediate personal safety", Icons.Default.Warning, "Emergency"),
-            ResolutionCategory("Smart Home", "Connected home concern", Icons.Default.AccountTree, "Smart Home"),
-            ResolutionCategory("Other", "Describe another issue", Icons.Default.Security, "Other")
+            ResolutionCategory("Malware", "Suspicious app or file", Icons.Default.BugReport, "Threat Intelligence", R.drawable.ic_solution_threat_engine),
+            ResolutionCategory("Suspicious SMS", "Unsafe message or link", Icons.Default.Sms, "Suspicious SMS", R.drawable.ic_solution_permission_monitor),
+            ResolutionCategory("Scam Call", "Caller requests sensitive data", Icons.Default.Call, "Scam Call", R.drawable.ic_solution_repair_tool),
+            ResolutionCategory("Network Risk", "Unsafe Wi-Fi or connection", Icons.Default.Wifi, "Network Risk", R.drawable.ic_solution_vpn_shield),
+            ResolutionCategory("Privacy", "Permissions or tracking", Icons.Default.PrivacyTip, "Privacy", R.drawable.ic_solution_app_lock),
+            ResolutionCategory("Data Breach", "Account or identity exposure", Icons.Default.Report, "Data Breach", R.drawable.ic_solution_data_vault),
+            ResolutionCategory("Lost Device", "Device recovery support", Icons.Default.PhoneAndroid, "Lost Device", R.drawable.ic_solution_device_core),
+            ResolutionCategory("Emergency", "Immediate personal safety", Icons.Default.Warning, "Emergency", R.drawable.ic_solution_firewall),
+            ResolutionCategory("Smart Home", "Connected home concern", Icons.Default.AccountTree, "Smart Home", R.drawable.ic_solution_workflow_engine),
+            ResolutionCategory("Other", "Describe another issue", Icons.Default.Security, "Other", R.drawable.ic_solution_ai_heuristics)
         )
     }
     val scan = rememberInfiniteTransition(label = "solution_engine_scan")
@@ -143,9 +163,9 @@ fun SolutionEngineResolutionScreen(
                 IconButton(onClick = onHistory) { Icon(Icons.Default.History, "History logs", tint = RoyalGold) }
                 IconButton(onClick = onOpenGrid) { Icon(Icons.Default.Grid4x4, "3D Shield Grid", tint = RoyalGold) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF00FF94)))
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(RoyalGold))
                     Spacer(Modifier.width(5.dp))
-                    Text("Online", color = Color(0xFF00FF94), fontSize = 10.sp)
+                    Text(solutionEngineGuidanceServicePresentation(), color = RoyalGold, fontSize = 10.sp)
                 }
             }
 
@@ -257,17 +277,42 @@ private fun Panel(title: String, content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun CategoryChip(category: ResolutionCategory, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Row(modifier = modifier.heightIn(min = 58.dp).clip(RoundedCornerShape(12.dp)).background(if (selected) RoyalGold.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.035f)).border(1.dp, if (selected) RoyalGold else Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(category.icon, category.name, tint = if (selected) RoyalGold else Color.LightGray, modifier = Modifier.size(22.dp))
+    Row(
+        modifier = modifier
+            .heightIn(min = 60.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) RoyalGold.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.035f))
+            .border(1.dp, if (selected) RoyalGold else Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (category.drawableRes != null) {
+            Image(
+                painter = painterResource(id = category.drawableRes),
+                contentDescription = category.name,
+                modifier = Modifier.size(24.dp)
+            )
+        } else {
+            Icon(
+                imageVector = category.icon,
+                contentDescription = category.name,
+                tint = if (selected) RoyalGold else Color.LightGray,
+                modifier = Modifier.size(22.dp)
+            )
+        }
         Spacer(Modifier.width(8.dp))
-        Column { Text(category.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold); Text(category.description, color = Color.Gray, fontSize = 9.sp, maxLines = 2) }
+        Column {
+            Text(category.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(category.description, color = Color.Gray, fontSize = 9.sp, maxLines = 2)
+        }
     }
 }
 
 @Composable
 private fun AnalysisPipeline(stage: Int) {
     Panel(title = "Analysis pipeline") {
-        listOf("Understanding the issue", "Checking device context", "Matching Royal Shield tools", "Evaluating risk", "Preparing recommended actions").forEachIndexed { index, label ->
+        solutionEngineGuidanceStages().forEachIndexed { index, label ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (index < stage) Icons.Default.CheckCircle else Icons.Default.AccountTree, null, tint = if (index < stage) Color(0xFF00FF94) else Color.Gray, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp)); Text(label, color = if (index <= stage) Color.White else Color.Gray, fontSize = 11.sp)

@@ -43,9 +43,9 @@ class EntitlementStore(context: Context) {
         private const val KEY_SERVER_VERIFIED = "subscription_tier_server_verified_v1"
         
         /**
-         * Development override. Keep false for normal builds so premium
-         * features require the Google Play purchase flow.
+         * Development override. Set true during testing so all premium
+         * features are immediately available without being blocked by paywalls.
          */
-        const val DEV_SUPERPOWERS = false
+        const val DEV_SUPERPOWERS = true
     }
 }

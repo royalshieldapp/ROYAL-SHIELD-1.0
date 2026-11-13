@@ -45,7 +45,9 @@ Los datos se guardarán en PostgreSQL mediante migraciones versionadas. Cada reg
 - Un entrenamiento solo se ejecutará con volumen mínimo configurable de datos durables y calidad validada. Si no se alcanza, terminará sin modelo nuevo y con un estado explícito.
 - Métricas mínimas: tamaño de muestra, periodo, MAE, RMSE y R² cuando sea matemáticamente aplicable.
 - Todo modelo aprobado llevará versión, fecha, conjunto de fuentes, métricas y checksum de artefacto.
-- Los artefactos se guardarán en almacenamiento persistente externo o disco persistente de Render. Un artefacto local temporal no puede declararse desplegado.
+- Para el primer modelo, los artefactos XGBoost JSON de hasta 10 MiB se guardarán en PostgreSQL junto con versión, métricas, periodo, estado activo y SHA-256. Este límite protege la base de datos de blobs grandes.
+- Si un artefacto supera 10 MiB, el entrenamiento no lo promoverá: se migrará a almacenamiento persistente externo y PostgreSQL conservará únicamente URI, versión, métricas y checksum.
+- Un artefacto local temporal nunca puede declararse desplegado.
 
 ## Contrato API y estados
 
@@ -90,6 +92,14 @@ La bitácora de trabajo del repositorio conserva hallazgos y validaciones. La ta
 5. Ejecutar colectores con fuentes reales, verificar filas persistidas y entrenar solo si se alcanza el mínimo.
 6. Publicar el artefacto persistente, probar el endpoint y comprobar que Android refleja los tres estados.
 7. Desplegar manualmente en Render y repetir la verificación desde la URL pública.
+
+## Decisión de finalización 2026-08-25
+
+- El alcance aprobado es producción E2E, no solo validación local.
+- La implementación continuará en `C:\tmp\royal-shield-server-backend-forecast`, basada en `royalshieldapp/server-beckend`, para aislarla del árbol Android con cambios locales.
+- Render debe desplegar `royalshieldapp/server-beckend`, rama `main`. El servicio público comprobado todavía expone la API legacy 1.0.0: no tiene `/api/v1/system/status` ni la ruta Forecast v2 `/api/v1/predict/risk`, y `/api/v1/hotspots` devuelve una colección vacía sin contrato de disponibilidad.
+- La primera cadena verificable será Miami-Dade durable -> PostgreSQL -> entrenamiento cronológico -> artefacto PostgreSQL -> API -> Android/Samsung.
+- Commit, push, migración de producción y deploy requieren autorización explícita justo antes de ejecutarse.
 
 No se hará merge, push ni despliegue de un cambio concreto sin verificación proporcional y sin conservar los cambios locales existentes del usuario.
 

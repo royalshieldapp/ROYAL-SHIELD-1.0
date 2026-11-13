@@ -9,7 +9,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.location.Geocoder
 import android.location.LocationManager
-import android.net.Uri
 import android.os.Build
 import android.os.Looper
 import android.provider.Settings
@@ -58,11 +57,15 @@ import com.google.maps.android.compose.*
 import com.royalshield.app.R
 import com.royalshield.app.data.MapReminder
 import com.royalshield.app.data.AvailabilityState
+import com.royalshield.app.features.riskprediction.data.models.RiskMapStatus
+import com.royalshield.app.features.riskprediction.data.models.isRenderableOnMap
+import com.royalshield.app.features.riskprediction.ui.RiskMapViewModel
 import com.royalshield.app.features.trackingshield.TrackingShieldViewModel
 import com.royalshield.app.features.trackingshield.data.GpsMode
 import com.royalshield.app.features.trackingshield.data.TrackingMode
 import com.royalshield.app.managers.PreferencesManager
 import com.royalshield.app.ui.theme.RoyalGold
+import com.royalshield.app.ui.components.RoyalMapZoneDetailsSheet
 import com.royalshield.app.ui.components.verifiedItems
 import com.royalshield.app.ui.viewmodels.GlobalMapViewModel
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +78,7 @@ private val MapPanel = Color(0xE6090909)
 private val MapGreen = Color(0xFF00FF94)
 private val MapCyan = Color(0xFF00E5FF)
 private val MapRed = Color(0xFFFF3B30)
+private val MapCaution = Color(0xFFFFD54F)
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -83,17 +87,20 @@ fun RoyalMapScreen(
     forecastAvailability: AvailabilityState = AvailabilityState.Unavailable("STATUS_UNVERIFIED"),
     threatMapAvailability: AvailabilityState = AvailabilityState.Unavailable("STATUS_UNVERIFIED"),
     trackingVm: TrackingShieldViewModel = viewModel(),
-    globalVm: GlobalMapViewModel = viewModel()
+    globalVm: GlobalMapViewModel = viewModel(),
+    riskVm: RiskMapViewModel = viewModel()
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val trackingState by trackingVm.uiState.collectAsState()
     val centerRequest by trackingVm.centerRequest.collectAsState()
     val reminders by globalVm.reminders.collectAsState()
+    val riskState by riskVm.uiState.collectAsState()
     var timeline by remember { mutableStateOf(PreferencesManager.getLocationTimeline()) }
     var selectedTab by remember { mutableStateOf(RoyalMapTab.CONTROL) }
     var showAddReminder by remember { mutableStateOf(false) }
     var showTimeline by remember { mutableStateOf(false) }
+    var showAgentDialog by remember { mutableStateOf(false) }
     var showCameras by remember { mutableStateOf(true) }
     var showPolice by remember { mutableStateOf(true) }
     var showSpeed by remember { mutableStateOf(true) }
@@ -101,10 +108,12 @@ fun RoyalMapScreen(
     var showTheft by remember { mutableStateOf(true) }
     var showCyber by remember { mutableStateOf(true) }
     var is3D by remember { mutableStateOf(false) }
+    var isDarkMode by remember { mutableStateOf(true) }
     var isGoogleMapLoaded by remember { mutableStateOf(false) }
     var currentLocation by remember { mutableStateOf<LatLng?>(null) }
     var lastRecordedLocation by remember { mutableStateOf<LatLng?>(null) }
     var lastGpsUpdate by remember { mutableStateOf("--") }
+    var selectedFamilyZone by remember { mutableStateOf<RoyalMapZoneDetails?>(null) }
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var isSystemLocationEnabled by remember { mutableStateOf(isDeviceLocationEnabled(context)) }
@@ -160,8 +169,9 @@ fun RoyalMapScreen(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultCenter, 13f)
     }
-    val mapStyle = remember {
-        runCatching { MapStyleOptions.loadRawResourceStyle(context, R.raw.royal_grayscale_map_style) }.getOrNull()
+    val mapStyle = remember(isDarkMode) {
+        val styleRes = if (isDarkMode) R.raw.map_style_dark else R.raw.royal_grayscale_map_style
+        runCatching { MapStyleOptions.loadRawResourceStyle(context, styleRes) }.getOrNull()
     }
     val mapSignals = remember(trackingState.mapLayers, threatMapAvailability) {
         verifiedItems(
@@ -193,6 +203,25 @@ fun RoyalMapScreen(
             cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 16f), 700)
             trackingVm.consumeCenterRequest()
         }
+    }
+
+    // Load Forecast Engine data when the map is ready and we have a position
+    LaunchedEffect(isGoogleMapLoaded, currentLocation) {
+        if (!isGoogleMapLoaded) return@LaunchedEffect
+        val loc = currentLocation ?: defaultCenter
+        val delta = 0.25
+        riskVm.loadRiskMap(
+            minLat = loc.latitude - delta,
+            minLng = loc.longitude - delta,
+            maxLat = loc.latitude + delta,
+            maxLng = loc.longitude + delta
+        )
+        riskVm.loadHotspots(
+            minLat = loc.latitude - delta,
+            minLng = loc.longitude - delta,
+            maxLat = loc.latitude + delta,
+            maxLng = loc.longitude + delta
+        )
     }
 
     LaunchedEffect(currentLocation) {
@@ -266,19 +295,75 @@ fun RoyalMapScreen(
             }
 
             trackingState.safeZones.forEach { zone ->
-                Circle(
-                    center = zone.center,
-                    radius = zone.radiusMeters,
-                    fillColor = MapGreen.copy(alpha = 0.12f),
-                    strokeColor = MapGreen.copy(alpha = 0.72f),
-                    strokeWidth = 3f
-                )
-                Marker(
-                    state = MarkerState(zone.center),
-                    title = zone.name,
-                    snippet = "Safe zone",
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
-                )
+                key("safe-zone-${zone.id}-${zone.center.latitude}-${zone.center.longitude}") {
+                    val points = remember(zone.center, zone.radiusMeters) {
+                        geofencePolygon(zone.center, zone.radiusMeters)
+                    }
+                    val details = remember(zone) { zone.toRoyalMapZoneDetails() }
+                    val isSelected = selectedFamilyZone?.id == details.id &&
+                        selectedFamilyZone?.center == details.center
+                    if (points.size >= 3) {
+                        Polygon(
+                            points = points,
+                            clickable = true,
+                            geodesic = true,
+                            fillColor = MapGreen.copy(alpha = if (isSelected) 0.26f else 0.14f),
+                            strokeColor = MapGreen.copy(alpha = 0.92f),
+                            strokeWidth = if (isSelected) 6f else 3f,
+                            onClick = {
+                                riskVm.clearSelection()
+                                selectedFamilyZone = details
+                            },
+                        )
+                    }
+                    Marker(
+                        state = MarkerState(zone.center),
+                        title = zone.name.ifBlank { details.category.label },
+                        snippet = details.category.label,
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                        onClick = {
+                            riskVm.clearSelection()
+                            selectedFamilyZone = details
+                            false
+                        },
+                    )
+                }
+            }
+
+            trackingState.riskZones.forEach { zone ->
+                key("risk-zone-${zone.id}-${zone.center.latitude}-${zone.center.longitude}") {
+                    val points = remember(zone.center, zone.radiusMeters) {
+                        geofencePolygon(zone.center, zone.radiusMeters)
+                    }
+                    val details = remember(zone) { zone.toRoyalMapZoneDetails() }
+                    val isSelected = selectedFamilyZone?.id == details.id &&
+                        selectedFamilyZone?.center == details.center
+                    if (points.size >= 3) {
+                        Polygon(
+                            points = points,
+                            clickable = true,
+                            geodesic = true,
+                            fillColor = MapRed.copy(alpha = if (isSelected) 0.27f else 0.15f),
+                            strokeColor = MapRed.copy(alpha = 0.94f),
+                            strokeWidth = if (isSelected) 6f else 3f,
+                            onClick = {
+                                riskVm.clearSelection()
+                                selectedFamilyZone = details
+                            },
+                        )
+                    }
+                    Marker(
+                        state = MarkerState(zone.center),
+                        title = zone.name.ifBlank { details.category.label },
+                        snippet = "${details.category.label} · Threat ${zone.threatLevel.coerceIn(1, 5)}/5",
+                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
+                        onClick = {
+                            riskVm.clearSelection()
+                            selectedFamilyZone = details
+                            false
+                        },
+                    )
+                }
             }
 
             verifiedItems(forecastAvailability, trackingState.hotspots).forEach { hotspot ->
@@ -325,6 +410,83 @@ fun RoyalMapScreen(
                 }
             }
 
+            // === Forecast Engine: H3 risk zones (normalized) ===
+            if (riskState.mapStatus == RiskMapStatus.LOADED) {
+                riskState.normalizedRiskZones
+                    .filter { it.polygon.size >= 3 }
+                    .forEach { zone ->
+                    val details = zone.toRoyalMapZoneDetails()
+                    val riskColor = when (details.category) {
+                        RoyalMapZoneCategory.SAFE -> MapGreen
+                        RoyalMapZoneCategory.CAUTION -> MapCaution
+                        RoyalMapZoneCategory.RISK -> MapRed
+                    }
+                    val isSelected = riskState.selectedNormalizedZone?.h3Cell == zone.h3Cell
+                    Polygon(
+                        points = zone.polygon,
+                        clickable = true,
+                        geodesic = true,
+                        fillColor = riskColor.copy(alpha = if (isSelected) 0.28f else 0.16f),
+                        strokeColor = riskColor.copy(alpha = 0.92f),
+                        strokeWidth = if (isSelected) 6f else 3f,
+                        onClick = {
+                            selectedFamilyZone = null
+                            riskVm.selectNormalizedZone(zone)
+                            scope.launch {
+                                cameraPositionState.animate(
+                                    CameraUpdateFactory.newLatLngZoom(details.center, 16f),
+                                    650,
+                                )
+                            }
+                        },
+                    )
+                    if (isSelected) {
+                        Marker(
+                            state = MarkerState(details.center),
+                            title = details.name,
+                            snippet = "${details.category.label} · ${zone.riskScore.toInt()}/100",
+                            icon = BitmapDescriptorFactory.defaultMarker(
+                                when (details.category) {
+                                    RoyalMapZoneCategory.SAFE -> BitmapDescriptorFactory.HUE_GREEN
+                                    RoyalMapZoneCategory.CAUTION -> BitmapDescriptorFactory.HUE_YELLOW
+                                    RoyalMapZoneCategory.RISK -> BitmapDescriptorFactory.HUE_RED
+                                },
+                            ),
+                        )
+                    }
+                }
+            }
+
+            // Forecast hotspots are independent from the H3 zone-layer request.
+            if (riskState.showHotspots) {
+                riskState.normalizedHotspots
+                    .filter { it.isRenderableOnMap() }
+                    .forEach { hotspot ->
+                        val center = LatLng(hotspot.latitude, hotspot.longitude)
+                        val riskColor = when (hotspot.riskLevel) {
+                            com.royalshield.app.features.riskprediction.data.models.RiskLevel.CRITICAL,
+                            com.royalshield.app.features.riskprediction.data.models.RiskLevel.HIGH -> MapRed
+                            com.royalshield.app.features.riskprediction.data.models.RiskLevel.ELEVATED -> RoyalGold
+                            else -> MapGreen
+                        }
+                        Circle(
+                            center = center,
+                            radius = hotspot.radiusMeters.coerceIn(1.0, 50_000.0),
+                            fillColor = riskColor.copy(alpha = 0.20f),
+                            strokeColor = riskColor.copy(alpha = 0.80f),
+                            strokeWidth = 2.5f
+                        )
+                        Marker(
+                            state = MarkerState(center),
+                            title = "Forecast ${hotspot.riskLevel.label}",
+                            snippet = "${hotspot.eventCount} verified signals",
+                            icon = BitmapDescriptorFactory.defaultMarker(
+                                if (riskColor == MapRed) BitmapDescriptorFactory.HUE_RED else BitmapDescriptorFactory.HUE_YELLOW
+                            )
+                        )
+                    }
+            }
+
             reminders.forEach { reminder ->
                 val position = LatLng(reminder.lat, reminder.lon)
                 Marker(
@@ -356,16 +518,28 @@ fun RoyalMapScreen(
 
         RoyalMapHeader(
             onBack = onBack,
+            onOpenAgent = { showAgentDialog = true },
             onCenter = {
                 val target = currentLocation ?: trackingState.child?.latLng ?: defaultCenter
                 scope.launch { cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(target, 16f), 600) }
             },
-            forecast = if (forecastAvailability is AvailabilityState.Ready) {
-                forecastSummary(trackingState.hotspots)
-            } else {
-                "Unavailable"
+            forecast = when {
+                riskState.mapStatus == RiskMapStatus.LOADED && riskState.forecastNotice != null -> {
+                    riskState.forecastNotice.orEmpty()
+                }
+                forecastAvailability is AvailabilityState.Ready -> forecastSummary(trackingState.hotspots)
+                else -> "Unavailable"
             },
-            lastGpsUpdate = lastGpsUpdate
+            lastGpsUpdate = lastGpsUpdate,
+            isDarkMode = isDarkMode,
+            onToggleDarkMode = {
+                isDarkMode = !isDarkMode
+                Toast.makeText(
+                    context,
+                    if (isDarkMode) "Map Dark Mode: Activated" else "Map Standard Mode: Activated",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         )
 
         val locationStatus = resolveMapLocationStatus(
@@ -394,6 +568,46 @@ fun RoyalMapScreen(
                     )
                 },
             )
+        }
+
+        // MODEL UNAVAILABLE banner — shown when Forecast Engine backend is down (503/timeout)
+        AnimatedVisibility(
+            visible = riskState.mapStatus == RiskMapStatus.BACKEND_ERROR ||
+                riskState.mapStatus == RiskMapStatus.OFFLINE,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = if (locationStatus != MapLocationStatus.AVAILABLE) 140.dp else 88.dp, start = 12.dp, end = 12.dp),
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A0000)),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MapRed.copy(alpha = 0.72f)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = MapRed, modifier = Modifier.size(18.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "MODEL UNAVAILABLE",
+                            color = MapRed,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            "Forecast Engine offline. Risk zones are not verified.",
+                            color = Color.White.copy(alpha = 0.72f),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
         }
 
         Column(
@@ -453,6 +667,15 @@ fun RoyalMapScreen(
                                 900
                             )
                         }
+                    },
+                    isDarkMode = isDarkMode,
+                    onToggleDarkMode = {
+                        isDarkMode = !isDarkMode
+                        Toast.makeText(
+                            context,
+                            if (isDarkMode) "Map Dark Mode: Activated" else "Map Standard Mode: Activated",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 )
             }
@@ -460,7 +683,16 @@ fun RoyalMapScreen(
                 ReminderPanel(
                     reminders = reminders,
                     onAdd = { showAddReminder = true },
-                    onDirections = { openDirections(context, it.lat, it.lon) }
+                    onDirections = { reminder ->
+                        // Native camera animation — no external intent, user stays in Royal Shield
+                        val dest = LatLng(reminder.lat, reminder.lon)
+                        riskVm.setDestination(dest, reminder.name)
+                        scope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(dest, 16f), 800
+                            )
+                        }
+                    }
                 )
             }
             AnimatedVisibility(visible = selectedTab == RoyalMapTab.SAFE, enter = fadeIn(), exit = fadeOut()) {
@@ -522,6 +754,25 @@ fun RoyalMapScreen(
         }
     }
 
+    val selectedZoneDetails = selectedFamilyZone ?: riskState.selectedNormalizedZone?.toRoyalMapZoneDetails()
+    selectedZoneDetails?.let { details ->
+        RoyalMapZoneDetailsSheet(
+            details = details,
+            onDismiss = {
+                selectedFamilyZone = null
+                riskVm.clearSelection()
+            },
+            onCenterZone = {
+                scope.launch {
+                    cameraPositionState.animate(
+                        CameraUpdateFactory.newLatLngZoom(details.center, 16f),
+                        650,
+                    )
+                }
+            },
+        )
+    }
+
     if (showAddReminder) {
         AddReminderDialog(
             currentLocation = currentLocation ?: defaultCenter,
@@ -530,6 +781,12 @@ fun RoyalMapScreen(
                 globalVm.addReminder(name, address, latLng.latitude, latLng.longitude)
                 showAddReminder = false
             }
+        )
+    }
+
+    if (showAgentDialog) {
+        com.royalshield.app.ui.components.VirtualAgentDialog(
+            onDismiss = { showAgentDialog = false }
         )
     }
 }
@@ -665,7 +922,10 @@ private fun RoyalMapHeader(
     onBack: () -> Unit,
     onCenter: () -> Unit,
     forecast: String,
-    lastGpsUpdate: String
+    lastGpsUpdate: String,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+    onOpenAgent: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -683,10 +943,47 @@ private fun RoyalMapHeader(
         }
         Column(modifier = Modifier.weight(1f)) {
             Text("ROYAL MAP", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.5.sp)
-            Text("Forecast: $forecast · GPS $lastGpsUpdate", color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, maxLines = 1)
+            Text("Forecast: $forecast · GPS $lastGpsUpdate", color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, maxLines = 2)
+        }
+        IconButton(
+            onClick = onToggleDarkMode,
+            modifier = Modifier
+                .padding(end = 4.dp)
+                .size(36.dp)
+                .background(
+                    if (isDarkMode) RoyalGold.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.10f),
+                    CircleShape
+                )
+                .border(
+                    1.dp,
+                    if (isDarkMode) RoyalGold.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.30f),
+                    CircleShape
+                )
+        ) {
+            Icon(
+                if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                contentDescription = if (isDarkMode) "Disable Dark Mode" else "Enable Dark Mode",
+                tint = if (isDarkMode) RoyalGold else Color.White,
+                modifier = Modifier.size(18.dp)
+            )
         }
         IconButton(onClick = onCenter) {
             Icon(Icons.Default.MyLocation, contentDescription = "Center", tint = RoyalGold)
+        }
+        IconButton(
+            onClick = onOpenAgent,
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .size(36.dp)
+                .background(RoyalGold.copy(alpha = 0.20f), CircleShape)
+                .border(1.dp, RoyalGold.copy(alpha = 0.85f), CircleShape)
+        ) {
+            Icon(
+                Icons.Default.SmartToy,
+                contentDescription = "AI Agent",
+                tint = RoyalGold,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
@@ -737,7 +1034,7 @@ private fun MapSignalLayerPanel(
         item {
             SignalLayerChip(
                 label = "Cameras",
-                iconRes = R.drawable.pin_surveillance_map,
+                iconRes = R.drawable.pin_surveillance_gold,
                 color = MapCyan,
                 selected = showCameras,
                 onClick = onToggleCameras
@@ -746,7 +1043,7 @@ private fun MapSignalLayerPanel(
         item {
             SignalLayerChip(
                 label = "Police",
-                iconRes = R.drawable.pin_police_map,
+                iconRes = R.drawable.pin_police_gold,
                 color = Color(0xFF4DA3FF),
                 selected = showPolice,
                 onClick = onTogglePolice
@@ -764,7 +1061,7 @@ private fun MapSignalLayerPanel(
         item {
             SignalLayerChip(
                 label = "Protest",
-                iconRes = R.drawable.pin_protest_map,
+                iconRes = R.drawable.pin_protest_gold,
                 color = Color(0xFFFFA726),
                 selected = showProtest,
                 onClick = onToggleProtest
@@ -773,7 +1070,7 @@ private fun MapSignalLayerPanel(
         item {
             SignalLayerChip(
                 label = "Theft",
-                iconRes = R.drawable.pin_thief_map,
+                iconRes = R.drawable.pin_thief_gold,
                 color = Color(0xFFB27CFF),
                 selected = showTheft,
                 onClick = onToggleTheft
@@ -831,7 +1128,9 @@ private fun RoyalMapControlPanel(
     onGpsMode: (GpsMode) -> Unit,
     onRefresh: () -> Unit,
     is3D: Boolean,
-    onToggle3D: () -> Unit
+    onToggle3D: () -> Unit,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit
 ) {
     RoyalMapSheet {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -846,13 +1145,22 @@ private fun RoyalMapControlPanel(
             ControlAction("Refresh", Icons.Default.Refresh, false, Modifier.weight(1f), onRefresh)
         }
         Spacer(Modifier.height(10.dp))
-        ControlAction(
-            label = if (is3D) "2D View" else "3D View",
-            icon = Icons.Default.Layers,
-            active = is3D,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onToggle3D
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            ControlAction(
+                label = if (isDarkMode) "Dark Map ON" else "Dark Map OFF",
+                icon = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                active = isDarkMode,
+                modifier = Modifier.weight(1f),
+                onClick = onToggleDarkMode
+            )
+            ControlAction(
+                label = if (is3D) "2D View" else "3D View",
+                icon = Icons.Default.Layers,
+                active = is3D,
+                modifier = Modifier.weight(1f),
+                onClick = onToggle3D
+            )
+        }
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Column {
@@ -1045,12 +1353,8 @@ private fun forecastSummary(hotspots: List<com.royalshield.app.features.riskpred
     }
 }
 
-private fun openDirections(context: android.content.Context, lat: Double, lon: Double) {
-    val uri = Uri.parse("google.navigation:q=$lat,$lon")
-    val intent = Intent(Intent.ACTION_VIEW, uri).setPackage("com.google.android.apps.maps")
-    runCatching { context.startActivity(intent) }
-        .onFailure { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon"))) }
-}
+// openDirections removed: navigation is now fully native via camera animation in RoyalMapScreen.
+// The reminder destinations are handled by riskVm.setDestination() + cameraPositionState.animate().
 
 private fun distanceMeters(a: LatLng, b: LatLng): Double {
     val radius = 6371000.0

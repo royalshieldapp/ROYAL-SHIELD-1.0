@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.geometry.CornerRadius
 
 @Composable
-fun PremiumEliteScreen(
+fun LegacyPremiumEliteScreen(
     onContinue: () -> Unit,
     onPurchaseSuccess: () -> Unit,
     billingManager: BillingManager
@@ -133,7 +133,7 @@ fun PremiumEliteScreen(
                     }
                     is PaywallUiState.Error -> {
                         Text("Error: ${state.message}", color = Color.Red, modifier = Modifier.padding(16.dp))
-                        Button(onClick = { /* Retry */ }) { Text("Retry") }
+                        Button(onClick = viewModel::retryLoading) { Text("Retry") }
                     }
                     is PaywallUiState.ProductsReady -> {
                         val starter = state.starter
