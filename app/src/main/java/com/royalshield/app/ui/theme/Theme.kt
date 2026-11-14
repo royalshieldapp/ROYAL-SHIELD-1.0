@@ -25,17 +25,28 @@ private val NeonTheme = darkColorScheme(
     error = NeonRed
 )
 
-// 2. GOLD (Luxury)
+// 2. GOLD PRO (Signature Luxury Black & Gold)
 private val GoldTheme = darkColorScheme(
     primary = RoyalGold,
-    secondary = Color(0xFFB8860B),
-    tertiary = Color.White,
-    background = Color(0xFF050505), // Deep Black
-    surface = Color(0xFF121212),
-    onPrimary = Color.Black,
-    onBackground = Color(0xFFF0EAD6), // Eggshell
-    onSurface = RoyalGold,
-    error = Color(0xFF800000)
+    onPrimary = Color(0xFF050505),
+    primaryContainer = Color(0xFF2A2000),
+    onPrimaryContainer = Color(0xFFFFDF73),
+    secondary = Color(0xFFE5C158),
+    onSecondary = Color(0xFF1E1600),
+    secondaryContainer = Color(0xFF3B2E05),
+    onSecondaryContainer = Color(0xFFFFE088),
+    tertiary = Color(0xFFB8860B),
+    onTertiary = Color.White,
+    background = GoldProBackground, // Deep Titanium Obsidian (#050505)
+    onBackground = GoldProTextPrimary, // High-contrast Eggshell (#F5F5F0)
+    surface = GoldProSurface, // Smoked Glass Base (#121418)
+    onSurface = GoldProTextPrimary,
+    surfaceVariant = GoldProSurfaceElevated,
+    onSurfaceVariant = GoldProTextSecondary,
+    outline = GoldProBorder,
+    outlineVariant = GoldProBorderSubtle,
+    error = Color(0xFFFF453A),
+    onError = Color.White
 )
 
 // 3. OBSIDIAN (Clean Blue/Black)
@@ -79,17 +90,18 @@ private val GoldLightTheme = lightColorScheme(
 
 @Composable
 fun Royal_shieldTheme(
-    style: String = "Neon", // Added style parameter
+    style: String = "Gold", // Gold Pro is the signature default theme
     darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        style == "Gold" && !darkTheme -> GoldLightTheme
-        style == "Gold" -> GoldTheme
+        (style == "Gold" || style == "GoldPro" || style == "Gold Pro") && !darkTheme -> GoldLightTheme
+        (style == "Gold" || style == "GoldPro" || style == "Gold Pro") -> GoldTheme
         style == "Obsidian" -> ObsidianTheme
         style == "Cyber" -> CyberTheme
-        else -> NeonTheme // Default
+        style == "Neon" -> NeonTheme
+        else -> GoldTheme // Default to Gold Pro
     }
 
     val view = LocalView.current

@@ -1,6 +1,31 @@
 package com.royalshield.app.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+
+// Gold Pro Luxury Tokens (Signature Brand Specification)
+val GoldProBackground = Color(0xFF050505) // Deep Titanium Obsidian
+val GoldProSurface = Color(0xFF121418) // Smoked Obsidian Base
+val GoldProSurfaceGlass = Color(0xE6121418) // 90% opacity smoked acrylic glass
+val GoldProSurfaceElevated = Color(0xFF1A1D24)
+val GoldProBorder = Color(0x59FFD700) // 35% alpha gold hairline
+val GoldProBorderSubtle = Color(0x26FFD700) // 15% alpha
+val GoldProPrimary = Color(0xFFFFD700) // 24K Royal Gold
+val GoldProSecondary = Color(0xFFE5C158) // Aureum Gold
+val GoldProDark = Color(0xFFB8860B) // Antique Dark Gold
+val GoldProTextPrimary = Color(0xFFF5F5F0) // High-contrast Eggshell White
+val GoldProTextSecondary = Color(0xFFD4AF37) // Metallic Gold Label
+val GoldProTextMuted = Color(0xFF9E9E9E)
+
+val GoldProMetallicBrush = Brush.linearGradient(
+    listOf(Color(0xFFFFDF73), Color(0xFFFFD700), Color(0xFFB8860B))
+)
+val GoldProGlassBrush = Brush.verticalGradient(
+    listOf(Color(0xFF1A1D24).copy(alpha = 0.95f), Color(0xFF0D0F13).copy(alpha = 0.90f))
+)
+val GoldProBorderBrush = Brush.linearGradient(
+    listOf(Color(0xFFFFD700).copy(alpha = 0.55f), Color(0xFFB8860B).copy(alpha = 0.18f))
+)
 
 // Tesla-inspired Minimalist Palette
 val TeslaBlack = Color(0xFF171A20) // Main Background

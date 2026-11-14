@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -933,17 +934,27 @@ private fun RoyalMapHeader(
             .statusBarsPadding()
             .padding(12.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(MapPanel)
-            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(22.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF14171E).copy(alpha = 0.95f), Color(0xFF090A0D).copy(alpha = 0.92f))
+                )
+            )
+            .border(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(RoyalGold.copy(alpha = 0.65f), Color(0xFFB8860B).copy(alpha = 0.25f))
+                ),
+                RoundedCornerShape(22.dp)
+            )
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = RoyalGold)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text("ROYAL MAP", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.5.sp)
-            Text("Forecast: $forecast · GPS $lastGpsUpdate", color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, maxLines = 2)
+            Text("ROYAL MAP PRO", color = RoyalGold, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.6.sp)
+            Text("Forecast: $forecast · GPS $lastGpsUpdate", color = Color(0xFFF0EAD6).copy(alpha = 0.72f), fontSize = 11.sp, maxLines = 2)
         }
         IconButton(
             onClick = onToggleDarkMode,
@@ -1277,8 +1288,18 @@ private fun RoyalMapSheet(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(MapPanel)
-            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(22.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF14171E).copy(alpha = 0.95f), Color(0xFF090A0D).copy(alpha = 0.92f))
+                )
+            )
+            .border(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(RoyalGold.copy(alpha = 0.50f), Color(0xFFB8860B).copy(alpha = 0.20f))
+                ),
+                RoundedCornerShape(22.dp)
+            )
             .padding(14.dp),
         content = content
     )
@@ -1290,14 +1311,17 @@ private fun ControlAction(label: String, icon: androidx.compose.ui.graphics.vect
         modifier = modifier
             .height(58.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (active) RoyalGold else Color.White.copy(alpha = 0.07f))
-            .border(1.dp, RoyalGold.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+            .background(
+                if (active) Brush.horizontalGradient(listOf(RoyalGold, Color(0xFFE5C158)))
+                else Brush.linearGradient(listOf(Color(0xFF16181F), Color(0xFF0D0E12)))
+            )
+            .border(1.dp, if (active) RoyalGold else RoyalGold.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
             .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(icon, null, tint = if (active) Color.Black else RoyalGold, modifier = Modifier.size(18.dp))
-        Text(label, color = if (active) Color.Black else Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = if (active) Color.Black else Color(0xFFF0EAD6), fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 

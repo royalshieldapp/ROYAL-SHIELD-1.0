@@ -240,7 +240,7 @@ object PreferencesManager {
     }
 
     fun getThemeStyle(): String {
-        return if (isInitialized()) prefs.getString(KEY_THEME_STYLE, "Neon") ?: "Neon" else "Neon"
+        return if (isInitialized()) prefs.getString(KEY_THEME_STYLE, "Gold") ?: "Gold" else "Gold"
     }
 
     fun setNotificationsEnabled(enabled: Boolean) {
