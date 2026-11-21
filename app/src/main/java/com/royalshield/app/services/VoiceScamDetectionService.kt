@@ -6,6 +6,7 @@ import android.telecom.Call
 import android.telecom.CallScreeningService
 import android.util.Log
 import com.royalshield.app.managers.AnalyticsManager
+import com.royalshield.app.managers.PreferencesManager
 
 /**
  * Service to detect AI Voice Scams using Call Screening API.
@@ -21,8 +22,10 @@ class VoiceScamDetectionService : CallScreeningService() {
         val riskScore = calculateInitialRisk(phoneNumber)
         
         // 2. Track event
+        PreferencesManager.incrementVoiceCallsScreened()
         AnalyticsManager.logEvent("call_screened")
         if (riskScore > 70) {
+            PreferencesManager.incrementVoiceThreatsBlocked()
             AnalyticsManager.logEvent("high_risk_call_detected")
             
             // Check for overlay permission before starting

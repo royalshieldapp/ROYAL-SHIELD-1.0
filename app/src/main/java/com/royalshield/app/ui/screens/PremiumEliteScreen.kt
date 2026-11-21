@@ -38,6 +38,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.managers.BillingManager
 import com.royalshield.app.ui.theme.RoyalGold
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.RoyalEliteBadgeMode
 import androidx.compose.ui.graphics.luminance
 import com.royalshield.app.ui.viewmodels.PaywallUiState
 import com.royalshield.app.ui.viewmodels.PaywallViewModel
@@ -49,7 +51,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.geometry.CornerRadius
 
 @Composable
-fun PremiumEliteScreen(
+fun LegacyPremiumEliteScreen(
     onContinue: () -> Unit,
     onPurchaseSuccess: () -> Unit,
     billingManager: BillingManager
@@ -131,12 +133,24 @@ fun PremiumEliteScreen(
                     }
                     is PaywallUiState.Error -> {
                         Text("Error: ${state.message}", color = Color.Red, modifier = Modifier.padding(16.dp))
-                        Button(onClick = { /* Retry */ }) { Text("Retry") }
+                        Button(onClick = viewModel::retryLoading) { Text("Retry") }
                     }
                     is PaywallUiState.ProductsReady -> {
                         val starter = state.starter
                         val gold = state.gold
                         val ultimate = state.ultimate
+
+                        RoyalEliteBadge(
+                            mode = RoyalEliteBadgeMode.PROMOTIONAL,
+                            modifier = Modifier.size(112.dp)
+                        )
+                        Text(
+                            text = "Preview of Royal Elite benefit",
+                            color = RoyalGold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // STARTER - WHITE THEME
                         PlanCard(
@@ -237,7 +251,7 @@ fun PremiumEliteScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.btn_unlock_premium),
+                        painter = painterResource(id = R.drawable.gold_pill_button),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.FillBounds

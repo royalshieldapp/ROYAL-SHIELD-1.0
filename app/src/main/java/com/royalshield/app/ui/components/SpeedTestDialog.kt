@@ -25,8 +25,7 @@ import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.ui.theme.NeonBlue
 import com.royalshield.app.ui.theme.RoyalGold
 import com.royalshield.app.ui.theme.SafeGreen
-import kotlinx.coroutines.delay
-import kotlin.random.Random
+import com.royalshield.app.data.NetworkSpeedTestRepository
 
 @Composable
 fun SpeedTestDialog(onDismiss: () -> Unit) {
@@ -34,6 +33,7 @@ fun SpeedTestDialog(onDismiss: () -> Unit) {
     var uploadSpeed by remember { mutableStateOf(0f) }
     var ping by remember { mutableStateOf(0) }
     var progress by remember { mutableStateOf(0f) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     
     // Graph Data (Normalized 0..1)
     val graphPoints = remember { mutableStateListOf<Float>() }
@@ -41,38 +41,23 @@ fun SpeedTestDialog(onDismiss: () -> Unit) {
     var stage by remember { mutableStateOf(TestStage.CONNECTING) }
 
     LaunchedEffect(Unit) {
-        // 1. Connecting / Ping
-        stage = TestStage.CONNECTING
-        delay(1000)
-        ping = Random.nextInt(15, 45)
-        
-        // 2. Download Test
-        stage = TestStage.DOWNLOAD
-        val maxDownload = Random.nextFloat() * 100 + 50 // 50-150 Mbps
-        for (i in 0..50) {
-            val variance = Random.nextFloat() * 0.2f - 0.1f // +/- 10%
-            val current = (maxDownload * (i / 50f)) * (1f + variance)
-            downloadSpeed = current.coerceAtLeast(0f)
-            graphPoints.add(current / 150f) // Normalize roughly
-            progress = i / 100f // 0 to 0.5
-            delay(50)
-        }
-        
-        // 3. Upload Test
-        stage = TestStage.UPLOAD
-        val maxUpload = Random.nextFloat() * 20 + 10 // 10-30 Mbps
-        for (i in 0..50) {
-            val variance = Random.nextFloat() * 0.2f - 0.1f
-            val current = (maxUpload * (i / 50f)) * (1f + variance)
-            uploadSpeed = current.coerceAtLeast(0f)
-            // Add to graph but maybe scale differently or clear? 
-            // Let's keep adding but shift usage.
-            graphPoints.add(current / 150f) 
-            progress = 0.5f + (i / 100f) // 0.5 to 1.0
-            delay(50)
-        }
-        
-        stage = TestStage.FINISHED
+        runCatching { NetworkSpeedTestRepository.run() }
+            .onSuccess { result ->
+                ping = result.pingMs
+                stage = TestStage.DOWNLOAD
+                downloadSpeed = result.downloadMbps
+                graphPoints.add((result.downloadMbps / 150f).coerceIn(0f, 1f))
+                progress = 0.66f
+                stage = TestStage.UPLOAD
+                uploadSpeed = result.uploadMbps
+                graphPoints.add((result.uploadMbps / 150f).coerceIn(0f, 1f))
+                progress = 1f
+                stage = TestStage.FINISHED
+            }
+            .onFailure {
+                errorMessage = "Unable to measure the connection. Check internet and backend availability."
+                stage = TestStage.ERROR
+            }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -183,7 +168,12 @@ fun SpeedTestDialog(onDismiss: () -> Unit) {
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                if (stage == TestStage.FINISHED) {
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                if (stage == TestStage.FINISHED || stage == TestStage.ERROR) {
                     Button(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
@@ -205,5 +195,5 @@ fun SpeedTestDialog(onDismiss: () -> Unit) {
 }
 
 enum class TestStage {
-    CONNECTING, DOWNLOAD, UPLOAD, FINISHED
+    CONNECTING, DOWNLOAD, UPLOAD, FINISHED, ERROR
 }

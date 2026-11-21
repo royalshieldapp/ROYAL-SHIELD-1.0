@@ -1,12 +1,21 @@
 package com.royalshield.app.ui.screens
 
 import android.widget.Toast
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,29 +71,149 @@ import kotlin.math.PI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.ContextCompat
+import com.royalshield.app.features.smarthome.SmartHomeViewModel
+import com.royalshield.app.data.AvailabilityState
+
+
+data class AutomationRuleTemplate(
+    val title: String,
+    val description: String,
+    val triggerType: TriggerType,
+    val actionType: ActionType,
+    val triggerParams: String = "",
+    val actionParams: String = "",
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val accentColor: Color = RoyalGold,
+    val requiresVerification: Boolean = false
+)
+
+val defaultRuleTemplates = listOf(
+    AutomationRuleTemplate(
+        title = "Route Guard",
+        description = "Alert contacts if GPS route deviates > 50km",
+        triggerType = TriggerType.ROUTE_DEVIATION,
+        actionType = ActionType.ALERT_PROMPT,
+        triggerParams = "50km",
+        actionParams = "Check Status/Send Alert",
+        icon = Icons.Filled.LocationOn,
+        accentColor = SafeGreen,
+        requiresVerification = true
+    ),
+    AutomationRuleTemplate(
+        title = "Night Lockdown",
+        description = "Automatically arm security perimeter at 22:00",
+        triggerType = TriggerType.TIME_SCHEDULE,
+        actionType = ActionType.ACTIVATE_ALARM,
+        triggerParams = "22:00",
+        actionParams = "Arm Perimeter",
+        icon = Icons.Filled.Timer,
+        accentColor = RoyalGold
+    ),
+    AutomationRuleTemplate(
+        title = "Battery SOS Beacon",
+        description = "Send emergency GPS location when battery < 15%",
+        triggerType = TriggerType.BATTERY_LOW,
+        actionType = ActionType.SEND_SOS,
+        triggerParams = "15%",
+        actionParams = "Emergency Contacts",
+        icon = Icons.Filled.Power,
+        accentColor = Color(0xFFFF6B6B)
+    ),
+    AutomationRuleTemplate(
+        title = "Public Wi-Fi Shield",
+        description = "Automatically activate VPN on untrusted Wi-Fi",
+        triggerType = TriggerType.WIFI_CONNECT,
+        actionType = ActionType.TOGGLE_VPN,
+        triggerParams = "Public Wi-Fi",
+        actionParams = "Connect Secure VPN",
+        icon = Icons.Filled.Wifi,
+        accentColor = CyberCyan
+    ),
+    AutomationRuleTemplate(
+        title = "Safe Arrival Home",
+        description = "Disarm perimeter siren upon entering Home zone",
+        triggerType = TriggerType.LOCATION_ENTER,
+        actionType = ActionType.MUTE_AUDIO,
+        triggerParams = "Home",
+        actionParams = "Disarm Siren",
+        icon = Icons.Filled.LocationOn,
+        accentColor = SafeGreen
+    ),
+    AutomationRuleTemplate(
+        title = "Car Sentry S.O.S.",
+        description = "Enable highway travel guard on car Bluetooth connect",
+        triggerType = TriggerType.BLUETOOTH_CONNECT,
+        actionType = ActionType.ALERT_PROMPT,
+        triggerParams = "Car Bluetooth",
+        actionParams = "Highway Travel Monitor",
+        icon = Icons.Filled.BluetoothSearching,
+        accentColor = NeonBlue
+    )
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) {
+fun AutomationScreen(
+    availability: AvailabilityState = AvailabilityState.Unavailable("STATUS_UNVERIFIED"),
+    onBack: () -> Unit = {},
+    onBusinessClick: () -> Unit = {}
+) {
+    val actionsVerified = availability is AvailabilityState.Ready
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val db = remember { AppDatabase.getDatabase(context) }
+    val smartHomeViewModel: SmartHomeViewModel = viewModel()
+    val smartHomeState by smartHomeViewModel.uiState.collectAsStateWithLifecycle()
+    val bluetoothPermissions = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        if (results.values.all { it }) {
+            smartHomeViewModel.scan()
+        } else {
+            Toast.makeText(
+                context,
+                "Nearby devices permission is required for Smart Home discovery",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    fun scanSmartHomeDevices() {
+        val missingPermissions = bluetoothPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missingPermissions.isEmpty()) {
+            smartHomeViewModel.scan()
+        } else {
+            bluetoothPermissionLauncher.launch(missingPermissions.toTypedArray())
+        }
+    }
     
     // Automation Rules State
     var rules by remember { mutableStateOf(emptyList<AutomationRule>()) }
-
-    // Smart Home State
-    var isScanning by remember { mutableStateOf(false) }
-    var scannedDevices by remember { mutableStateOf(listOf<SmartDevice>()) }
-    var connectedDevices by remember { mutableStateOf(listOf<SmartDevice>()) }
-    var showNetworkTools by remember { mutableStateOf(false) }
-    var showWifiScanDialog by remember { mutableStateOf(false) }
-    var showSpeedTestDialog by remember { mutableStateOf(false) }
+    var showAddRuleDialog by remember { mutableStateOf(false) }
 
     // Load initial automation data
     LaunchedEffect(Unit) {
         db.automationDao().getAllRules().collect {
             rules = it
+        }
+    }
+
+    LaunchedEffect(smartHomeState.message) {
+        smartHomeState.message?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            smartHomeViewModel.consumeMessage()
         }
     }
 
@@ -94,9 +223,12 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
+        val scrollState = rememberScrollState()
         Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
@@ -115,7 +247,9 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp),
+                    .height(140.dp)
+                    .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f)
+                    .border(1.5.dp, RoyalGold.copy(alpha = 0.85f), RoundedCornerShape(20.dp)),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
@@ -131,9 +265,9 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
 
             // SYSTEM HEALTH STATUS
             CyberStatusStrip(
-                progress = 0.85f,
-                label = "Automation Neural Link Health",
-                color = SafeGreen,
+                progress = if (actionsVerified) 1.0f else 0.0f,
+                label = if (actionsVerified) "Automation Neural Link Active" else "Automation Neural Link (Unverified)",
+                color = if (actionsVerified) SafeGreen else Color.Gray,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
@@ -147,7 +281,10 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                     modifier = Modifier
                         .weight(1f)
                         .height(100.dp)
+                        .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 7f, maxRotationY = 10f)
                         .clickable { onBusinessClick() }
+                    ,
+                    borderColor = RoyalGold.copy(alpha = 0.75f)
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize()
@@ -179,24 +316,6 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                     }
                 }
 
-                // Card 2: NETWORK
-                PremiumGlassCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(100.dp)
-                        .clickable { showNetworkTools = true }
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                             Icon(Icons.Default.BluetoothSearching, contentDescription = null, tint = NeonBlue, modifier = Modifier.size(32.dp))
-                             Spacer(modifier = Modifier.height(8.dp))
-                             Text("NETWORK", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                    }
-                }
             }
 
             // --- SMART HOME SECTION ---
@@ -213,31 +332,9 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                         fontSize = 18.sp
                     )
                     
-                    if (!isScanning) {
+                    if (!smartHomeState.isScanning) {
                         FloatingActionButton(
-                            onClick = {
-                                isScanning = true
-                                scope.launch {
-                                    // Mimic scanning delay
-                                    delay(2000)
-                                    // Mock results
-                                    val newDevices = listOf(
-                                        SmartDevice("1", "Living Room Light", DeviceType.LIGHT),
-                                        SmartDevice("2", "Kitchen LED Strip", DeviceType.LIGHT),
-                                        SmartDevice("3", "Smart Plug A1", DeviceType.PLUG)
-                                    ).filter { device -> 
-                                        // Filter out already connected
-                                        connectedDevices.none { it.id == device.id }
-                                    }
-                                    
-                                    scannedDevices = newDevices
-                                    isScanning = false
-                                    
-                                    if (newDevices.isEmpty()) {
-                                        Toast.makeText(context, "No new devices found", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
+                            onClick = ::scanSmartHomeDevices,
                             containerColor = CyberCyan,
                             contentColor = Color.Black,
                             modifier = Modifier.size(40.dp) // Small size
@@ -253,36 +350,33 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                 }
 
                 // List Connected Devices (The functional control panel)
-                if (connectedDevices.isNotEmpty()) {
+                if (smartHomeState.connectedDevices.isNotEmpty()) {
                     Text("My Devices", color = Color.Gray, fontSize = 12.sp)
-                    connectedDevices.forEach { device ->
-                        SmartDeviceControlCard(device, onUpdate = { updatedDevice ->
-                            // Update local state list
-                            connectedDevices = connectedDevices.map { 
-                                if (it.id == updatedDevice.id) updatedDevice else it 
-                            }
-                        })
+                    smartHomeState.connectedDevices.forEach { device ->
+                        SmartDeviceControlCard(device, onUpdate = smartHomeViewModel::updateDevice)
                     }
                 }
 
                 // List Scanned/Found Devices (Waiting to connect)
-                AnimatedVisibility(visible = scannedDevices.isNotEmpty()) {
+                AnimatedVisibility(visible = smartHomeState.scannedDevices.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Found Nearby", color = Color.Gray, fontSize = 12.sp)
-                        scannedDevices.forEach { device ->
+                        Text("Google Home devices", color = Color.Gray, fontSize = 12.sp)
+                        smartHomeState.scannedDevices.forEach { device ->
                             ScannedDeviceItem(device) {
-                                // Connect logic
-                                val connected = device.copy(isConnected = true, isOn = true)
-                                connectedDevices = connectedDevices + connected
-                                scannedDevices = scannedDevices - device
-                                Toast.makeText(context, "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
+                                smartHomeViewModel.connect(device)
                             }
                         }
                     }
                 }
                 
-                if (connectedDevices.isEmpty() && scannedDevices.isEmpty() && !isScanning) {
-                     PremiumGlassCard(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+                if (smartHomeState.connectedDevices.isEmpty() && smartHomeState.scannedDevices.isEmpty() && !smartHomeState.isScanning) {
+                     PremiumGlassCard(
+                         modifier = Modifier
+                             .fillMaxWidth()
+                             .height(100.dp)
+                             .tilt3D(defaultRotationX = 0f, defaultRotationY = 0f, maxRotationX = 5f, maxRotationY = 8f),
+                         borderColor = RoyalGold.copy(alpha = 0.65f)
+                     ) {
                          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                              Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                  Icon(Icons.Default.Lightbulb, null, tint = Color.Gray)
@@ -303,56 +397,104 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
             )
 
             // --- AUTOMATION RULES SECTION ---
-            Text(
-                "My Rules",
-                color = RoyalGold,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-
-            // Quick Create Route Guard Card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SafeGreen.copy(alpha = 0.1f)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        scope.launch(Dispatchers.IO) {
-                            val routeRule = AutomationRule(
-                                name = "Route Guard",
-                                triggerType = TriggerType.ROUTE_DEVIATION,
-                                actionType = ActionType.ALERT_PROMPT,
-                                triggerParams = "50km",
-                                actionParams = "Check Status/Send Alert"
-                            )
-                            db.automationDao().insertRule(routeRule)
-                        }
-                        Toast.makeText(context, "Route Guard Activated", Toast.LENGTH_SHORT).show()
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                   modifier = Modifier.padding(16.dp),
-                   verticalAlignment = Alignment.CenterVertically
+                Text(
+                    "My Rules",
+                    color = RoyalGold,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                IconButton(
+                    onClick = { showAddRuleDialog = true }
                 ) {
-                    Icon(Icons.Filled.LocationOn, "Route", tint = SafeGreen)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Activate Route Guard", color = SafeGreen, fontWeight = FontWeight.Bold)
-                        Text("Alert if deviation > 50km", color = Color.Gray, fontSize = 12.sp)
+                    Icon(Icons.Default.Add, contentDescription = "Add Rule", tint = RoyalGold)
+                }
+            }
+
+            // Rule Templates Section
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Rule Templates",
+                    color = RoyalGold,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(defaultRuleTemplates) { template ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = template.accentColor.copy(alpha = 0.10f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .width(200.dp)
+                                .height(115.dp)
+                                .border(1.2.dp, template.accentColor.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    if (template.requiresVerification && !actionsVerified) {
+                                        Toast.makeText(context, "${template.title} unavailable: automations unverified", Toast.LENGTH_SHORT).show()
+                                        return@clickable
+                                    }
+                                    scope.launch(Dispatchers.IO) {
+                                        val rule = AutomationRule(
+                                            name = template.title,
+                                            triggerType = template.triggerType,
+                                            actionType = template.actionType,
+                                            triggerParams = template.triggerParams,
+                                            actionParams = template.actionParams
+                                        )
+                                        db.automationDao().insertRule(rule)
+                                    }
+                                    Toast.makeText(context, "Added: ${template.title}", Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp).fillMaxSize(),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(template.icon, null, tint = template.accentColor, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        template.title,
+                                        color = template.accentColor,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                                Text(
+                                    template.description,
+                                    color = Color.LightGray,
+                                    fontSize = 10.sp,
+                                    maxLines = 2,
+                                    lineHeight = 13.sp
+                                )
+                                Text(
+                                    "+ Tap to apply",
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (rules.isEmpty()) {
-                    item {
-                         Text("No automatic rules set.", color = Color.Gray)
-                    }
+                    Text("No automatic rules set.", color = Color.Gray, fontSize = 13.sp)
                 } else {
-                    items(rules) { rule ->
+                    rules.forEach { rule ->
                         AutomationRuleItem(
                             rule = rule,
                             onToggle = { isEnabled ->
@@ -369,59 +511,180 @@ fun AutomationScreen(onBack: () -> Unit = {}, onBusinessClick: () -> Unit = {}) 
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(32.dp))
         }
-        
-        if (showNetworkTools) {
-             androidx.compose.material3.AlertDialog(
-                onDismissRequest = { showNetworkTools = false },
-                containerColor = Color(0xFF1A1A1A),
-                title = { Text("Network Tools", color = Color.White, fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        NetworkToolItem(
-                            icon = Icons.Default.Wifi,
-                            title = "WiFi Scan",
-                            description = "Analyze signal strength & channels",
-                            onClick = { 
-                                showNetworkTools = false
-                                showWifiScanDialog = true
-                            }
-                        )
-                         NetworkToolItem(
-                            icon = Icons.Default.CompareArrows,
-                            title = "Ping Tracker",
-                            description = "Monitor latency & packet loss",
-                             onClick = { 
-                                Toast.makeText(context, "Tracking Ping...", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                        NetworkToolItem(
-                            icon = Icons.Default.Timer, // Or Speed/ShutterSpeed
-                            title = "Speed Test",
-                            description = "Measure download/upload speed",
-                             onClick = { 
-                                showNetworkTools = false
-                                showSpeedTestDialog = true
-                            }
+
+        if (showAddRuleDialog) {
+            CreateAutomationRuleDialog(
+                onDismiss = { showAddRuleDialog = false },
+                onConfirm = { name, triggerType, actionType ->
+                    scope.launch(Dispatchers.IO) {
+                        db.automationDao().insertRule(
+                            AutomationRule(
+                                name = name,
+                                triggerType = triggerType,
+                                actionType = actionType
+                            )
                         )
                     }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showNetworkTools = false }) {
-                        Text("Close", color = CyberCyan)
-                    }
+                    showAddRuleDialog = false
                 }
             )
         }
-        
-        if (showWifiScanDialog) {
-            WifiScanDialog(onDismiss = { showWifiScanDialog = false })
-        }
-        
-        if (showSpeedTestDialog) {
-            com.royalshield.app.ui.components.SpeedTestDialog(onDismiss = { showSpeedTestDialog = false })
-        }
     }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreateAutomationRuleDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, trigger: TriggerType, action: ActionType) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var selectedTrigger by remember { mutableStateOf(TriggerType.TIME_SCHEDULE) }
+    var selectedAction by remember { mutableStateOf(ActionType.ALERT_PROMPT) }
+    var triggerExpanded by remember { mutableStateOf(false) }
+    var actionExpanded by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.5.dp, RoyalGold.copy(alpha = 0.8f), RoundedCornerShape(20.dp))
+        ) {
+            Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("New Automation Rule", color = RoyalGold, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+
+                Text("Pick a template (optional):", color = Color.Gray, fontSize = 11.sp)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(defaultRuleTemplates) { t ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (name == t.title) RoyalGold.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, if (name == t.title) RoyalGold else Color.Gray.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable {
+                                name = t.title
+                                selectedTrigger = t.triggerType
+                                selectedAction = t.actionType
+                            }
+                        ) {
+                            Text(
+                                t.title,
+                                color = if (name == t.title) RoyalGold else Color.White,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Rule Name", color = Color.Gray) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = RoyalGold,
+                        unfocusedBorderColor = Color.Gray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = RoyalGold
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Trigger dropdown
+                ExposedDropdownMenuBox(expanded = triggerExpanded, onExpandedChange = { triggerExpanded = it }) {
+                    OutlinedTextField(
+                        value = selectedTrigger.name.replace('_', ' '),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Trigger", color = Color.Gray) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(triggerExpanded) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = RoyalGold,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = triggerExpanded,
+                        onDismissRequest = { triggerExpanded = false },
+                        modifier = Modifier.background(Color(0xFF1A1A2E))
+                    ) {
+                        TriggerType.entries.forEach { trigger ->
+                            DropdownMenuItem(
+                                text = { Text(trigger.name.replace('_', ' '), color = Color.White) },
+                                onClick = { selectedTrigger = trigger; triggerExpanded = false }
+                            )
+                        }
+                    }
+                }
+
+                // Action dropdown
+                ExposedDropdownMenuBox(expanded = actionExpanded, onExpandedChange = { actionExpanded = it }) {
+                    OutlinedTextField(
+                        value = selectedAction.name.replace('_', ' '),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Action", color = Color.Gray) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(actionExpanded) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = RoyalGold,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = actionExpanded,
+                        onDismissRequest = { actionExpanded = false },
+                        modifier = Modifier.background(Color(0xFF1A1A2E))
+                    ) {
+                        ActionType.entries.forEach { action ->
+                            DropdownMenuItem(
+                                text = { Text(action.name.replace('_', ' '), color = Color.White) },
+                                onClick = { selectedAction = action; actionExpanded = false }
+                            )
+                        }
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray),
+                        border = BorderStroke(1.dp, Color.Gray)
+                    ) { Text("Cancel") }
+
+                    val dialogContext = LocalContext.current
+                    Button(
+                        onClick = {
+                            if (name.isNotBlank()) {
+                                onConfirm(name.trim(), selectedTrigger, selectedAction)
+                            } else {
+                                Toast.makeText(dialogContext, "Please enter a rule name", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RoyalGold,
+                            contentColor = Color.Black
+                        )
+                    ) { Text("Create", fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
     }
 }
 

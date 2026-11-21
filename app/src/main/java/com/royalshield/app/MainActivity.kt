@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -48,13 +49,17 @@ import com.royalshield.app.managers.PreferencesManager
 import com.royalshield.app.ui.screens.PremiumEliteScreen
 import com.royalshield.app.ui.screens.RegistrationScreen
 import com.royalshield.app.ui.screens.PhoneAuthScreen
+import com.royalshield.app.ui.screens.SecuritySetupScreen
+import com.royalshield.app.securitysetup.EncryptedSecuritySetupStore
 import com.royalshield.app.services.RoyalShieldService
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
+import com.royalshield.app.features.smarthome.google.GoogleHomeClientManager
 
 class MainActivity : ComponentActivity() {
 
     // State to hold the current theme style AND dark mode
-    private val _themeStyle = mutableStateOf("Neon")
+    private val _themeStyle = mutableStateOf("Gold")
     private val _isDarkMode = mutableStateOf(true)
 
     // Listener for SharedPreferences changes
@@ -82,6 +87,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PreferencesManager.init(applicationContext)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            GoogleHomeClientManager.registerPermissionCaller(this)
+        }
 
         // Initialize state with current preference
         _themeStyle.value = PreferencesManager.getThemeStyle()
@@ -111,13 +119,37 @@ class MainActivity : ComponentActivity() {
 }
 
 enum class AppState {
-    SPLASH, PREMIUM_PROMO, REGISTRATION, PHONE_AUTH, MAIN
+    SPLASH, PREMIUM_PROMO, REGISTRATION, PHONE_AUTH, SECURITY_SETUP, MAIN
 }
 
 @Composable
 fun AppMainFlow() {
-    var currentState by remember { mutableStateOf(AppState.SPLASH) }
     val context = LocalContext.current
+    val securitySetupStore = remember(context) { EncryptedSecuritySetupStore(context) }
+
+    fun postAuthState(): AppState {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return AppState.REGISTRATION
+        return if (securitySetupStore.needsSetup(uid)) AppState.SECURITY_SETUP else AppState.MAIN
+    }
+
+    var currentState by rememberSaveable { mutableStateOf(AppState.SPLASH) }
+
+    DisposableEffect(Unit) {
+        val auth = FirebaseAuth.getInstance()
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            if (firebaseAuth.currentUser == null &&
+                currentState != AppState.SPLASH &&
+                currentState != AppState.REGISTRATION &&
+                currentState != AppState.PHONE_AUTH
+            ) {
+                currentState = AppState.REGISTRATION
+            }
+        }
+        auth.addAuthStateListener(listener)
+        onDispose {
+            auth.removeAuthStateListener(listener)
+        }
+    }
 
     // Initialize BillingManager
     val billingManager = remember { BillingManager(context) }
@@ -131,7 +163,7 @@ fun AppMainFlow() {
     Crossfade(targetState = currentState, label = "AppFlow") { state ->
         when (state) {
             AppState.SPLASH -> SplashScreen {
-                currentState = AppState.MAIN
+                currentState = AppState.REGISTRATION
             }
             AppState.PREMIUM_PROMO -> PremiumEliteScreen(
                 billingManager = billingManager,
@@ -141,14 +173,29 @@ fun AppMainFlow() {
                 }
             )
             AppState.REGISTRATION -> RegistrationScreen(
-                onRegistrationSuccess = { currentState = AppState.MAIN },
+                onRegistrationSuccess = { currentState = AppState.PREMIUM_PROMO },
                 onNavigateToPhoneAuth = { currentState = AppState.PHONE_AUTH }
             )
             AppState.PHONE_AUTH -> PhoneAuthScreen(
                 onBack = { currentState = AppState.REGISTRATION },
-                onAuthSuccess = { currentState = AppState.MAIN }
+                onAuthSuccess = { currentState = AppState.PREMIUM_PROMO }
             )
-            AppState.MAIN -> RoyalShieldApp(billingManager)
+            AppState.SECURITY_SETUP -> {
+                val uid = FirebaseAuth.getInstance().currentUser?.uid
+                if (uid == null) {
+                    LaunchedEffect(Unit) { currentState = AppState.REGISTRATION }
+                } else {
+                    SecuritySetupScreen(
+                        uid = uid,
+                        store = securitySetupStore,
+                        onComplete = { currentState = AppState.MAIN },
+                    )
+                }
+            }
+            AppState.MAIN -> RoyalShieldApp(
+                billingManager = billingManager,
+                onSignedOut = { currentState = AppState.REGISTRATION }
+            )
         }
     }
 }
@@ -444,9 +491,14 @@ fun SplashScreenLegacy(onTimeout: () -> Unit) {
 }
 
 @Composable
-fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager) {
+fun RoyalShieldApp(
+    billingManager: com.royalshield.app.managers.BillingManager,
+    onSignedOut: () -> Unit = {}
+) {
     val context = LocalContext.current
     val navController = rememberNavController()
+    val hasPremiumAccess by billingManager.hasPremiumAccess.collectAsState()
+    val showAds = !hasPremiumAccess
 
     // Service activation (Safe Mode) - Enabled
     // Service activation (Safe Mode) - Enabled
@@ -467,17 +519,18 @@ fun RoyalShieldApp(billingManager: com.royalshield.app.managers.BillingManager) 
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = { RoyalShieldBottomBar(navController) }
+        bottomBar = { RoyalShieldBottomBar(navController, showAds = showAds) }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             RoyalShieldNavGraph(
                 navController = navController,
                 billingManager = billingManager,
+                showAds = showAds,
                 onTriggerSOS = {
                     com.royalshield.app.SosManager.triggerSos(context)
-                }
+                },
+                onSignedOut = onSignedOut
             )
         }
     }
 }
-

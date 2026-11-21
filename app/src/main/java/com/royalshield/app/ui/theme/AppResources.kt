@@ -14,6 +14,8 @@ object RoyalIcons {
     val GalleryGold = R.drawable.gallery_icon_sin_frame
     val LockGold = R.drawable.ic_lock_gold
     val LockGoldLarge = R.drawable.ic_lock_gold_large
+    val LockGreenLarge = R.drawable.ic_lock_green_large
+    val LockRedLarge = R.drawable.ic_lock_red_large
     val NavAutomation = R.drawable.nav_automation
 
     // Feature Grid Icons (New structure)
@@ -22,7 +24,7 @@ object RoyalIcons {
     val AiNeuralHub = R.drawable.ai_brain_hub
     val SmartHome = R.drawable.dashboard_card_smart_home
     val SmsPhishing = R.drawable.dashboard_card_sms_phishing
-    val RoyalVpn = R.drawable.dashboard_card_vpn
+    val RoyalVpn = R.drawable.img_icon_shield_gold
     val TrackingChild = R.drawable.card_tracking_child
 
     // Navigation / Action Icons
@@ -50,5 +52,5 @@ object RoyalImages {
     // Specific Hero/Card Backgrounds
     val MalwareSkull = R.drawable.img_malware_skull
     val CyberCity = R.drawable.cyber_city_bg
-    val GlobalShield = R.drawable.hero_royal_shield_hero
+    val GlobalShield = R.drawable.royal_shield_hero
 }

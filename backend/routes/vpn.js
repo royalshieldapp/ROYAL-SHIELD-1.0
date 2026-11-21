@@ -9,34 +9,45 @@ const router = express.Router();
  */
 router.get('/servers', (req, res) => {
     const vpnProvider = process.env.VPN_PROVIDER; // 'wireguard', 'tailscale', etc.
+    const serverPublicKey = process.env.VPN_SERVER_PUBLIC_KEY;
+    const serversEnv = process.env.VPN_SERVERS || '';
+    const canIssueConfig = process.env.VPN_ALLOW_STATIC_CONFIG === 'true';
 
-    if (!vpnProvider) {
+    if (!vpnProvider || !serverPublicKey || !serversEnv) {
         return res.json({
             success: true,
             status: 'not_configured',
             code: 'VPN_NOT_CONFIGURED',
-            message: 'VPN provider not configured. Set VPN_PROVIDER and server details in environment.',
+            message: 'VPN provider not configured. Set VPN_PROVIDER, VPN_SERVER_PUBLIC_KEY, and VPN_SERVERS in environment.',
             servers: []
         });
     }
 
-    // TODO: Query real VPN provider for server list
-    // For now, return configured servers from env
+    if (!canIssueConfig) {
+        return res.json({
+            success: true,
+            status: 'peer_registration_not_configured',
+            code: 'VPN_PEER_REGISTRATION_NOT_CONFIGURED',
+            message: 'VPN server exists, but peer registration/config issuing is not enabled. Set VPN_ALLOW_STATIC_CONFIG=true only for a controlled lab server with pre-authorized peers.',
+            servers: []
+        });
+    }
+
     const servers = [];
 
     // Parse servers from env: VPN_SERVERS=us-east:US East:us-east.vpn.royalshield.app,eu-west:EU West:eu-west.vpn.royalshield.app
-    const serversEnv = process.env.VPN_SERVERS || '';
     if (serversEnv) {
         const parsed = serversEnv.split(',').map(s => {
             const [id, name, host] = s.split(':');
             return {
                 id: id?.trim(),
                 name: name?.trim(),
+                countryCode: (id || '').split('-')[0]?.toUpperCase() || '',
                 host: host?.trim(),
                 port: parseInt(process.env.VPN_PORT || '51820'),
                 protocol: vpnProvider,
                 status: 'available',
-                load: Math.floor(Math.random() * 60) + 10 // Simulated load %
+                load: null
             };
         }).filter(s => s.id && s.host);
         servers.push(...parsed);
@@ -65,8 +76,8 @@ router.post('/config', (req, res) => {
     if (!publicKey) return res.status(400).json({ error: 'publicKey (client WireGuard public key) is required' });
 
     const vpnProvider = process.env.VPN_PROVIDER;
-    const serverPrivateKey = process.env.VPN_SERVER_PRIVATE_KEY;
     const serverPublicKey = process.env.VPN_SERVER_PUBLIC_KEY;
+    const canIssueConfig = process.env.VPN_ALLOW_STATIC_CONFIG === 'true';
 
     if (!vpnProvider || !serverPublicKey) {
         return res.status(503).json({
@@ -76,8 +87,13 @@ router.post('/config', (req, res) => {
         });
     }
 
-    // TODO: In production, generate per-user configs dynamically
-    // and register the client's public key with the WireGuard server
+    if (!canIssueConfig) {
+        return res.status(501).json({
+            error: 'VPN peer registration not configured',
+            code: 'VPN_PEER_REGISTRATION_NOT_CONFIGURED',
+            message: 'WireGuard peer registration is not implemented for this deployment. Configure a real peer-registration workflow before issuing VPN profiles.'
+        });
+    }
 
     // Parse the requested server from env
     const serversEnv = process.env.VPN_SERVERS || '';
@@ -118,12 +134,21 @@ router.post('/config', (req, res) => {
  */
 router.get('/status', (req, res) => {
     const vpnProvider = process.env.VPN_PROVIDER;
-    const configured = vpnProvider && process.env.VPN_SERVER_PUBLIC_KEY;
+    const hasBaseConfig = Boolean(vpnProvider && process.env.VPN_SERVER_PUBLIC_KEY && process.env.VPN_SERVERS);
+    const canIssueConfig = process.env.VPN_ALLOW_STATIC_CONFIG === 'true';
+    const configured = hasBaseConfig && canIssueConfig;
 
     res.json({
         service: 'vpn',
-        status: configured ? 'available' : 'not_configured',
-        provider: vpnProvider || null
+        status: configured ? 'available' : (hasBaseConfig ? 'peer_registration_not_configured' : 'not_configured'),
+        code: configured ? 'VPN_AVAILABLE' : (hasBaseConfig ? 'VPN_PEER_REGISTRATION_NOT_CONFIGURED' : 'VPN_NOT_CONFIGURED'),
+        message: configured
+            ? 'VPN service available.'
+            : (hasBaseConfig
+                ? 'VPN server variables exist, but peer registration/config issuing is not enabled.'
+                : 'VPN provider not configured. Set VPN_PROVIDER, VPN_SERVER_PUBLIC_KEY, and VPN_SERVERS.'),
+        provider: vpnProvider || null,
+        staticConfigAllowed: canIssueConfig
     });
 });
 

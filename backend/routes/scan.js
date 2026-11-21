@@ -4,8 +4,12 @@ const axios = require('axios');
 
 const VT_BASE = 'https://www.virustotal.com/api/v3';
 
+function getVirusTotalApiKey() {
+    return process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY;
+}
+
 function vtHeaders() {
-    return { 'x-apikey': process.env.VIRUSTOTAL_API_KEY };
+    return { 'x-apikey': getVirusTotalApiKey() };
 }
 
 /**
@@ -15,7 +19,7 @@ function vtHeaders() {
  */
 router.post('/url', async (req, res) => {
     const { url } = req.body;
-    const apiKey = process.env.VIRUSTOTAL_API_KEY;
+    const apiKey = getVirusTotalApiKey();
 
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
@@ -46,7 +50,7 @@ router.post('/url', async (req, res) => {
  */
 router.get('/result/:analysisId', async (req, res) => {
     const { analysisId } = req.params;
-    const apiKey = process.env.VIRUSTOTAL_API_KEY;
+    const apiKey = getVirusTotalApiKey();
 
     if (!apiKey) {
         return res.status(503).json({ error: 'Scanner service configuration unavailable' });
@@ -86,7 +90,7 @@ router.get('/result/:analysisId', async (req, res) => {
  */
 router.post('/file-hash', async (req, res) => {
     const { hash } = req.body;
-    const apiKey = process.env.VIRUSTOTAL_API_KEY;
+    const apiKey = getVirusTotalApiKey();
 
     if (!hash) return res.status(400).json({ error: 'hash is required' });
     if (!apiKey) return res.status(503).json({ error: 'Scanner service configuration unavailable' });

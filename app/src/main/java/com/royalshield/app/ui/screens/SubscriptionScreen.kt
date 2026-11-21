@@ -49,6 +49,8 @@ import com.royalshield.app.billing.BillingRepository
 import com.royalshield.app.subscription.SubscriptionManager
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.Icons
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.subscriptionEliteBadgeMode
 
 data class UiSubscriptionTier(
     val title: String,
@@ -100,7 +102,7 @@ fun SubscriptionScreen(
     val demoTiers = listOf(
         UiSubscriptionTier(
             title = products?.starter?.title ?: "Starter Shield",
-            price = products?.starter?.price ?: "USD 4.99 / mo",
+            price = products?.starter?.price ?: "One-time price unavailable",
             perks = listOf("Basic threat scan", "Safe Browsing", "1 Device"),
             accent = Color.White,
             badgeRes = R.drawable.starter_emblem_screen_subscripcion,
@@ -108,7 +110,7 @@ fun SubscriptionScreen(
         ),
         UiSubscriptionTier(
             title = products?.gold?.title ?: "Gold Bundle",
-            price = products?.gold?.price ?: "USD 29.99 / mo",
+            price = products?.gold?.price ?: "One-time price unavailable",
             perks = listOf("Priority Support", "Cloud Reports", "10 Devices + Admin Panel"),
             accent = goldColor,
             badgeRes = R.drawable.emblem_golden_screen_subscription,
@@ -116,7 +118,7 @@ fun SubscriptionScreen(
         ),
         UiSubscriptionTier(
             title = products?.ultimate?.title ?: "Ultimate Shield",
-            price = products?.ultimate?.price ?: "USD 99.99 / mo",
+            price = products?.ultimate?.price ?: "One-time price unavailable",
             perks = listOf("Dedicated Analyst", "API Access", "Unlimited Devices", "Forensic Audit"),
             accent = redColor,
             badgeRes = R.drawable.emblem_ultimate_red_screen_subscription,
@@ -186,6 +188,24 @@ fun SubscriptionScreen(
                 }
             }
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RoyalEliteBadge(
+                    mode = subscriptionEliteBadgeMode(isPremium),
+                    modifier = Modifier.size(84.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Preview of Royal Elite benefit",
+                    color = goldColor,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+            }
+
             if (com.royalshield.app.managers.PreferencesManager.isDiscountApplied()) {
                 Surface(
                     color = goldColor.copy(alpha = 0.2f),
@@ -206,7 +226,7 @@ fun SubscriptionScreen(
                 }
             }
 
-            if (isPremium || purchasedPack != null) {
+            if (isPremium) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
                         text = "Premium Features Active - ${purchasedPack ?: "Elite User"}", 

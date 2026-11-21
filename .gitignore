@@ -13,6 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+backend/.env
 node_modules
 .dev-tools/
 Royaol Shield from linux/
@@ -48,6 +49,9 @@ render-mcp-server/
 *.bat
 keystore/
 backend/
+!backend/
+!backend/routes/
+!backend/routes/risk.js
 royal_shield_backend/
 !royal_shield_backend_unified/
 !royal_shield_backend_unified/**/

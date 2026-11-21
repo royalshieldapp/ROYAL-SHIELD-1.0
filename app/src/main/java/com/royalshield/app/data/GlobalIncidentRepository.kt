@@ -32,7 +32,7 @@ object GlobalIncidentRepository {
         return listOf(
             Incident(1, "Theft reported", "Theft", 4.6097, -74.0817, "Robo a mano armada reportado cerca de la plaza central."),
             Incident(2, "Manifestation", "Protest", 4.6200, -74.0900, "Protesta pacifica bloqueando la via principal."),
-            Incident(3, "Suspicious Activity", "Suspicious", 4.6150, -74.0850, "Personas merodeando vehiculos estacionados.")
+            Incident(3, "Suspicious Activity", "Suspicious", 4.6150, -74.0850, "People loitering near parked vehicles.")
         )
     }
 

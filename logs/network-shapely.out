@@ -1,0 +1,15 @@
+Collecting shapely==2.1.1
+  Downloading shapely-2.1.1.tar.gz (315 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting numpy>=1.21 (from shapely==2.1.1)
+  Using cached numpy-2.5.1-cp314-cp314-win_amd64.whl.metadata (6.6 kB)
+Using cached numpy-2.5.1-cp314-cp314-win_amd64.whl (12.6 MB)
+Building wheels for collected packages: shapely
+  Building wheel for shapely (pyproject.toml): started
+  Building wheel for shapely (pyproject.toml): finished with status 'error'
+Failed to build shapely

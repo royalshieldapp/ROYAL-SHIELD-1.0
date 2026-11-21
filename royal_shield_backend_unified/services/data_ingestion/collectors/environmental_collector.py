@@ -154,14 +154,8 @@ class NASAFIRMSCollector(BaseCollector):
 
     async def store(self, records: List[Dict[str, Any]]) -> Dict[str, int]:
         """Store fire hotspot data in database"""
-        # TODO: Implement database storage using SQLAlchemy
-        logger.info(f"Would store {len(records)} fire hotspot records")
-
-        return {
-            "records_inserted": len(records),  # Simulated
-            "records_updated": 0,
-            "records_failed": 0
-        }
+        from services.data_ingestion.storage import store_forecast_events
+        return store_forecast_events(records)
 
     def _parse_csv(self, csv_text: str) -> List[Dict[str, Any]]:
         """Parse CSV response from FIRMS API"""

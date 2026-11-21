@@ -184,3 +184,27 @@ data class RiskFactor(
     val contribution: Double,
     val direction: String
 )
+
+data class MapLayersResponse(
+    val layers: List<MapLayerPoint>,
+    @Json(name = "total_count") val totalCount: Int,
+    val metadata: MapLayersMetadata? = null
+)
+
+data class MapLayersMetadata(
+    @Json(name = "generated_at") val generatedAt: String? = null,
+    @Json(name = "requested_layers") val requestedLayers: List<String> = emptyList(),
+    val sources: List<String> = emptyList()
+)
+
+data class MapLayerPoint(
+    val id: String,
+    val type: String,
+    val title: String,
+    val snippet: String,
+    val lat: Double,
+    val lng: Double,
+    val severity: String,
+    val source: String,
+    @Json(name = "updated_at") val updatedAt: String
+)

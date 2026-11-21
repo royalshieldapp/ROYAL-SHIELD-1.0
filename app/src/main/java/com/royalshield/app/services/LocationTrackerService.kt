@@ -17,6 +17,7 @@ import com.royalshield.app.managers.PreferencesManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class LocationTrackerService : Service() {
@@ -24,7 +25,7 @@ class LocationTrackerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var repository: FamilyRepository
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var locationCallback: LocationCallback
+    private var locationCallback: LocationCallback? = null
 
     companion object {
         private const val CHANNEL_ID = "RoyalShieldLocationChannel"
@@ -40,21 +41,40 @@ class LocationTrackerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NOTIFICATION_ID, createNotification())
+        if (PreferencesManager.getDeviceRole() != "CHILD") {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val hasLocationPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!hasLocationPermission) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } catch (e: SecurityException) {
+            android.util.Log.e("LocationTrackerService", "Unable to start location foreground service", e)
+            stopSelf()
+            return START_NOT_STICKY
         }
         startTracking()
         return START_STICKY
     }
 
     private fun startTracking() {
-        if (PreferencesManager.getDeviceRole() != "CHILD") {
-            stopSelf()
-            return
-        }
-
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL)
             .setMinUpdateIntervalMillis(10000L)
             .build()
@@ -80,7 +100,9 @@ class LocationTrackerService : Service() {
         }
 
         try {
-            fusedLocationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+            locationCallback?.let { callback ->
+                fusedLocationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
+            }
         } catch (e: SecurityException) {
             e.printStackTrace()
         }
@@ -119,7 +141,9 @@ class LocationTrackerService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        locationCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
+        locationCallback = null
+        serviceScope.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

@@ -54,7 +54,7 @@ fun ReportsCenterScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     
     var isGenerating by remember { mutableStateOf(false) }
-    var reports by remember { mutableStateOf(loadSampleReports()) }
+    var reports by remember { mutableStateOf(loadSavedReports(context)) }
     var selectedReportType by remember { mutableStateOf<ReportType?>(null) }
     var scanProgressText by remember { mutableStateOf("") }
     
@@ -112,7 +112,7 @@ fun ReportsCenterScreen(onBack: () -> Unit) {
                 ) {
                     ReportStat("Total", reports.size.toString(), Icons.Default.Description)
                     ReportStat("PDF", reports.count { it.filePath != null }.toString(), Icons.Default.PictureAsPdf)
-                    ReportStat("This Month", "8", Icons.Default.CalendarToday)
+                    ReportStat("Stored", reports.size.toString(), Icons.Default.CalendarToday)
                 }
             }
             
@@ -216,7 +216,9 @@ fun ReportsCenterScreen(onBack: () -> Unit) {
                                     val newReport = generatePdfReport(context, selectedReportType!!) { progress ->
                                         scanProgressText = progress
                                     }
-                                    reports = reports + newReport
+                                    val updated = reports + newReport
+                                    reports = updated
+                                    saveReports(context, updated)
                                     selectedReportType = null
                                     Toast.makeText(context, "Report generated successfully!", Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
@@ -343,13 +345,42 @@ fun EmptyReportsView() {
 }
 
 // Helper Functions
-fun loadSampleReports(): List<SecurityReport> {
-    val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-    return listOf(
-        SecurityReport("1", "Security Scan Report", sdf.format(Date()), ReportType.SECURITY_SCAN),
-        SecurityReport("2", "Compliance Check", sdf.format(Date(System.currentTimeMillis() - 86400000)), ReportType.COMPLIANCE_CHECK)
-    )
+fun loadSavedReports(context: Context): List<SecurityReport> {
+    val prefs = context.getSharedPreferences("royal_reports_pref", Context.MODE_PRIVATE)
+    val json = prefs.getString("reports_json", null)
+    if (json.isNullOrBlank()) {
+        return defaultSecurityReports()
+    }
+    return try {
+        val gson = com.google.gson.Gson()
+        val array = gson.fromJson(json, Array<SecurityReport>::class.java)
+        val stored = array?.toList() ?: defaultSecurityReports()
+        val verified = removeLegacySampleReports(stored)
+        if (verified.size != stored.size) saveReports(context, verified)
+        verified
+    } catch (e: Exception) {
+        defaultSecurityReports()
+    }
 }
+
+fun saveReports(context: Context, reports: List<SecurityReport>) {
+    val prefs = context.getSharedPreferences("royal_reports_pref", Context.MODE_PRIVATE)
+    val json = com.google.gson.Gson().toJson(reports)
+    prefs.edit().putString("reports_json", json).apply()
+}
+
+fun defaultSecurityReports(): List<SecurityReport> = emptyList()
+
+fun removeLegacySampleReports(reports: List<SecurityReport>): List<SecurityReport> =
+    reports.filterNot { report ->
+        report.filePath == null && (
+            (report.id == "1" && report.title == "Security Scan Report") ||
+                (report.id == "2" && report.title == "Compliance Check")
+            )
+    }
+
+fun reportFileCandidates(discoveredFiles: List<String>): List<String> =
+    discoveredFiles.distinct()
 
 suspend fun generatePdfReport(
     context: Context,
@@ -380,7 +411,7 @@ suspend fun generatePdfReport(
         onProgress("Scanning system and user directories...")
         kotlinx.coroutines.delay(200)
 
-        // Read files to scan or simulate them
+        // Include only files actually discovered through accessible directories.
         val filePaths = mutableListOf<String>()
         val directoriesToScan = listOf(
             Environment.DIRECTORY_DOCUMENTS,
@@ -400,17 +431,7 @@ suspend fun generatePdfReport(
             }
         } catch (e: Exception) {}
 
-        val fallbackFiles = listOf(
-            "/system/framework/framework-res.apk",
-            "/system/app/Settings/Settings.apk",
-            "/system/bin/app_process",
-            "/system/bin/linker",
-            "/system/etc/hosts",
-            "Documents/financial_report.pdf",
-            "Downloads/update.apk",
-            "Pictures/IMG_0001.jpg"
-        )
-        val allFiles = filePaths + fallbackFiles
+        val allFiles = reportFileCandidates(filePaths)
         val scanFilesBatch = allFiles.take(8)
         val timePerFile = 600L / scanFilesBatch.size.coerceAtLeast(1)
         scanFilesBatch.forEachIndexed { index, filePath ->

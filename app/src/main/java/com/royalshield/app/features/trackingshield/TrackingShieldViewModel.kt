@@ -13,6 +13,9 @@ import kotlinx.coroutines.launch
 import com.royalshield.app.features.riskprediction.data.repository.RiskPredictionRepository
 import com.royalshield.app.features.riskprediction.data.remote.Hotspot
 
+fun unavailableTrackingForecastState(current: TrackingUiState): TrackingUiState =
+    current.copy(hotspots = emptyList(), isForecastAvailable = false)
+
 class TrackingShieldViewModel(application: Application) : AndroidViewModel(application) {
 
     private val manager = FamilyTrackingManager(application)
@@ -29,23 +32,19 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
 
     init {
         checkRole()
-        // Only start tracking if we are PARENT or CHILD (logic tailored later)
-        // For now, if role is set, we proceed.
+        // Location services are started by the screen after runtime permission is granted.
         if (PreferencesManager.getDeviceRole() != "UNSET") {
              manager.startTracking()
         }
         observeData()
         startLastUpdateTicker()
         loadHotspots()
+        loadMapLayers()
     }
 
     private fun checkRole() {
         val role = PreferencesManager.getDeviceRole()
         _uiState.value = _uiState.value.copy(deviceRole = role)
-        
-        if (role == "CHILD") {
-             startLocationService()
-        }
     }
 
     fun setRole(role: String) {
@@ -54,18 +53,34 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
         
         if (role == "PARENT") {
             manager.startTracking()
-        } else if (role == "CHILD") {
-            startLocationService()
         }
     }
-    
-    private fun startLocationService() {
+
+    /** Starts the child service only after the UI has confirmed location permission. */
+    fun startChildLocationService() {
+        if (PreferencesManager.getDeviceRole() != "CHILD") return
         val context = com.royalshield.app.RoyalShieldApp.instance
+        val hasLocationPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!hasLocationPermission) return
+
         val intent = android.content.Intent(context, com.royalshield.app.services.LocationTrackerService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: IllegalStateException) {
+            android.util.Log.e("TrackingShieldViewModel", "Unable to start child location service", e)
+        } catch (e: SecurityException) {
+            android.util.Log.e("TrackingShieldViewModel", "Location service permission denied", e)
         }
     }
 
@@ -116,55 +131,31 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
             try {
                 val result = riskRepo.getHotspots(null, null, null, null)
                 result.onSuccess { response ->
-                    _uiState.value = _uiState.value.copy(hotspots = response.hotspots)
+                    _uiState.value = _uiState.value.copy(
+                        hotspots = response.hotspots,
+                        isForecastAvailable = true,
+                    )
                 }.onFailure {
-                    loadFallbackHotspots()
+                    _uiState.value = unavailableTrackingForecastState(_uiState.value)
                 }
             } catch (e: Exception) {
-                loadFallbackHotspots()
+                _uiState.value = unavailableTrackingForecastState(_uiState.value)
             }
         }
     }
 
-    private fun loadFallbackHotspots() {
-        val baseLat = 25.7617
-        val baseLng = -80.1918
-        val simulated = listOf(
-            Hotspot(
-                hotspotId = 1,
-                center = com.royalshield.app.features.riskprediction.data.remote.HotspotCenter(baseLat + 0.005, baseLng - 0.005),
-                h3Cell = "sim_cell_h1",
-                radiusMeters = 500.0,
-                eventCount = 15,
-                eventTypes = emptyMap(),
-                severities = emptyMap(),
-                riskScore = 0.9,
-                riskLevel = "CRITICAL"
-            ),
-            Hotspot(
-                hotspotId = 2,
-                center = com.royalshield.app.features.riskprediction.data.remote.HotspotCenter(baseLat - 0.008, baseLng + 0.006),
-                h3Cell = "sim_cell_h2",
-                radiusMeters = 400.0,
-                eventCount = 8,
-                eventTypes = emptyMap(),
-                severities = emptyMap(),
-                riskScore = 0.7,
-                riskLevel = "HIGH"
-            ),
-            Hotspot(
-                hotspotId = 3,
-                center = com.royalshield.app.features.riskprediction.data.remote.HotspotCenter(baseLat + 0.003, baseLng + 0.009),
-                h3Cell = "sim_cell_h3",
-                radiusMeters = 300.0,
-                eventCount = 4,
-                eventTypes = emptyMap(),
-                severities = emptyMap(),
-                riskScore = 0.5,
-                riskLevel = "MEDIUM"
-            )
-        )
-        _uiState.value = _uiState.value.copy(hotspots = simulated)
+    fun loadMapLayers(
+        minLat: Double = 25.62,
+        minLng: Double = -80.33,
+        maxLat: Double = 25.90,
+        maxLng: Double = -80.10
+    ) {
+        viewModelScope.launch {
+            riskRepo.getMapLayers(minLat, minLng, maxLat, maxLng)
+                .onSuccess { response ->
+                    _uiState.value = _uiState.value.copy(mapLayers = response.layers)
+                }
+        }
     }
 
     /** Refreshes "last update: Xs ago" text every second */
@@ -197,9 +188,18 @@ class TrackingShieldViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private fun generateNavRouteFromState(): NavRoute? {
-        val child = _uiState.value.child ?: return null
-        val parent = _uiState.value.parentLocation ?: return null
-        return manager.generateNavRoute(from = child.latLng, to = parent)
+        val child = _uiState.value.child
+        val parent = _uiState.value.parentLocation
+        if (child != null && parent != null) {
+            return manager.generateNavRoute(from = child.latLng, to = parent)
+        }
+        val origin = parent ?: child?.latLng ?: LatLng(25.7617, -80.1918)
+        val destination = _uiState.value.safeZones.firstOrNull()?.center
+            ?: _uiState.value.riskZones.firstOrNull()?.center
+            ?: LatLng(origin.latitude + 0.008, origin.longitude + 0.008)
+        val destName = _uiState.value.safeZones.firstOrNull()?.name?.ifBlank { null } ?: "Safe Perimeter Point"
+        val route = manager.generateNavRoute(from = origin, to = destination)
+        return route.copy(destinationName = destName, currentInstruction = "Route to $destName active")
     }
 
     // ── History Playback ────────────────────────────────────

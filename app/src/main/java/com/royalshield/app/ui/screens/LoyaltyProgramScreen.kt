@@ -26,6 +26,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.features.loyalty.LoyaltyViewModel
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.RoyalEliteBadgeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +86,31 @@ fun LoyaltyProgramScreen(
                 // Points Progress Card
                 LoyaltyProgressCard(state.points, gold, deepGold, surfaceColor)
 
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = surfaceColor),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RoyalEliteBadge(
+                            mode = RoyalEliteBadgeMode.LOCKED,
+                            modifier = Modifier.size(72.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Royal Elite badge locked", color = gold, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Activation requires a verified entitlement.",
+                                color = Color.LightGray,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
                 // Tier Info
                 TierSection(state.tier, gold, deepGold)
 
@@ -133,8 +160,18 @@ fun LoyaltyProgramScreen(
 
 @Composable
 fun LoyaltyProgressCard(points: Int, gold: Color, deepGold: Color, surface: Color) {
-    // Logic for next tier
-    val nextTierPoints = 1000
+    val nextTier = when {
+        points < 300 -> "Silver"
+        points < 800 -> "Gold"
+        points < 1500 -> "Elite"
+        else -> null
+    }
+    val nextTierPoints = when {
+        points < 300 -> 300
+        points < 800 -> 800
+        points < 1500 -> 1500
+        else -> 1500
+    }
     val progress = (points.toFloat() / nextTierPoints).coerceIn(0f, 1f)
     val remaining = (nextTierPoints - points).coerceAtLeast(0)
 
@@ -171,9 +208,9 @@ fun LoyaltyProgressCard(points: Int, gold: Color, deepGold: Color, surface: Colo
                 trackColor = Color.DarkGray
             )
             Spacer(modifier = Modifier.height(8.dp))
-            if (remaining > 0) {
+            if (nextTier != null && remaining > 0) {
                 Text(
-                    "$remaining pts left for Platinum Tier",
+                    "$remaining pts left for $nextTier Tier",
                     color = Color.LightGray,
                     fontSize = 12.sp
                 )
@@ -447,6 +484,7 @@ fun ReferralCard(gold: Color, background: Color) {
 }
 
 data class LoyaltyReward(
+    val id: String,
     val name: String,
     val description: String,
     val cost: Int,
@@ -460,10 +498,10 @@ fun RewardShopSection(gold: Color, vm: LoyaltyViewModel) {
     var showRedemptionResult by remember { mutableStateOf(false) }
     
     val rewards = listOf(
-        LoyaltyReward("1 Month Premium VPN", "Unlimited high-speed secure tunnel access.", 200, Icons.Default.VpnLock),
-        LoyaltyReward("Matrix Custom Theme", "Unlock the glowing matrix style UI completely.", 500, Icons.Default.Palette),
-        LoyaltyReward("Priority AI Processing (24h)", "Your analysis requests skip the queue.", 800, Icons.Default.Bolt),
-        LoyaltyReward("VIP Custom Avatar", "Exclusive digital agent animation presets.", 1500, Icons.Default.Face)
+        LoyaltyReward("vpn_30_days", "1 Month Premium VPN", "Unlimited high-speed secure tunnel access.", 200, Icons.Default.VpnLock),
+        LoyaltyReward("matrix_theme", "Matrix Custom Theme", "Unlock the glowing matrix style UI completely.", 500, Icons.Default.Palette),
+        LoyaltyReward("ai_priority_24h", "Priority AI Processing (24h)", "Your analysis requests skip the queue.", 800, Icons.Default.Bolt),
+        LoyaltyReward("vip_avatar", "VIP Custom Avatar", "Exclusive digital agent animation presets.", 1500, Icons.Default.Face)
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -525,7 +563,8 @@ fun RewardShopSection(gold: Color, vm: LoyaltyViewModel) {
                         
                         Button(
                             onClick = {
-                                vm.redeemReward(reward.cost, reward.name) { success, message ->
+                                vm.redeemReward(reward.id, reward.name) { success, message ->
+                                    @Suppress("UNUSED_VARIABLE") val redemptionSucceeded = success
                                     redemptionStatus = message
                                     showRedemptionResult = true
                                 }
@@ -533,6 +572,7 @@ fun RewardShopSection(gold: Color, vm: LoyaltyViewModel) {
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (state.points >= reward.cost) gold else Color.DarkGray
                             ),
+                            enabled = state.points >= reward.cost && !state.isLoading,
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.height(36.dp)

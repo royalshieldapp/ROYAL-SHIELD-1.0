@@ -6,7 +6,12 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import android.util.Patterns
-import com.royalshield.app.VirusTotalRepository
+import com.google.firebase.auth.FirebaseAuth
+import com.royalshield.app.data.AdvancedScanResult
+import com.royalshield.app.data.AdvancedUrlScanRepository
+import com.royalshield.app.models.PhishingRiskLevel
+import com.royalshield.app.securitysetup.EncryptedSecuritySetupStore
+import com.royalshield.app.services.PhishingDetectionService
 import com.royalshield.app.util.NotificationUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,29 +19,51 @@ import kotlinx.coroutines.launch
 
 /**
  * SMS Guard (PHASE 2.13-2.15)
- * Intercepts incoming SMS, extracts URLs, and scans them against VirusTotal.
+ * Receives incoming SMS after explicit opt-in, analyzes locally, and optionally
+ * submits extracted URLs to the authenticated advanced scanner.
  */
 class SmsReceiver : BroadcastReceiver() {
-
-    private val repository = VirusTotalRepository()
-    private val scope = CoroutineScope(Dispatchers.IO)
-
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            for (sms in messages) {
-                val body = sms.displayMessageBody
-                val sender = sms.displayOriginatingAddress
-                
-                Log.d("SMS_GUARD", "Received SMS from $sender: $body")
-                
-                // Extract URLs using standard Android patterns
-                val urls = extractUrls(body)
-                
-                if (urls.isNotEmpty()) {
-                    Log.d("SMS_GUARD", "Found ${urls.size} URLs to scan: $urls")
-                    scanAndNotify(context, urls, sender)
+        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val setup = EncryptedSecuritySetupStore(context).load(uid)
+        if (setup.smsPhishingEnabled != true) return
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val localAnalyzer = PhishingDetectionService()
+                val advancedScanner = AdvancedUrlScanRepository.createDefault()
+                for (sms in Telephony.Sms.Intents.getMessagesFromIntent(intent)) {
+                    val body = sms.displayMessageBody.orEmpty()
+                    val urls = extractUrls(body)
+                    Log.d("SMS_GUARD", SmsPrivacy.receivedMessage(urls.size))
+
+                    val localResult = localAnalyzer.analyzeText(body)
+                    if (localResult.riskLevel == PhishingRiskLevel.HIGH) {
+                        NotificationUtils.showSecurityAlert(
+                            context = context,
+                            title = "Posible phishing detectado",
+                            message = "Royal Shield detectó indicadores de alto riesgo en un SMS recibido.",
+                            isCritical = true,
+                        )
+                    }
+
+                    urls.forEach { url ->
+                        when (advancedScanner.submit(url)) {
+                            is AdvancedScanResult.Submitted ->
+                                Log.d("SMS_GUARD", SmsPrivacy.scanCompleted("SUBMITTED"))
+                            is AdvancedScanResult.Unavailable ->
+                                Log.d("SMS_GUARD", SmsPrivacy.scanCompleted("UNAVAILABLE"))
+                            is AdvancedScanResult.Rejected ->
+                                Log.d("SMS_GUARD", SmsPrivacy.scanCompleted("REJECTED"))
+                        }
+                    }
                 }
+            } catch (error: Exception) {
+                Log.e("SMS_GUARD", "SMS protection unavailable", error)
+            } finally {
+                pendingResult.finish()
             }
         }
     }
@@ -50,26 +77,4 @@ class SmsReceiver : BroadcastReceiver() {
         return urls
     }
 
-    private fun scanAndNotify(context: Context, urls: List<String>, sender: String) {
-        scope.launch {
-            for (url in urls) {
-                try {
-                    val result = repository.checkUrl(url)
-                    Log.d("SMS_GUARD", "Scan result for $url: ${result.verdict}")
-                    
-                    if (result.verdict == "malicious" || result.verdict == "suspicious") {
-                        // High Priority Alert
-                        NotificationUtils.showSecurityAlert(
-                            context = context,
-                            title = "🚨 Phishing Link Detected!",
-                            message = "The link from $sender is flagged as ${result.verdict.uppercase()}. Avoid clicking it.",
-                            isCritical = result.verdict == "malicious"
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.e("SMS_GUARD", "Error scanning URL $url", e)
-                }
-            }
-        }
-    }
 }

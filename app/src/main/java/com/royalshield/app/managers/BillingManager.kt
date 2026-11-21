@@ -5,38 +5,43 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.android.billingclient.api.*
+import com.royalshield.app.billing.BillingVerificationResult
+import com.royalshield.app.billing.BillingVerificationDecision
+import com.royalshield.app.billing.BillingVerifier
+import com.royalshield.app.billing.RenderBillingVerifier
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.royalshield.app.subscription.EntitlementStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.tasks.await
-import com.royalshield.app.managers.PreferencesManager
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Manager for Google Play Billing
  * Handles the $0.99 paywall for Security Screen
  */
-class BillingManager(private val context: Context) : PurchasesUpdatedListener {
-
-    private val firestore by lazy { FirebaseFirestore.getInstance() }
-    private val auth by lazy { FirebaseAuth.getInstance() }
-
-    // Normal tier testing: true keeps the app on forced Ultimate for testing.
-    private val isDevMode = true
+class BillingManager(
+    private val context: Context,
+    private val billingVerifier: BillingVerifier = RenderBillingVerifier(),
+) : PurchasesUpdatedListener {
 
     private var billingClient: BillingClient? = null
+
+    private val _billingConnectionReady = MutableStateFlow(false)
+    val billingConnectionReady: StateFlow<Boolean> = _billingConnectionReady.asStateFlow()
 
     private val _purchaseState = MutableStateFlow<PurchaseState>(PurchaseState.Idle)
     val purchaseState: StateFlow<PurchaseState> = _purchaseState.asStateFlow()
 
-    private val _hasPremiumAccess = MutableStateFlow(false) // FREE MODE
+    private val _hasPremiumAccess = MutableStateFlow(
+        EntitlementStore.DEV_SUPERPOWERS || PreferencesManager.getPurchasedPack() != null
+    )
     val hasPremiumAccess: StateFlow<Boolean> = _hasPremiumAccess.asStateFlow()
 
-    private val _currentProduct = MutableStateFlow<String?>(null)
+    private val _currentProduct = MutableStateFlow<String?>(
+        if (EntitlementStore.DEV_SUPERPOWERS) PRODUCT_ULTIMATE else PreferencesManager.getPurchasedPack()
+    )
     val currentProduct: StateFlow<String?> = _currentProduct.asStateFlow()
 
     companion object {
@@ -48,7 +53,6 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         const val PRODUCT_GOLD = "lifetime_gold"       // Unified ID
         const val PRODUCT_ULTIMATE = "lifetime_ultimate" // Unified ID
 
-        private const val COLLECTION_PURCHASES = "purchases"
     }
 
     sealed class PurchaseState {
@@ -71,16 +75,19 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
         billingClient?.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    _billingConnectionReady.value = true
                     Log.d(TAG, "Billing client connected")
                     // Check existing purchases
                     queryPurchases()
                     onReady()
                 } else {
+                    _billingConnectionReady.value = false
                     Log.e(TAG, "Error connecting billing: ${billingResult.debugMessage}")
                 }
             }
 
             override fun onBillingServiceDisconnected() {
+                _billingConnectionReady.value = false
                 Log.w(TAG, "Billing service disconnected")
                 // Retry connection
             }
@@ -92,74 +99,26 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
      * DEV MODE: Always returns true for full access
      */
     suspend fun checkPremiumAccess(): Boolean {
-        if (isDevMode) {
-            _hasPremiumAccess.value = true
-            return true
-        }
-
-        return try {
-            val uid = auth.currentUser?.uid ?: return false
-
-            // Verify in Firestore if user has SOLO or DUO plan
-            val userDoc = firestore.collection("users")
-                .document(uid)
-                .get()
-                .await()
-
-            if (userDoc.exists()) {
-                val planTier = userDoc.getString("planTier") ?: "FREE"
-                val premiumExpires = userDoc.getLong("premiumExpiresAt")
-
-                val hasPlan = planTier == "SOLO" || planTier == "DUO" || planTier == "GOLD" || planTier == "ULTIMATE" || planTier == "STARTER"
-
-                val hasPremiumTemp = premiumExpires?.let {
-                    System.currentTimeMillis() < it
-                } ?: false
-
-                val hasAccess = hasPlan || hasPremiumTemp
-                _hasPremiumAccess.value = hasAccess
-                // Also update local cache if we found a specific pack
-                val productId = when(planTier) {
-                    "STARTER" -> PRODUCT_STARTER
-                    "GOLD" -> PRODUCT_GOLD
-                    "ULTIMATE" -> PRODUCT_ULTIMATE
-                    else -> null
-                }
-
-                if (productId != null) {
-                   PreferencesManager.savePurchasedPack(productId)
-                }
-                return hasAccess
-            }
-            // Fallback to local
-            val localPack = PreferencesManager.getPurchasedPack()
-            if (localPack != null) {
-                _hasPremiumAccess.value = true
-                return true
-            }
-
-            false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error verifying premium access", e)
-            false
-        }
+        if (EntitlementStore.DEV_SUPERPOWERS) return true
+        return _hasPremiumAccess.value
     }
 
     /**
      * Queries available products
      */
     suspend fun queryProducts(): List<com.royalshield.app.models.ProductInfo> {
-        if (isDevMode) {
-            kotlinx.coroutines.delay(500) // Simular latencia
-            return listOf(
-                com.royalshield.app.models.ProductInfo(PRODUCT_STARTER, "Starter Pack", "Essential protection", "$9.99", null),
-                com.royalshield.app.models.ProductInfo(PRODUCT_GOLD, "Gold Bundle", "Advanced automation", "$19.99", null),
-                com.royalshield.app.models.ProductInfo(PRODUCT_ULTIMATE, "Ultimate Pack", "Lifetime Elite status", "$39.99", null)
-            )
-        }
-
         return try {
-            val productList = listOf(
+            val ready = _billingConnectionReady.value ||
+                withTimeoutOrNull(5_000L) {
+                    _billingConnectionReady.first { it }
+                    true
+                } == true
+            if (!ready) {
+                Log.e(TAG, "Google Play Billing was not ready before the catalog timeout")
+                return emptyList()
+            }
+
+            val inAppList = listOf(
                 QueryProductDetailsParams.Product.newBuilder()
                     .setProductId(PRODUCT_STARTER)
                     .setProductType(BillingClient.ProductType.INAPP)
@@ -174,26 +133,50 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                     .build()
             )
 
-            val params = QueryProductDetailsParams.newBuilder()
-                .setProductList(productList)
+            val subsList = listOf(
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_STARTER)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build(),
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_GOLD)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build(),
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_ULTIMATE)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build()
+            )
+
+            val inAppParams = QueryProductDetailsParams.newBuilder()
+                .setProductList(inAppList)
                 .build()
+            val inAppResult = billingClient?.queryProductDetails(inAppParams)
+            val inAppDetails = if (inAppResult?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
+                inAppResult.productDetailsList ?: emptyList()
+            } else emptyList()
 
-            val result = billingClient?.queryProductDetails(params)
+            val subsParams = QueryProductDetailsParams.newBuilder()
+                .setProductList(subsList)
+                .build()
+            val subsResult = billingClient?.queryProductDetails(subsParams)
+            val subsDetails = if (subsResult?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
+                subsResult.productDetailsList ?: emptyList()
+            } else emptyList()
 
-            if (result?.billingResult?.responseCode == BillingClient.BillingResponseCode.OK) {
-                result.productDetailsList?.map { detail ->
-                    val offer = detail.oneTimePurchaseOfferDetails
-                    com.royalshield.app.models.ProductInfo(
-                        id = detail.productId,
-                        title = detail.name,
-                        description = detail.description,
-                        price = offer?.formattedPrice ?: "N/A",
-                        originalDetails = detail
-                    )
-                } ?: emptyList()
-            } else {
-                Log.e(TAG, "Error querying products: ${result?.billingResult?.debugMessage}")
-                emptyList()
+            val allDetails = (inAppDetails + subsDetails).distinctBy { it.productId }
+
+            allDetails.map { detail ->
+                val price = detail.oneTimePurchaseOfferDetails?.formattedPrice
+                    ?: detail.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
+                    ?: "N/A"
+                com.royalshield.app.models.ProductInfo(
+                    id = detail.productId,
+                    title = detail.name,
+                    description = detail.description,
+                    price = price,
+                    originalDetails = detail
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error querying products", e)
@@ -204,24 +187,12 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
     /**
      * Launches the purchase flow
      */
-    /**
-     * Launches the purchase flow
-     */
     fun launchPurchaseFlow(activity: Activity, productInfo: com.royalshield.app.models.ProductInfo) {
-        if (isDevMode) {
-            _purchaseState.value = PurchaseState.Loading
-            // Simular proceso de Google Play
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                kotlinx.coroutines.delay(1000)
-                // Éxito simulado
-                PreferencesManager.savePurchasedPack(productInfo.id)
-                _hasPremiumAccess.value = true
-                _currentProduct.value = productInfo.id
-                _purchaseState.value = PurchaseState.Success(productInfo.id)
-            }
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _purchaseState.value = PurchaseState.Error("Authentication required")
             return
         }
-
         val productDetails = productInfo.originalDetails
         if (productDetails == null) {
             _purchaseState.value = PurchaseState.Error("Product details not available")
@@ -230,14 +201,21 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
 
         _purchaseState.value = PurchaseState.Loading
 
-        val productDetailsParamsList = listOf(
-            BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(productDetails)
-                .build()
-        )
+        val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
+        val productDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
+            .setProductDetails(productDetails)
+            .apply {
+                if (offerToken != null) {
+                    setOfferToken(offerToken)
+                }
+            }
+            .build()
+
+        val productDetailsParamsList = listOf(productDetailsParams)
 
         val billingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
+            .setObfuscatedAccountId(BillingVerificationDecision.obfuscatedAccountId(uid))
             .build()
 
         billingClient?.launchBillingFlow(activity, billingFlowParams)
@@ -273,29 +251,82 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
      * Processes a purchase
      */
     private fun handlePurchase(purchase: Purchase) {
-        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            if (!purchase.isAcknowledged) {
-                acknowledgePurchase(purchase)
+        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
+            _purchaseState.value = PurchaseState.Error("Purchase is pending")
+            return
+        }
+
+        billingVerifier.verify(purchase) { result ->
+            when (result) {
+                is BillingVerificationResult.Rejected -> {
+                    _hasPremiumAccess.value = false
+                    _currentProduct.value = null
+                    _purchaseState.value = PurchaseState.Error(result.message)
+                }
+                is BillingVerificationResult.Verified -> {
+                    val productId = purchase.products.singleOrNull()
+                    if (productId == null) {
+                        _purchaseState.value = PurchaseState.Error("Invalid product")
+                        return@verify
+                    }
+                    if (!purchase.isAcknowledged && !result.acknowledged) {
+                        acknowledgePurchase(purchase) { acknowledged ->
+                            if (acknowledged) grantVerifiedPurchase(productId)
+                            else _purchaseState.value = PurchaseState.Error("Purchase verified but acknowledgement failed")
+                        }
+                    } else {
+                        grantVerifiedPurchase(productId)
+                    }
+                }
             }
+        }
+    }
 
-            // Identify product
-            val productId = purchase.products.firstOrNull() ?: "unknown"
+    private fun grantVerifiedPurchase(productId: String) {
+        _currentProduct.value = productId
+        _hasPremiumAccess.value = true
+        PreferencesManager.savePurchasedPack(productId)
+        _purchaseState.value = PurchaseState.Success(productId)
+    }
 
-            // Save locally
-            PreferencesManager.savePurchasedPack(productId)
+    /**
+     * Explicitly restores purchases and notifies callback of the result.
+     */
+    fun restorePurchases(onComplete: (Boolean, String?) -> Unit = { _, _ -> }) {
+        val client = billingClient
+        if (client == null || !_billingConnectionReady.value) {
+            val localPack = PreferencesManager.getPurchasedPack()
+            onComplete(localPack != null, localPack)
+            return
+        }
 
-            // Update user access in Firestore
-            savePurchaseToFirestore(purchase)
+        client.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        ) { _, inAppPurchases ->
+            val activeInApp = inAppPurchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+            activeInApp.forEach(::handlePurchase)
 
-            _purchaseState.value = PurchaseState.Success(productId)
-            _hasPremiumAccess.value = true
+            client.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder()
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build()
+            ) { _, subsPurchases ->
+                val activeSubs = subsPurchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                activeSubs.forEach(::handlePurchase)
+
+                val hasActive = activeInApp.isNotEmpty() || activeSubs.isNotEmpty() || _hasPremiumAccess.value
+                val currentPack = _currentProduct.value ?: PreferencesManager.getPurchasedPack()
+                onComplete(hasActive, currentPack)
+            }
         }
     }
 
     /**
      * Acknowledges the purchase in Google Play
      */
-    private fun acknowledgePurchase(purchase: Purchase) {
+    private fun acknowledgePurchase(purchase: Purchase, onResult: (Boolean) -> Unit) {
         val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
             .setPurchaseToken(purchase.purchaseToken)
             .build()
@@ -304,55 +335,8 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                 Log.d(TAG, "Purchase acknowledged successfully")
             }
+            onResult(billingResult.responseCode == BillingClient.BillingResponseCode.OK)
         }
-    }
-
-    /**
-     * Saves the purchase to Firestore
-     */
-    private fun savePurchaseToFirestore(purchase: Purchase) {
-        val uid = auth.currentUser?.uid ?: return
-        val productId = purchase.products.firstOrNull() ?: ""
-
-        val purchaseData = mapOf(
-            "uid" to uid,
-            "productId" to productId,
-            "purchaseToken" to purchase.purchaseToken,
-            "purchaseTime" to purchase.purchaseTime,
-            "orderId" to (purchase.orderId ?: ""),
-            "acknowledged" to purchase.isAcknowledged
-        )
-
-        firestore.collection(COLLECTION_PURCHASES)
-            .document("${uid}_${purchase.orderId}")
-            .set(purchaseData)
-            .addOnSuccessListener {
-                Log.d(TAG, "Purchase saved in Firestore")
-
-                // Determine Tier from ID
-                val planTier = when(productId) {
-                    PRODUCT_STARTER -> "STARTER"
-                    PRODUCT_GOLD -> "GOLD"
-                    PRODUCT_ULTIMATE -> "ULTIMATE"
-                    else -> "SOLO"
-                }
-
-                // Update user plan
-                val userUpdates = mapOf(
-                    "planTier" to planTier,
-                    "lastPurchaseAt" to System.currentTimeMillis()
-                )
-
-                firestore.collection("users")
-                    .document(uid)
-                    .update(userUpdates)
-                    .addOnSuccessListener {
-                        Log.d(TAG, "Plan updated to $planTier")
-                    }
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Error saving purchase", e)
-            }
     }
 
     /**
@@ -365,12 +349,25 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
                 .build()
         ) { billingResult, purchases ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val hasActivePurchase = purchases.any {
-                    it.purchaseState == Purchase.PurchaseState.PURCHASED
+                if (!EntitlementStore.DEV_SUPERPOWERS) {
+                    _hasPremiumAccess.value = false
+                    _currentProduct.value = null
                 }
-                _hasPremiumAccess.value = if (isDevMode) true else hasActivePurchase
-
-                Log.d(TAG, "Existing purchases: ${purchases.size}")
+                purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                    .forEach(::handlePurchase)
+                Log.d(TAG, "Existing INAPP purchases: ${purchases.size}")
+            }
+        }
+        // Also query subscriptions so entitlement is restored correctly on launch
+        billingClient?.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+        ) { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+                    .forEach(::handlePurchase)
+                Log.d(TAG, "Existing SUBS purchases: ${purchases.size}")
             }
         }
     }
@@ -379,6 +376,7 @@ class BillingManager(private val context: Context) : PurchasesUpdatedListener {
      * Releases resources
      */
     fun release() {
+        _billingConnectionReady.value = false
         billingClient?.endConnection()
         billingClient = null
     }

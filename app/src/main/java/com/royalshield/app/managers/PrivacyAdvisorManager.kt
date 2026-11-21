@@ -24,9 +24,17 @@ object PrivacyAdvisorManager {
         android.Manifest.permission.RECORD_AUDIO,
         android.Manifest.permission.ACCESS_FINE_LOCATION,
         android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
         android.Manifest.permission.READ_CONTACTS,
         android.Manifest.permission.READ_SMS,
-        android.Manifest.permission.SEND_SMS
+        android.Manifest.permission.SEND_SMS,
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.READ_MEDIA_IMAGES,
+        android.Manifest.permission.READ_MEDIA_VIDEO,
+        android.Manifest.permission.READ_MEDIA_AUDIO,
+        android.Manifest.permission.POST_NOTIFICATIONS,
+        android.Manifest.permission.READ_CALL_LOG,
+        android.Manifest.permission.BODY_SENSORS
     )
 
     suspend fun scanApps(
@@ -59,8 +67,9 @@ object PrivacyAdvisorManager {
                     
                     val riskLevel = when {
                         detectedRisks.contains("CAMERA") || detectedRisks.contains("RECORD_AUDIO") -> RiskLevel.HIGH
-                        detectedRisks.contains("READ_SMS") -> RiskLevel.HIGH
-                        detectedRisks.size > 3 -> RiskLevel.MEDIUM
+                        detectedRisks.contains("READ_SMS") || detectedRisks.contains("SEND_SMS") -> RiskLevel.HIGH
+                        detectedRisks.contains("ACCESS_BACKGROUND_LOCATION") -> RiskLevel.HIGH
+                        detectedRisks.size > 2 -> RiskLevel.MEDIUM
                         else -> RiskLevel.LOW
                     }
 
@@ -107,8 +116,9 @@ object PrivacyAdvisorManager {
                     
                     val riskLevel = when {
                         detectedRisks.contains("CAMERA") || detectedRisks.contains("RECORD_AUDIO") -> RiskLevel.HIGH
-                        detectedRisks.contains("READ_SMS") -> RiskLevel.HIGH
-                        detectedRisks.size > 3 -> RiskLevel.MEDIUM
+                        detectedRisks.contains("READ_SMS") || detectedRisks.contains("SEND_SMS") -> RiskLevel.HIGH
+                        detectedRisks.contains("ACCESS_BACKGROUND_LOCATION") -> RiskLevel.HIGH
+                        detectedRisks.size > 2 -> RiskLevel.MEDIUM
                         else -> RiskLevel.LOW
                     }
 

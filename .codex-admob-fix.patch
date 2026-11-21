@@ -1,0 +1,161 @@
+diff --git a/app/src/main/java/com/royalshield/app/services/VoiceScamDetectionService.kt b/app/src/main/java/com/royalshield/app/services/VoiceScamDetectionService.kt
+--- a/app/src/main/java/com/royalshield/app/services/VoiceScamDetectionService.kt
++++ b/app/src/main/java/com/royalshield/app/services/VoiceScamDetectionService.kt
+@@ -6,6 +6,7 @@ import android.telecom.Call
+ import android.telecom.CallScreeningService
+ import android.util.Log
+ import com.royalshield.app.managers.AnalyticsManager
++import com.royalshield.app.managers.PreferencesManager
+ 
+ /**
+  * Service to detect AI Voice Scams using Call Screening API.
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -40,6 +40,7 @@ android {
+         val geminiKey = localProps.getProperty("GEMINI_API_KEY", "")
+         val mapsKey = localProps.getProperty("MAPS_API_KEY", "")
+         val admobAppId = localProps.getProperty("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
++        val admobBannerAdUnitId = localProps.getProperty("ADMOB_BANNER_AD_UNIT_ID", "")
+         val avKey = localProps.getProperty("ALIENVAULT_API_KEY", "")
+         val twilioSid = localProps.getProperty("TWILIO_ACCOUNT_SID", "")
+         val twilioToken = localProps.getProperty("TWILIO_AUTH_TOKEN", "")
+@@ -55,6 +56,7 @@ android {
+         buildConfigField("String", "DID_API_KEY", "\"$didKey\"")
+         buildConfigField("String", "LOYALTY_API_URL", "\"$loyaltyUrl\"")
+         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
++        buildConfigField("String", "ADMOB_BANNER_AD_UNIT_ID", "\"$admobBannerAdUnitId\"")
+ 
+         // Maps key injected into Manifest via placeholder (never hardcoded)
+         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
+diff --git a/local.properties b/local.properties
+--- a/local.properties
++++ b/local.properties
+@@ -1,4 +1,5 @@
+ sdk.dir=C\:\\Users\\Anonymous\\AppData\\Local\\Android\\Sdk
+ MAPS_API_KEY=AIzaSyCkl21DriifhuvKAB0Z4gX8wA3IZzxpAcg
+-ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
++ADMOB_APP_ID=ca-app-pub-1586798082508064~3049764774
++ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-1586798082508064/2006218364
+ MAPBOX_DOWNLOADS_TOKEN=
+diff --git a/local.properties.example b/local.properties.example
+--- a/local.properties.example
++++ b/local.properties.example
+@@ -8,6 +8,8 @@ GEMINI_API_KEY=
+ MAPS_API_KEY=
+ MAPBOX_DOWNLOADS_TOKEN=
+ ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
++# Optional. Keep blank until a production banner unit is configured locally.
++ADMOB_BANNER_AD_UNIT_ID=
+ ALIENVAULT_API_KEY=
+ DID_API_KEY=
+ 
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -67,8 +67,7 @@
+     <!-- Location Tracking Service -->
+     <service android:name=".services.LocationTrackerService" android:enabled="true" android:exported="false" android:foregroundServiceType="location" />
+     <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}" />
+-    <!-- AdMob App ID (Test - Replace with real ID when you get it from AdMob Console) -->
+-    <!-- Real Advertiser ID: db201234-2403-4297-8158-10ca1ad1abe1 (needs to be registered in AdMob) -->
++    <!-- AdMob App ID is injected from local.properties and is not versioned. -->
+     <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${ADMOB_APP_ID}" />
+     <!-- Main Activity (LAUNCHER) -->
+     <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
+diff --git a/app/src/main/java/com/royalshield/app/ui/components/AdComponents.kt b/app/src/main/java/com/royalshield/app/ui/components/AdComponents.kt
+--- a/app/src/main/java/com/royalshield/app/ui/components/AdComponents.kt
++++ b/app/src/main/java/com/royalshield/app/ui/components/AdComponents.kt
+@@ -1,13 +1,41 @@
+ package com.royalshield.app.ui.components
+ 
+-import androidx.compose.foundation.layout.Spacer
+-import androidx.compose.foundation.layout.size
+-import androidx.compose.runtime.Composable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.DisposableEffect
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+-import androidx.compose.ui.unit.dp
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.viewinterop.AndroidView
++import com.google.android.gms.ads.AdRequest
++import com.google.android.gms.ads.AdSize
++import com.google.android.gms.ads.AdView
++import com.royalshield.app.BuildConfig
++
++private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+ 
+ @Composable
+ fun AdBanner(modifier: Modifier = Modifier) {
+-    // Ads disabled by user request
+-    Spacer(modifier = modifier.size(0.dp))
++    val adUnitId = if (BuildConfig.DEBUG) TEST_BANNER_AD_UNIT_ID else BuildConfig.ADMOB_BANNER_AD_UNIT_ID
++    if (adUnitId.isBlank()) return
++
++    val context = LocalContext.current
++    val adView = remember(adUnitId) {
++        AdView(context).apply {
++            setAdSize(AdSize.BANNER)
++            this.adUnitId = adUnitId
++            loadAd(AdRequest.Builder().build())
++        }
++    }
++    DisposableEffect(adView) {
++        onDispose { adView.destroy() }
++    }
++
++    Box(
++        modifier = modifier.fillMaxWidth(),
++        contentAlignment = Alignment.Center,
++    ) {
++        AndroidView(factory = { adView })
++    }
+ }
+diff --git a/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt b/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt
+--- a/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt
++++ b/app/src/main/java/com/royalshield/app/ui/components/BottomBar.kt
+@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Settings
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.offset
++import androidx.compose.foundation.layout.Column
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.NavigationBar
+@@ -50,6 +51,10 @@ fun RoyalShieldBottomBar(navController: NavController) {
+         BottomNavItem.Settings
+     )
+ 
++    Column {
++        // Kept above the carousel so the ad cannot overlap navigation controls.
++        AdBanner()
++
+     NavigationBar(
+         containerColor = SpaceDeep.copy(alpha = 0.95f),
+         contentColor = Color.White
+@@ -100,4 +105,5 @@ fun RoyalShieldBottomBar(navController: NavController) {
+             )
+         }
+     }
++    }
+ }
+diff --git a/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt b/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt
+--- a/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt
++++ b/app/src/main/java/com/royalshield/app/ui/screens/CyberHomeScreen.kt
+@@ -431,6 +431,13 @@ fun CyberHomeScreen(
+                         }
+                     }
+                 }
++
++                // Separate from security actions and contained in the scrollable Cyber content.
++                AdBanner(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(horizontal = 20.dp, vertical = 8.dp)
++                )
+ 
+ 
+             } // End Column

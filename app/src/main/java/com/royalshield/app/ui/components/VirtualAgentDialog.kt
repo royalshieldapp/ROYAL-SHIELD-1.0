@@ -1,8 +1,32 @@
 package com.royalshield.app.ui.components
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -12,13 +36,32 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SupportAgent
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -28,36 +71,126 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.ui.theme.RoyalGold
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.royalshield.app.ui.viewmodels.AssistantMessage
+import com.royalshield.app.ui.viewmodels.AssistantMessageRole
+import com.royalshield.app.ui.viewmodels.AssistantViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
-
-data class AgentMessage(
-    val id: String = UUID.randomUUID().toString(),
-    val text: String,
-    val isUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
-)
 
 @Composable
-fun VirtualAgentDialog(onDismiss: () -> Unit) {
+fun VirtualAgentDialog(
+    onDismiss: () -> Unit,
+    viewModel: AssistantViewModel = viewModel()
+) {
+    val context = LocalContext.current
     var messageText by remember { mutableStateOf("") }
-    val messages = remember { mutableStateListOf<AgentMessage>() }
+    val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    
+    var isVoiceEnabled by remember { mutableStateOf(true) }
+    var isListening by remember { mutableStateOf(false) }
 
-    // Initial Greeting - Multilingual
-    LaunchedEffect(Unit) {
-        if (messages.isEmpty()) {
-            delay(500)
-            messages.add(AgentMessage(text = "🛡️ Royal Shield AI Online.\n\nHola. Hello. Olá. Bonjour.\n\nI speak all languages. How can I protect you today?", isUser = false))
+    // TTS Engine
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    DisposableEffect(context) {
+        var textToSpeech: TextToSpeech? = null
+        textToSpeech = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                textToSpeech?.language = Locale.getDefault()
+            }
         }
+        tts = textToSpeech
+        onDispose {
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+        }
+    }
+
+    // Speech Recognizer
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+    DisposableEffect(context) {
+        val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        speechRecognizer = recognizer
+        onDispose {
+            recognizer.destroy()
+        }
+    }
+
+    // Speech-to-Text Listener
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            }
+            speechRecognizer?.startListening(intent)
+            isListening = true
+        }
+    }
+
+    fun startListening() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) { isListening = true }
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() { isListening = false }
+            override fun onError(error: Int) { isListening = false }
+            override fun onResults(results: Bundle?) {
+                isListening = false
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    val text = matches[0]
+                    messageText = text
+                    viewModel.sendMessage(text)
+                    messageText = ""
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        speechRecognizer?.startListening(intent)
+        isListening = true
+    }
+
+    // Speak last assistant message if enabled
+    LaunchedEffect(uiState.messages.size) {
+        val lastIndex = uiState.messages.lastIndex
+        if (lastIndex >= 0) {
+            listState.animateScrollToItem(lastIndex)
+            val lastMsg = uiState.messages[lastIndex]
+            if (isVoiceEnabled && lastMsg.role == AssistantMessageRole.ASSISTANT) {
+                tts?.speak(lastMsg.text, TextToSpeech.QUEUE_FLUSH, null, "msg_${lastMsg.id}")
+            }
+        }
+    }
+
+    fun submit() {
+        if (messageText.isBlank() || uiState.isSending) return
+        val text = messageText
+        messageText = ""
+        focusManager.clearFocus()
+        viewModel.sendMessage(text)
     }
 
     Dialog(
@@ -67,14 +200,18 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.7f)
+                .fillMaxHeight(0.75f)
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF0F0F13).copy(alpha = 0.95f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, RoyalGold.copy(alpha = 0.3f))
+            color = Color(0xFF101216).copy(alpha = 0.95f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                Brush.linearGradient(
+                    listOf(RoyalGold.copy(alpha = 0.65f), Color(0xFFB8860B).copy(alpha = 0.20f))
+                )
+            )
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -85,36 +222,47 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Color(0xFF7B42F6).copy(alpha = 0.2f), CircleShape)
-                            .border(1.dp, CyberCyan, CircleShape),
+                            .background(RoyalGold.copy(alpha = 0.18f), CircleShape)
+                            .border(1.dp, RoyalGold.copy(alpha = 0.85f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Use SupportAgent icon for a more "Human" feel
-                        Icon(Icons.Default.SupportAgent, null, tint = CyberCyan, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.SupportAgent, null, tint = RoyalGold, modifier = Modifier.size(20.dp))
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "ROYAL AGENT",
+                            text = "ROYAL AGENT PRO",
                             style = MaterialTheme.typography.titleMedium,
                             color = RoyalGold,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Multi-Language Active",
+                            text = if (isListening) "Escuchando voz..." else if (uiState.isSending) "Consultando servicio..." else "Chat y Voz Activos",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Green
+                            color = if (isListening) Color(0xFF00E5FF) else if (uiState.isSending) RoyalGold else Color.Gray
                         )
                     }
                     Spacer(modifier = Modifier.weight(1f))
+                    
+                    // Voice speaker toggle
+                    IconButton(onClick = {
+                        isVoiceEnabled = !isVoiceEnabled
+                        if (!isVoiceEnabled) tts?.stop()
+                    }) {
+                        Icon(
+                            if (isVoiceEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                            contentDescription = "Voz",
+                            tint = if (isVoiceEnabled) RoyalGold else Color.Gray
+                        )
+                    }
+
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "Cerrar", tint = Color.Gray)
+                        Icon(Icons.Default.Close, "Close", tint = Color.Gray)
                     }
                 }
 
                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-                // Chat Area
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -124,26 +272,72 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
                     contentPadding = PaddingValues(vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(messages) { msg ->
-                        AgentChatBubble(message = msg)
+                    if (uiState.messages.isEmpty()) {
+                        item {
+                            Text(
+                                text = "Habla o escribe tu consulta. El asistente de Royal Shield te responderá con voz y texto en tiempo real.",
+                                color = Color.Gray,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                    items(uiState.messages, key = { it.id }) { message ->
+                        AgentChatBubble(
+                            message = message,
+                            onSpeak = { text ->
+                                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "click_${message.id}")
+                            }
+                        )
+                    }
+                    if (uiState.isSending) {
+                        item {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = RoyalGold,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Esperando respuesta real...", color = Color.Gray, fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
 
-                // Input Area
-                Surface(
-                    color = Color.Black.copy(alpha = 0.3f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Surface(color = Color.Black.copy(alpha = 0.3f), modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .padding(16.dp)
                             .fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Microphone button for STT
+                        IconButton(
+                            onClick = { startListening() },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    if (isListening) Color(0xFFFF3D00) else RoyalGold.copy(alpha = 0.2f),
+                                    CircleShape
+                                )
+                                .border(1.dp, if (isListening) Color.Red else RoyalGold, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Dictado por voz",
+                                tint = if (isListening) Color.White else RoyalGold,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
                         TextField(
                             value = messageText,
                             onValueChange = { messageText = it },
-                            placeholder = { Text("Ask anything / Pregunta lo que sea...", color = Color.Gray, fontSize = 12.sp) },
+                            enabled = !uiState.isSending,
+                            placeholder = { Text(if (isListening) "Escuchando..." else "Escribe tu consulta...", color = Color.Gray, fontSize = 12.sp) },
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(24.dp))
@@ -151,38 +345,31 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color(0xFF1E1E1E),
                                 unfocusedContainerColor = Color(0xFF1E1E1E),
+                                disabledContainerColor = Color(0xFF151515),
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
+                                disabledTextColor = Color.Gray,
                                 cursorColor = RoyalGold,
                                 focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent
                             ),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = {
-                                if (messageText.isNotBlank()) {
-                                    val text = messageText
-                                    messageText = ""
-                                    focusManager.clearFocus()
-                                    onSendMessage(text, messages, scope)
-                                }
-                            })
+                            keyboardActions = KeyboardActions(onSend = { submit() })
                         )
-                        
+
                         Spacer(modifier = Modifier.width(8.dp))
-                        
+
                         IconButton(
-                            onClick = {
-                                if (messageText.isNotBlank()) {
-                                    val text = messageText
-                                    messageText = ""
-                                    focusManager.clearFocus()
-                                    onSendMessage(text, messages, scope)
-                                }
-                            },
+                            onClick = { submit() },
+                            enabled = messageText.isNotBlank() && !uiState.isSending,
                             modifier = Modifier
-                                .size(48.dp)
-                                .background(RoyalGold, CircleShape)
+                                .size(44.dp)
+                                .background(
+                                    if (messageText.isNotBlank() && !uiState.isSending) RoyalGold else Color.DarkGray,
+                                    CircleShape
+                                )
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
@@ -198,81 +385,59 @@ fun VirtualAgentDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-fun AgentChatBubble(message: AgentMessage) {
-    val isAgent = !message.isUser
-    val alignment = if (isAgent) Alignment.Start else Alignment.End
-    val containerColor = if (isAgent) Color(0xFF1E1E1E) else RoyalGold.copy(alpha = 0.2f)
-    val borderColor = if (isAgent) CyberCyan.copy(alpha = 0.3f) else RoyalGold.copy(alpha = 0.5f)
+private fun AgentChatBubble(
+    message: AssistantMessage,
+    onSpeak: (String) -> Unit = {}
+) {
+    val isUser = message.role == AssistantMessageRole.USER
+    val isError = message.role == AssistantMessageRole.ERROR
+    val alignment = if (isUser) Alignment.End else Alignment.Start
+    val containerColor = when {
+        isError -> Color(0xFF3A1515)
+        isUser -> RoyalGold.copy(alpha = 0.22f)
+        else -> Color(0xFF14171E).copy(alpha = 0.95f)
+    }
+    val borderColor = when {
+        isError -> Color(0xFFFF6B6B)
+        isUser -> RoyalGold.copy(alpha = 0.65f)
+        else -> RoyalGold.copy(alpha = 0.35f)
+    }
 
     Column(horizontalAlignment = alignment, modifier = Modifier.fillMaxWidth()) {
         Surface(
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isAgent) 4.dp else 16.dp,
-                bottomEnd = if (isAgent) 16.dp else 4.dp
-            ),
+            shape = RoundedCornerShape(16.dp),
             color = containerColor,
             border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
-            Text(
-                text = message.text,
+            Row(
                 modifier = Modifier.padding(12.dp),
-                color = Color.White,
-                fontSize = 14.sp
-            )
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = message.text,
+                    modifier = Modifier.weight(1f, fill = false),
+                    color = if (isError) Color(0xFFFFB4B4) else Color.White,
+                    fontSize = 14.sp
+                )
+                if (!isUser && !isError) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = "Escuchar",
+                        tint = RoyalGold,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { onSpeak(message.text) }
+                    )
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
             style = MaterialTheme.typography.labelSmall,
             color = Color.Gray,
             modifier = Modifier.padding(horizontal = 4.dp)
         )
-    }
-}
-
-fun onSendMessage(text: String, messages: MutableList<AgentMessage>, scope: kotlinx.coroutines.CoroutineScope) {
-    messages.add(AgentMessage(text = text, isUser = true))
-    
-    scope.launch {
-        delay(1000)
-        val response = getAgentResponse(text)
-        messages.add(AgentMessage(text = response, isUser = false))
-    }
-}
-
-fun getAgentResponse(query: String): String {
-    val q = query.lowercase().trim()
-    
-    // LANGUAGE DETECTION LOGIC
-    val isSpanish = q.any { it in "áéíóúñ" } || q.contains("hola") || q.contains("gracias") || q.contains("como") || q.contains("seguridad")
-    val isPortuguese = q.contains("olá") || q.contains("obrigado") || q.contains("segurança") || q.contains("como estai")
-    val isFrench = q.contains("bonjour") || q.contains("merci") || q.contains("securite") || q.contains("comment")
-    
-    return when {
-         // SPANISH RESPONSES
-         isSpanish && (q.contains("hola") || q.contains("buenos")) -> "Hola, Oficial. Sistemas listos."
-         isSpanish && (q.contains("scan") || q.contains("analisis") || q.contains("virus")) -> "Iniciando escaneo profundo... Sin amenazas detectadas en este momento."
-         isSpanish && (q.contains("sos") || q.contains("ayuda")) -> "Protocolo SOS en espera. Presione el botón ROJO en el panel para activar la baliza de emergencia."
-         isSpanish && (q.contains("quien eres") || q.contains("nombre")) -> "Soy Royal AI, su asistente de ciberseguridad personal."
-         isSpanish -> "Entendido. Procesando su solicitud en español: '$query'. Sistemas seguros."
-
-         // PORTUGUESE RESPONSES
-         isPortuguese && (q.contains("olá") || q.contains("oi")) -> "Olá! Sistemas de segurança ativos e prontos."
-         isPortuguese && (q.contains("sos") || q.contains("ajuda")) -> "SOS em espera. Pressione o botão VERMELHO para emergência."
-         isPortuguese -> "Entendido. Processando em Português: '$query'. Tudo seguro."
-
-         // FRENCH RESPONSES
-         isFrench && (q.contains("bonjour") || q.contains("salut")) -> "Bonjour. Systèmes de sécurité actifs."
-         isFrench -> "Bien reçu. Traitement en Français: '$query'."
-
-         // ENGLISH (DEFAULT)
-         q.contains("hi") || q.contains("hello") -> "Greetings. Security systems nominal."
-         q.contains("scan") || q.contains("check") -> "Running diagnostics... System integrity 100%."
-         q.contains("sos") || q.contains("help") -> "SOS Protocol standby. Press the RED button on the dashboard for immediate extraction."
-         q.contains("who are you") -> "I am Royal AI, your personal cybersecurity defense agent."
-         else -> "Command received: '$query'. \n\nI speak EN, ES, PT, FR. How can I assist?"
     }
 }

@@ -1,0 +1,30 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -39,8 +39,9 @@ android {
+         val vtKey = localProps.getProperty("VIRUSTOTAL_API_KEY", "")
+         val geminiKey = localProps.getProperty("GEMINI_API_KEY", "")
+         val mapsKey = localProps.getProperty("MAPS_API_KEY", "")
+-        val admobAppId = localProps.getProperty("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
+-        val admobBannerAdUnitId = localProps.getProperty("ADMOB_BANNER_AD_UNIT_ID", "")
++        // AdMob identifiers are public configuration values, not credentials.
++        val admobAppId = "ca-app-pub-1586798082508064~3049764774"
++        val admobBannerAdUnitId = "ca-app-pub-1586798082508064/2006218364"
+         val avKey = localProps.getProperty("ALIENVAULT_API_KEY", "")
+         val twilioSid = localProps.getProperty("TWILIO_ACCOUNT_SID", "")
+         val twilioToken = localProps.getProperty("TWILIO_AUTH_TOKEN", "")
+diff --git a/local.properties.example b/local.properties.example
+--- a/local.properties.example
++++ b/local.properties.example
+@@ -7,9 +7,9 @@ VIRUSTOTAL_API_KEY=
+ GEMINI_API_KEY=
+ MAPS_API_KEY=
+ MAPBOX_DOWNLOADS_TOKEN=
+-ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
+-# Optional. Keep blank until a production banner unit is configured locally.
+-ADMOB_BANNER_AD_UNIT_ID=
++# AdMob identifiers are public. Debug requests still use Google's test banner unit.
++ADMOB_APP_ID=ca-app-pub-1586798082508064~3049764774
++ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-1586798082508064/2006218364
+ ALIENVAULT_API_KEY=
+ DID_API_KEY=

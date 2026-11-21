@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -73,6 +76,10 @@ class Settings(BaseSettings):
     # =============================================================================
     nasa_firms_api_key: Optional[str] = Field(default=None, alias="NASA_FIRMS_API_KEY")
     noaa_cdo_token: Optional[str] = Field(default=None, alias="NOAA_CDO_TOKEN")
+    overpass_api_url: str = Field(
+        default="https://overpass-api.de/api/interpreter",
+        alias="OVERPASS_API_URL",
+    )
 
     # =============================================================================
     # OSINT FEEDS
@@ -82,6 +89,11 @@ class Settings(BaseSettings):
     reddit_user_agent: str = Field(default="RoyalShield/1.0", alias="REDDIT_USER_AGENT")
 
     news_api_key: Optional[str] = Field(default=None, alias="NEWS_API_KEY")
+
+    # Cyber threat intelligence. CISA KEV is public and requires no key.
+    otx_api_key: Optional[str] = Field(default=None, alias="OTX_API_KEY")
+    abuseipdb_api_key: Optional[str] = Field(default=None, alias="ABUSEIPDB_API_KEY")
+    cyber_feed_limit: int = Field(default=500, alias="CYBER_FEED_LIMIT")
 
     twitter_bearer_token: Optional[str] = Field(default=None, alias="TWITTER_BEARER_TOKEN")
     twitter_api_key: Optional[str] = Field(default=None, alias="TWITTER_API_KEY")
@@ -115,6 +127,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_expire_minutes: int = Field(default=60, alias="JWT_EXPIRE_MINUTES")
     rate_limit_per_minute: int = Field(default=60, alias="RATE_LIMIT_PER_MINUTE")
+    firebase_project_id: Optional[str] = Field(default=None, alias="FIREBASE_PROJECT_ID")
+    firebase_service_account_json: Optional[str] = Field(
+        default=None,
+        alias="FIREBASE_SERVICE_ACCOUNT_JSON",
+    )
 
     # =============================================================================
     # APPLICATION
@@ -148,6 +165,7 @@ class Settings(BaseSettings):
     enable_crime_collection: bool = Field(default=True, alias="ENABLE_CRIME_COLLECTION")
     enable_environmental_collection: bool = Field(default=True, alias="ENABLE_ENVIRONMENTAL_COLLECTION")
     enable_osint_collection: bool = Field(default=True, alias="ENABLE_OSINT_COLLECTION")
+    enable_cyber_collection: bool = Field(default=True, alias="ENABLE_CYBER_COLLECTION")
     enable_camera_integration: bool = Field(default=False, alias="ENABLE_CAMERA_INTEGRATION")
     enable_ml_predictions: bool = Field(default=True, alias="ENABLE_ML_PREDICTIONS")
     enable_vector_search: bool = Field(default=True, alias="ENABLE_VECTOR_SEARCH")
@@ -155,6 +173,10 @@ class Settings(BaseSettings):
     # =============================================================================
     # UNIFIED INTEGRATIONS
     # =============================================================================
+    ai_provider: str = Field(default="nvidia", alias="AI_PROVIDER")
+    nvidia_api_key: Optional[str] = Field(default=None, alias="NVIDIA_API_KEY")
+    nvidia_model: str = Field(default="minimaxai/minimax-m3.1-flash", alias="NVIDIA_MODEL")
+    ai_request_timeout_seconds: float = Field(default=30.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
     gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
     google_play_service_account_json: Optional[str] = Field(default=None, alias="GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
     openclaw_base_url: Optional[str] = Field(default=None, alias="OPENCLAW_BASE_URL")
@@ -165,6 +187,9 @@ class Settings(BaseSettings):
     vpn_dns: str = Field(default="1.1.1.1, 1.0.0.1", alias="VPN_DNS")
     vpn_server_public_key: Optional[str] = Field(default=None, alias="VPN_SERVER_PUBLIC_KEY")
     vpn_server_private_key: Optional[str] = Field(default=None, alias="VPN_SERVER_PRIVATE_KEY")
+    vpn_allow_static_config: bool = Field(default=False, alias="VPN_ALLOW_STATIC_CONFIG")
+    vpn_control_url: Optional[str] = Field(default=None, alias="VPN_CONTROL_URL")
+    vpn_control_secret: Optional[str] = Field(default=None, alias="VPN_CONTROL_SECRET")
 
     @field_validator("environment", mode="before")
     @classmethod

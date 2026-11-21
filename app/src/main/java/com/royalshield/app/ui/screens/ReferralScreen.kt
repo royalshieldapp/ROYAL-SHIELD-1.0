@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,6 +51,7 @@ fun ReferralScreen(
     var invitesList by remember { mutableStateOf<List<Invite>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isCreatingInvite by remember { mutableStateOf(false) }
+    var selectedQrInvite by remember { mutableStateOf<Invite?>(null) }
 
     // Load data
     LaunchedEffect(Unit) {
@@ -208,6 +210,9 @@ fun ReferralScreen(
                                 context.startActivity(
                                     Intent.createChooser(shareIntent, "Share Invite")
                                 )
+                            },
+                            onShowQr = {
+                                selectedQrInvite = invite
                             }
                         )
                     }
@@ -216,6 +221,15 @@ fun ReferralScreen(
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
+    }
+
+    selectedQrInvite?.let { invite ->
+        val inviteLink = remember(invite.code) { referralManager.generateInviteLink(invite.code) }
+        InviteQrDialog(
+            inviteCode = invite.code,
+            inviteLink = inviteLink,
+            onDismiss = { selectedQrInvite = null }
+        )
     }
 }
 
@@ -396,7 +410,7 @@ private fun CreateInviteButton(
 }
 
 @Composable
-private fun InviteCard(invite: Invite, onShare: () -> Unit) {
+private fun InviteCard(invite: Invite, onShare: () -> Unit, onShowQr: () -> Unit) {
     val statusColor = when (invite.status) {
         InviteStatus.PENDING -> Color(0xFFFFD700)
         InviteStatus.CLAIMED -> Color(0xFF00BFFF)
@@ -449,27 +463,46 @@ private fun InviteCard(invite: Invite, onShare: () -> Unit) {
                 InviteDetailRow("Claimed by", invite.claimedByEmail)
             }
 
-            // Share button (only for pending invites)
+            // Action buttons (only for pending invites)
             if (invite.status == InviteStatus.PENDING) {
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onShare,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFFFFD700)
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFFFD700)
-                    )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("SHARE INVITE", fontWeight = FontWeight.Bold)
+                    OutlinedButton(
+                        onClick = onShare,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFFFD700)
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SHARE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = onShowQr,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFD700)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QrCode,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("QR CODE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -529,4 +562,108 @@ private fun formatTimestamp(timestamp: Long): String {
 private fun getCurrentMonthKey(): String {
     val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
     return sdf.format(Date())
+}
+
+@Composable
+private fun InviteQrDialog(
+    inviteCode: String,
+    inviteLink: String,
+    onDismiss: () -> Unit
+) {
+    var qrBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(inviteLink) {
+        qrBitmap = generateQrCode(inviteLink)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF161622),
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Icon(
+                    imageVector = Icons.Default.QrCode,
+                    contentDescription = null,
+                    tint = Color(0xFFFFD700),
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "2-for-1 Protection Invite",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Invite a friend to Royal Shield. When they activate an eligible plan, you'll both receive 30 days of Premium protection—free!",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .size(200.dp)
+                        .padding(8.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        qrBitmap?.let { bitmap ->
+                            androidx.compose.foundation.Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = "Referral QR Code",
+                                modifier = Modifier.fillMaxSize().padding(8.dp)
+                            )
+                        } ?: CircularProgressIndicator(color = Color(0xFFFFD700))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Surface(
+                    color = Color(0xFF222232),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "CODE: ",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = inviteCode,
+                            color = Color(0xFFFFD700),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("CLOSE", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }

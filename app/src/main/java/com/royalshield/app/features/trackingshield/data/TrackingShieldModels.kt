@@ -126,5 +126,7 @@ data class TrackingUiState(
     
     // Forecast Engine Risk Data
     val hotspots: List<Hotspot> = emptyList(),
-    val riskFeatures: List<RiskFeature> = emptyList()
+    val riskFeatures: List<RiskFeature> = emptyList(),
+    val mapLayers: List<com.royalshield.app.features.riskprediction.data.remote.MapLayerPoint> = emptyList(),
+    val isForecastAvailable: Boolean = false,
 )

@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.royalshield.app.BuildConfig
+import com.royalshield.app.subscription.EntitlementStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -239,7 +240,7 @@ object PreferencesManager {
     }
 
     fun getThemeStyle(): String {
-        return if (isInitialized()) prefs.getString(KEY_THEME_STYLE, "Neon") ?: "Neon" else "Neon"
+        return if (isInitialized()) prefs.getString(KEY_THEME_STYLE, "Gold") ?: "Gold" else "Gold"
     }
 
     fun setNotificationsEnabled(enabled: Boolean) {
@@ -281,6 +282,7 @@ object PreferencesManager {
     }
 
     fun getPurchasedPack(): String? {
+        if (EntitlementStore.DEV_SUPERPOWERS) return "lifetime_ultimate"
         return if (isInitialized()) securePrefs.getString(KEY_PURCHASED_PACK, null) else null
     }
     
@@ -291,9 +293,9 @@ object PreferencesManager {
     }
 
     fun getVirusTotalApiKey(): String? {
-        if (!isInitialized()) return BuildConfig.VIRUSTOTAL_API_KEY.ifBlank { null }
+        if (!isInitialized()) return null
         val key = securePrefs.getString(KEY_VIRUSTOTAL_API_KEY, null)
-        return if (key.isNullOrBlank()) BuildConfig.VIRUSTOTAL_API_KEY.ifBlank { null } else key
+        return key?.ifBlank { null }
     }
 
     // ===== OpenAI API Key (SENSIBLE → securePrefs) =====
@@ -402,8 +404,11 @@ object PreferencesManager {
     }
 
     fun isPremiumUser(): Boolean {
+        if (EntitlementStore.DEV_SUPERPOWERS) return true
+        val pack = getPurchasedPack()
+        if (pack != null && pack != "free") return true
         val tier = getUserPlanTier()
-        return tier == "SOLO" || tier == "DUO"
+        return tier == "SOLO" || tier == "DUO" || tier == "STARTER" || tier == "GOLD" || tier == "ULTIMATE"
     }
 
     // ===== Loyalty Cache =====
@@ -660,11 +665,97 @@ object PreferencesManager {
         return if (isInitialized()) prefs.getBoolean(KEY_DISCOUNT_APPLIED, false) else false
     }
 
-    fun setSystemArmed(enabled: Boolean) {
-        if (isInitialized()) prefs.edit().putBoolean(KEY_SYSTEM_ARMED, enabled).apply()
+    fun setSystemArmed(enabled: Boolean, context: android.content.Context? = null) {
+        if (isInitialized()) {
+            prefs.edit().putBoolean(KEY_SYSTEM_ARMED, enabled).apply()
+            context?.let { ctx ->
+                val automation = com.royalshield.app.SecurityAutomation(ctx)
+                if (enabled) {
+                    automation.startSafePathMonitoring()
+                } else {
+                    automation.stopSafePathMonitoring()
+                }
+            }
+        }
     }
 
     fun isSystemArmed(): Boolean {
         return if (isInitialized()) prefs.getBoolean(KEY_SYSTEM_ARMED, true) else true
+    }
+
+    // ===== Voice Scam Cache =====
+    private const val KEY_VOICE_CALLS_SCREENED = "key_voice_calls_screened"
+    private const val KEY_VOICE_THREATS_BLOCKED = "key_voice_threats_blocked"
+
+    fun getVoiceCallsScreened(): Int {
+        return if (isInitialized()) prefs.getInt(KEY_VOICE_CALLS_SCREENED, 0) else 0
+    }
+
+    fun incrementVoiceCallsScreened() {
+        if (isInitialized()) {
+            val current = getVoiceCallsScreened()
+            prefs.edit().putInt(KEY_VOICE_CALLS_SCREENED, current + 1).apply()
+        }
+    }
+
+    fun getVoiceThreatsBlocked(): Int {
+        return if (isInitialized()) prefs.getInt(KEY_VOICE_THREATS_BLOCKED, 0) else 0
+    }
+
+    fun incrementVoiceThreatsBlocked() {
+        if (isInitialized()) {
+            val current = getVoiceThreatsBlocked()
+            prefs.edit().putInt(KEY_VOICE_THREATS_BLOCKED, current + 1).apply()
+        }
+    }
+
+    // ===== Conversational Voice Agent Preferences =====
+    private const val KEY_VOICE_CONTINUOUS_MODE = "key_voice_continuous_mode"
+    private const val KEY_VOICE_PREFERRED_LANGUAGE = "key_voice_preferred_language"
+    private const val KEY_VOICE_SPEECH_RATE = "key_voice_speech_rate"
+
+    fun isVoiceContinuousModeEnabled(): Boolean {
+        return if (isInitialized()) prefs.getBoolean(KEY_VOICE_CONTINUOUS_MODE, true) else true
+    }
+
+    fun setVoiceContinuousModeEnabled(enabled: Boolean) {
+        if (isInitialized()) prefs.edit().putBoolean(KEY_VOICE_CONTINUOUS_MODE, enabled).apply()
+    }
+
+    fun getVoicePreferredLanguage(): String {
+        return if (isInitialized()) prefs.getString(KEY_VOICE_PREFERRED_LANGUAGE, "auto") ?: "auto" else "auto"
+    }
+
+    fun setVoicePreferredLanguage(lang: String) {
+        if (isInitialized()) prefs.edit().putString(KEY_VOICE_PREFERRED_LANGUAGE, lang).apply()
+    }
+
+    fun getVoiceSpeechRate(): Float {
+        return if (isInitialized()) prefs.getFloat(KEY_VOICE_SPEECH_RATE, 1.0f) else 1.0f
+    }
+
+    fun setVoiceSpeechRate(rate: Float) {
+        if (isInitialized()) prefs.edit().putFloat(KEY_VOICE_SPEECH_RATE, rate.coerceIn(0.5f, 2.0f)).apply()
+    }
+
+    fun clearVoicePreferences() {
+        if (isInitialized()) {
+            prefs.edit()
+                .remove(KEY_VOICE_CONTINUOUS_MODE)
+                .remove(KEY_VOICE_PREFERRED_LANGUAGE)
+                .remove(KEY_VOICE_SPEECH_RATE)
+                .apply()
+        }
+    }
+
+    // ===== Agent Orb Color =====
+    private const val KEY_AGENT_ORB_COLOR = "key_agent_orb_color"
+
+    fun getAgentOrbColor(): Long {
+        return if (isInitialized()) prefs.getLong(KEY_AGENT_ORB_COLOR, 0xFFFFD700L) else 0xFFFFD700L
+    }
+
+    fun setAgentOrbColor(colorValue: Long) {
+        if (isInitialized()) prefs.edit().putLong(KEY_AGENT_ORB_COLOR, colorValue).apply()
     }
 }

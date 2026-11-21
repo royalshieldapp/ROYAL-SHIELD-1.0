@@ -6,6 +6,8 @@ import com.royalshield.app.managers.AnalyticsManager
 import com.royalshield.app.managers.PreferencesManager
 import com.google.android.gms.ads.MobileAds
 import com.royalshield.app.util.NotificationUtils
+import com.google.firebase.FirebaseApp
+import com.royalshield.app.security.AppCheckProviderInstaller
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider
 import java.security.Security
@@ -23,6 +25,9 @@ class RoyalShieldApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        FirebaseApp.initializeApp(this)
+        AppCheckProviderInstaller.install()
         
         // Initialize Bouncy Castle Providers for PQC
         try {

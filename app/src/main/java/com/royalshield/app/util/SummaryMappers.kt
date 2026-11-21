@@ -46,7 +46,7 @@ fun AppScanSummary.toProStrings(): ScanProStrings {
     val m = metrics
     // Use Locale.US to ensure dot decimal separator and prevent formatting crashes
     val kpi = java.util.Locale.US.let { locale ->
-        "Riesgo promedio %.1f (min %d / máx %d)".format(locale, m.avgRiskScore, m.minRiskScore, m.maxRiskScore)
+        "Average risk %.1f (min %d / max %d)".format(locale, m.avgRiskScore, m.minRiskScore, m.maxRiskScore)
     }
     
     return ScanProStrings(

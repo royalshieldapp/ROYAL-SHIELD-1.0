@@ -43,6 +43,12 @@ class VpnManager(private val context: Context) {
                     _connectionState.value = VpnState.Error(error)
                     Log.e(TAG, "VPN error: $error")
                 }
+                RoyalVpnService.ACTION_VPN_STATS -> {
+                    _bytesTransferred.value = VpnStats(
+                        bytesReceived = intent.getLongExtra(RoyalVpnService.EXTRA_BYTES_RECEIVED, 0L),
+                        bytesSent = intent.getLongExtra(RoyalVpnService.EXTRA_BYTES_SENT, 0L)
+                    )
+                }
             }
         }
     }
@@ -57,6 +63,7 @@ class VpnManager(private val context: Context) {
             addAction(RoyalVpnService.ACTION_VPN_DISCONNECTED)
             addAction(RoyalVpnService.ACTION_VPN_MISSING_CONFIG)
             addAction(RoyalVpnService.ACTION_VPN_ERROR)
+            addAction(RoyalVpnService.ACTION_VPN_STATS)
         }
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -110,6 +117,14 @@ class VpnManager(private val context: Context) {
      */
     fun setPremiumRequired() {
         _connectionState.value = VpnState.PremiumRequired
+    }
+
+    fun setMissingConfig() {
+        _connectionState.value = VpnState.MissingConfig
+    }
+
+    fun setError(message: String) {
+        _connectionState.value = VpnState.Error(message)
     }
     
     private fun startVpnService(action: String, config: String? = null) {

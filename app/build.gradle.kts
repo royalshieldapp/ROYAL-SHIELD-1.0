@@ -26,8 +26,8 @@ android {
         applicationId = "com.royalshield.app"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -39,11 +39,15 @@ android {
         val vtKey = localProps.getProperty("VIRUSTOTAL_API_KEY", "")
         val geminiKey = localProps.getProperty("GEMINI_API_KEY", "")
         val mapsKey = localProps.getProperty("MAPS_API_KEY", "")
+        // AdMob identifiers are public configuration values, not credentials.
+        val admobAppId = "ca-app-pub-1586798082508064~3049764774"
+        val admobBannerAdUnitId = "ca-app-pub-1586798082508064/2006218364"
         val avKey = localProps.getProperty("ALIENVAULT_API_KEY", "")
         val twilioSid = localProps.getProperty("TWILIO_ACCOUNT_SID", "")
         val twilioToken = localProps.getProperty("TWILIO_AUTH_TOKEN", "")
         val didKey = localProps.getProperty("DID_API_KEY", "")
-        val loyaltyUrl = localProps.getProperty("LOYALTY_API_URL", "https://server-beckend.onrender.com/api/loyalty")
+        val apiBaseUrl = localProps.getProperty("API_BASE_URL", "https://server-beckend.onrender.com")
+        val loyaltyUrl = "${apiBaseUrl.trimEnd('/')}/api/v1/loyalty"
 
         buildConfigField("String", "VIRUSTOTAL_API_KEY", "\"$vtKey\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
@@ -52,9 +56,12 @@ android {
         buildConfigField("String", "TWILIO_AUTH_TOKEN", "\"$twilioToken\"")
         buildConfigField("String", "DID_API_KEY", "\"$didKey\"")
         buildConfigField("String", "LOYALTY_API_URL", "\"$loyaltyUrl\"")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "ADMOB_BANNER_AD_UNIT_ID", "\"$admobBannerAdUnitId\"")
 
         // Maps key injected into Manifest via placeholder (never hardcoded)
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
+        manifestPlaceholders["ADMOB_APP_ID"] = admobAppId
     }
 
     signingConfigs {
@@ -120,9 +127,12 @@ dependencies {
     // Firebase & Google Auth
     implementation(platform("com.google.firebase:firebase-bom:34.14.0"))
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-database")
-    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("com.google.android.gms:play-services-auth:21.6.0")
+    implementation("com.google.android.gms:play-services-home:17.1.0")
+    implementation("com.google.android.gms:play-services-home-types:17.1.0")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-crashlytics")
     implementation("com.google.firebase:firebase-ai")
@@ -174,6 +184,7 @@ dependencies {
     implementation("org.bouncycastle:bcutil-jdk18on:1.78.1")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
@@ -189,4 +200,5 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
 }

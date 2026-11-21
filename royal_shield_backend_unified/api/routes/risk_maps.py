@@ -1,235 +1,199 @@
-"""
-Risk Map API Routes
-Endpoints for retrieving risk zone data and heatmaps
-"""
-from fastapi import APIRouter, Query, HTTPException
-from typing import List, Optional
-from datetime import date, datetime
-from pydantic import BaseModel, Field
+"""Risk-map endpoints backed by durable observations and verified inference."""
 
-from services.geospatial import get_h3_generator, get_spatial_aggregator
-from services.ml import get_risk_predictor
+from datetime import date, datetime, timezone
+from typing import Optional
+
+import h3
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from api.contracts.status import unavailable
+from services.forecast.artifact_store import ArtifactStoreError
+from services.forecast.inference import InferenceUnavailableError
+from services.forecast.presentation import (
+    ForecastCellPresentation,
+    load_forecast_presentation,
+)
+from services.geospatial.database.connection import get_db
+
 
 router = APIRouter(prefix="/api/v1", tags=["Risk Maps"])
 
 
-# Response Models
-class RiskZone(BaseModel):
-    """Individual risk zone data"""
-    h3_cell: str
-    center: List[float] = Field(..., description="[lat, lng]")
-    boundary: List[List[float]] = Field(..., description="Hexagon vertices [[lat, lng], ...]")
-    risk_score: float = Field(..., ge=0, le=100)
-    risk_level: str = Field(..., description="LOW | MEDIUM | HIGH | CRITICAL")
-    event_count: int = Field(..., ge=0)
-    crime_count: int = Field(..., ge=0)
-    fire_count: int = Field(..., ge=0)
-    recent_events_7d: int = Field(..., ge=0)
-    recent_events_30d: int = Field(..., ge=0)
+def _risk_map_unavailable() -> None:
+    raise HTTPException(
+        status_code=503,
+        detail=unavailable("RISK_MAP_DATA_NOT_VERIFIED").model_dump(mode="json"),
+    )
 
 
-class RiskMapResponse(BaseModel):
-    """Risk map heatmap data"""
-    type: str = "FeatureCollection"
-    features: List[dict]
-    metadata: dict
+def _horizon_days(prediction_date: date | None) -> int:
+    if prediction_date is None:
+        return 7
+    horizon = (prediction_date - date.today()).days
+    if not 1 <= horizon <= 90:
+        raise HTTPException(
+            status_code=422,
+            detail="date_filter must be 1 to 90 days in the future",
+        )
+    return horizon
 
 
-class ZoneDetails(BaseModel):
-    """Detailed zone information"""
-    h3_cell: str
-    center: List[float]
-    risk_score: float
-    risk_level: str
-    statistics: dict
-    recent_events: List[dict]
-    trends: dict
+def _closed_geojson_boundary(cell: ForecastCellPresentation) -> list[list[float]]:
+    coordinates = [[lng, lat] for lat, lng in cell.boundary]
+    if coordinates and coordinates[0] != coordinates[-1]:
+        coordinates.append(coordinates[0])
+    return coordinates
 
 
-@router.get("/risk-map", response_model=RiskMapResponse)
+def _change(current: int, previous: int) -> tuple[str, str]:
+    if previous == 0:
+        return ("0%", "STABLE") if current == 0 else ("NOT_COMPARABLE", "RISING")
+    percent = ((current - previous) / previous) * 100.0
+    direction = "RISING" if percent > 0 else "FALLING" if percent < 0 else "STABLE"
+    return f"{percent:+.1f}%", direction
+
+
+@router.get("/risk-map")
 async def get_risk_map(
-    bbox_min_lat: float = Query(..., description="Minimum latitude"),
-    bbox_min_lng: float = Query(..., description="Minimum longitude"),
-    bbox_max_lat: float = Query(..., description="Maximum latitude"),
-    bbox_max_lng: float = Query(..., description="Maximum longitude"),
-    resolution: int = Query(9, ge=7, le=12, description="H3 resolution"),
-    date_filter: Optional[date] = Query(None, description="Optional: filter by date")
+    bbox_min_lat: float = Query(..., ge=-90, le=90),
+    bbox_min_lng: float = Query(..., ge=-180, le=180),
+    bbox_max_lat: float = Query(..., ge=-90, le=90),
+    bbox_max_lng: float = Query(..., ge=-180, le=180),
+    resolution: int = Query(9, ge=7, le=12),
+    date_filter: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
 ):
-    """
-    Get risk heatmap for a bounding box
-
-    Returns GeoJSON FeatureCollection with risk zones
-    """
     try:
-        h3_gen = get_h3_generator()
-        aggregator = get_spatial_aggregator()
-
-        # TODO: Get events from database
-        # For now, return mock data structure
-        events = []  # Would fetch from PostGIS
-
-        # Aggregate events
-        event_metrics = aggregator.aggregate_events_by_cell(events)
-        risk_scores = aggregator.calculate_risk_scores(event_metrics)
-
-        # Build GeoJSON features
-        features = []
-        for h3_cell, risk_score in risk_scores.items():
-            # Get cell geometry
-            center_lat, center_lng = h3_gen.get_cell_center(h3_cell)
-            boundary = h3_gen.get_cell_boundary(h3_cell)
-
-            # Convert boundary to GeoJSON coordinates (lng, lat)
-            coords = [[lng, lat] for lat, lng in boundary]
-            coords.append(coords[0])  # Close polygon
-
-            # Get metrics
-            metrics = event_metrics.get(h3_cell, {})
-
-            feature = {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [coords]
-                },
-                "properties": {
-                    "h3_cell": h3_cell,
-                    "risk_score": risk_score,
-                    "risk_level": _get_risk_level(risk_score),
-                    "event_count": metrics.get("total_events", 0),
-                    "crime_count": metrics.get("crime_events", 0),
-                    "fire_count": metrics.get("fire_events", 0),
-                    "recent_7d": metrics.get("recent_events_7d", 0),
-                    "recent_30d": metrics.get("recent_events_30d", 0)
-                }
-            }
-            features.append(feature)
-
-        return RiskMapResponse(
-            type="FeatureCollection",
-            features=features,
-            metadata={
-                "bbox": {
-                    "min_lat": bbox_min_lat,
-                    "min_lng": bbox_min_lng,
-                    "max_lat": bbox_max_lat,
-                    "max_lng": bbox_max_lng
-                },
-                "resolution": resolution,
-                "zone_count": len(features),
-                "generated_at": datetime.utcnow().isoformat()
-            }
+        presentation = load_forecast_presentation(
+            db,
+            bbox_min_lat=bbox_min_lat,
+            bbox_min_lng=bbox_min_lng,
+            bbox_max_lat=bbox_max_lat,
+            bbox_max_lng=bbox_max_lng,
+            resolution=resolution,
+            horizon_days=_horizon_days(date_filter),
+            as_of=date.today(),
         )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating risk map: {str(e)}")
-
-
-@router.get("/risk-zones/{h3_cell}", response_model=ZoneDetails)
-async def get_zone_details(h3_cell: str):
-    """
-    Get detailed information for a specific risk zone
-
-    Args:
-        h3_cell: H3 cell ID (e.g., "892a1072b7fffff")
-
-    Returns:
-        Detailed zone statistics, events, and trends
-    """
-    try:
-        h3_gen = get_h3_generator()
-
-        # Validate H3 cell
-        try:
-            center_lat, center_lng = h3_gen.get_cell_center(h3_cell)
-        except:
-            raise HTTPException(status_code=404, detail="Invalid H3 cell ID")
-
-        # TODO: Fetch from database
-        # For now, return mock structure
-
-        return ZoneDetails(
-            h3_cell=h3_cell,
-            center=[center_lat, center_lng],
-            risk_score=45.2,
-            risk_level="MEDIUM",
-            statistics={
-                "total_events": 23,
-                "crime_events": 18,
-                "fire_events": 2,
-                "osint_events": 3,
-                "recent_7d": 4,
-                "recent_30d": 15,
-                "severity_critical": 1,
-                "severity_high": 6,
-                "severity_medium": 11,
-                "severity_low": 5
-            },
-            recent_events=[
-                {
-                    "type": "ROBBERY",
-                    "severity": "HIGH",
-                    "occurred_at": "2026-01-27T10:30:00Z",
-                    "description": "Armed robbery at convenience store"
-                }
-            ],
-            trends={
-                "7d_change": "+12%",
-                "30d_change": "-5%",
-                "direction": "increasing"
-            }
-        )
-
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching zone details: {str(e)}")
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except (ArtifactStoreError, InferenceUnavailableError):
+        _risk_map_unavailable()
+
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [_closed_geojson_boundary(cell)],
+            },
+            "properties": {
+                "h3_cell": cell.prediction.h3_cell,
+                "risk_score": cell.prediction.risk_score,
+                "risk_level": cell.risk_level,
+                "event_count": cell.total_events,
+                "crime_count": 0,
+                "fire_count": 0,
+                "recent_7d": cell.recent_7d,
+                "recent_30d": cell.recent_30d,
+                "data_kind": "PREDICTED_RISK_WITH_OBSERVED_COUNTS",
+            },
+        }
+        for cell in presentation.cells
+    ]
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {
+            "bbox": {
+                "min_lat": bbox_min_lat,
+                "min_lng": bbox_min_lng,
+                "max_lat": bbox_max_lat,
+                "max_lng": bbox_max_lng,
+            },
+            "resolution": resolution,
+            "zone_count": len(features),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "status": presentation.status,
+            "data_freshness": presentation.data_freshness.isoformat(),
+            "sources": list(presentation.sources),
+            "model_version": presentation.artifact.version,
+            "confidence": None,
+        },
+    }
+
+
+@router.get("/risk-zones/{h3_cell}")
+async def get_zone_details(
+    h3_cell: str,
+    db: Session = Depends(get_db),
+):
+    if not h3.h3_is_valid(h3_cell):
+        raise HTTPException(status_code=422, detail="h3_cell is invalid")
+    resolution = h3.h3_get_resolution(h3_cell)
+    center_lat, center_lng = h3.h3_to_geo(h3_cell)
+    try:
+        presentation = load_forecast_presentation(
+            db,
+            bbox_min_lat=center_lat - 0.000001,
+            bbox_min_lng=center_lng - 0.000001,
+            bbox_max_lat=center_lat + 0.000001,
+            bbox_max_lng=center_lng + 0.000001,
+            resolution=resolution,
+            horizon_days=7,
+            as_of=date.today(),
+        )
+        cell = next(
+            item for item in presentation.cells if item.prediction.h3_cell == h3_cell
+        )
+    except (ArtifactStoreError, InferenceUnavailableError, StopIteration):
+        _risk_map_unavailable()
+
+    change_7d, direction_7d = _change(cell.recent_7d, cell.previous_7d)
+    change_30d, direction_30d = _change(cell.recent_30d, cell.previous_30d)
+    direction = direction_7d if direction_7d != "STABLE" else direction_30d
+    return {
+        "h3_cell": h3_cell,
+        "center": [cell.center_lat, cell.center_lng],
+        "risk_score": cell.prediction.risk_score,
+        "risk_level": cell.risk_level,
+        "statistics": {
+            "total_events": cell.total_events,
+            "crime_events": 0,
+            "fire_events": 0,
+            "osint_events": None,
+            "recent_7d": cell.recent_7d,
+            "recent_30d": cell.recent_30d,
+            "severity_critical": 0,
+            "severity_high": 0,
+            "severity_medium": 0,
+            "severity_low": 0,
+        },
+        "recent_events": [],
+        "trends": {
+            "7d_change": change_7d,
+            "30d_change": change_30d,
+            "direction": direction,
+        },
+        "metadata": {
+            "status": cell.prediction.status,
+            "observation_kind": "OBSERVED_DATA",
+            "risk_kind": "PREDICTED_RISK",
+            "data_freshness": cell.prediction.data_freshness.isoformat(),
+            "sources": list(cell.prediction.sources),
+            "model_version": cell.prediction.model_version,
+            "confidence": None,
+        },
+    }
 
 
 @router.get("/risk-history")
 async def get_risk_history(
-    h3_cell: str = Query(..., description="H3 cell ID"),
-    start_date: date = Query(..., description="Start date"),
-    end_date: date = Query(..., description="End date")
+    h3_cell: str = Query(...),
+    start_date: date = Query(...),
+    end_date: date = Query(...),
 ):
-    """
-    Get historical risk data for a zone
-
-    Returns time-series of risk scores
-    """
-    try:
-        # TODO: Query database for historical data
-
-        return {
-            "h3_cell": h3_cell,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "data_points": [
-                {"date": "2026-01-01", "risk_score": 42.1},
-                {"date": "2026-01-07", "risk_score": 38.5},
-                {"date": "2026-01-14", "risk_score": 45.2},
-                {"date": "2026-01-21", "risk_score": 51.3},
-                {"date": "2026-01-27", "risk_score": 48.7}
-            ],
-            "statistics": {
-                "min": 38.5,
-                "max": 51.3,
-                "avg": 45.2,
-                "trend": "stable"
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
-
-
-def _get_risk_level(risk_score: float) -> str:
-    """Convert risk score to categorical level"""
-    if risk_score >= 75:
-        return "CRITICAL"
-    elif risk_score >= 50:
-        return "HIGH"
-    elif risk_score >= 25:
-        return "MEDIUM"
-    else:
-        return "LOW"
+    del h3_cell, start_date, end_date
+    _risk_map_unavailable()

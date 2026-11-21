@@ -88,6 +88,7 @@ pydantic-settings>=2.0.0,<3
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 cryptography>=41.0.7
+firebase-admin>=6.5.0
 
 # =============================================================================
 # SMS GATEWAY (SOS Alerts - ported from Node.js)

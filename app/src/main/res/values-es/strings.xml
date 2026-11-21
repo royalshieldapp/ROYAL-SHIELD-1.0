@@ -1,305 +1,304 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App Name -->
     <string name="app_name">Royal Shield</string>
     <string name="firebase_web_client_id">1073150266100-gfkvt95bjl3cgdfb6kmrhos2kogmhpgt.apps.googleusercontent.com</string>
+    <string name="default_web_client_id">1073150266100-gfkvt95bjl3cgdfb6kmrhos2kogmhpgt.apps.googleusercontent.com</string>
 
     <!-- Navigation -->
-    <string name="nav_dashboard">Panel</string>
-    <string name="nav_security">Seguridad</string>
-    <string name="nav_location">Ubicación</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_security">Security</string>
+    <string name="nav_location">Location</string>
     <string name="nav_elite">Elite</string>
-    <string name="nav_registration">Registro</string>
+    <string name="nav_registration">Registration</string>
 
     <!-- Main Dashboard -->
     <string name="dashboard_title">Royal Shield</string>
-    <string name="protection_active">Protección activa</string>
-    <string name="system_standby">Sistema en espera</string>
-    <string name="history">Historial</string>
-    <string name="settings">Ajustes</string>
-    <string name="general_status">Estado general</string>
-    <string name="armed">Armado</string>
-    <string name="disarmed">Desarmado</string>
-    <string name="perimeter_protected">Perímetro protegido</string>
-    <string name="ready_to_activate">Listo para activar</string>
-    <string name="cameras">Cámaras</string>
-    <string name="no_cameras">Sin cámaras</string>
-    <string name="live_monitoring">Monitoreo en vivo</string>
-    <string name="check_connection">Revisa conexión</string>
+    <string name="protection_active">Protection active</string>
+    <string name="system_standby">System standby</string>
+    <string name="history">History</string>
+    <string name="settings">Settings</string>
+    <string name="general_status">General Status</string>
+    <string name="armed">Armed</string>
+    <string name="disarmed">Disarmed</string>
+    <string name="perimeter_protected">Perimeter protected</string>
+    <string name="ready_to_activate">Ready to activate</string>
+    <string name="cameras">Cameras</string>
+    <string name="no_cameras">No cameras</string>
+    <string name="live_monitoring">Live monitoring</string>
+    <string name="check_connection">Check connection</string>
 
     <!-- Security Actions -->
-    <string name="alarm_active">Alarma activa</string>
-    <string name="activate_alarm">Activar alarma</string>
-    <string name="perimeter_protected_desc">Todo el perímetro está protegido</string>
-    <string name="arm_network">Arma la red completa</string>
-    <string name="night_mode_active">Modo nocturno activo</string>
-    <string name="activate_night_mode">Activar modo nocturno</string>
-    <string name="night_routine_automated">Rutina nocturna automatizada</string>
-    <string name="dim_lights_sensors">Atenúa luces y sensores</string>
-    <string name="cameras_live">Cámaras en vivo</string>
-    <string name="reactivate_cameras">Reactivar cámaras</string>
-    <string name="monitoring_streaming">Monitoreo transmitiendo</string>
-    <string name="enable_streaming">Vuelve a habilitar transmisión</string>
-    <string name="request_patrol">Pedir patrulla</string>
-    <string name="request_preventive_escort">Solicita acompañamiento preventivo</string>
+    <string name="alarm_active">Alarm active</string>
+    <string name="activate_alarm">Activate alarm</string>
+    <string name="perimeter_protected_desc">Entire perimeter is protected</string>
+    <string name="arm_network">Arm entire network</string>
+    <string name="night_mode_active">Night mode active</string>
+    <string name="activate_night_mode">Activate night mode</string>
+    <string name="night_routine_automated">Night routine automated</string>
+    <string name="dim_lights_sensors">Dim lights and sensors</string>
+    <string name="cameras_live">Cameras live</string>
+    <string name="reactivate_cameras">Reactivate cameras</string>
+    <string name="monitoring_streaming">Monitoring streaming</string>
+    <string name="enable_streaming">Re-enable streaming</string>
+    <string name="request_patrol">Request patrol</string>
+    <string name="request_preventive_escort">Request preventive escort</string>
 
     <!-- SOS -->
-    <string name="sos_button">Botón SOS</string>
-    <string name="emergency_alert">Alerta de Emergencia</string>
-    <string name="sending_location">Enviando ubicación…</string>
-    <string name="location_sent">Ubicación enviada</string>
-    <string name="no_recent_events">Sin eventos recientes</string>
+    <string name="sos_button">SOS Button</string>
+    <string name="emergency_alert">Emergency Alert</string>
+    <string name="sending_location">Sending location…</string>
+    <string name="location_sent">Location sent</string>
+    <string name="no_recent_events">No recent events</string>
 
     <!-- Settings Activity -->
-    <string name="configuration">Configuración</string>
-    <string name="back">Volver</string>
-    <string name="emergency_contact">Contacto de emergencia</string>
-    <string name="emergency_contact_desc">Configura el número al que se enviará el mensaje SOS</string>
-    <string name="phone_number">Número de teléfono</string>
-    <string name="phone_example">Ej: +1234567890</string>
-    <string name="enter_emergency_number">Ingresa el número de emergencia</string>
-    <string name="save_contact">Guardar contacto</string>
-    <string name="contact_saved">Contacto guardado correctamente</string>
-    <string name="sos_button_behavior">Comportamiento del botón SOS</string>
-    <string name="sos_button_behavior_desc">Configura cómo responde la app al presionar el botón de emergencia</string>
-    <string name="vibration_on_sos">Vibración al activar SOS</string>
-    <string name="vibration_on_sos_desc">El dispositivo vibrará brevemente al presionar el botón de pánico</string>
-    <string name="privacy_and_history">Privacidad e historial</string>
-    <string name="privacy_and_history_desc">Gestiona cómo se almacenan tus eventos de emergencia</string>
-    <string name="save_event_history">Guardar historial de eventos</string>
-    <string name="save_event_history_desc">Registra fecha, hora y ubicación de cada evento SOS para consulta posterior</string>
-    <string name="information">Información</string>
-    <string name="app_details">Detalles de la aplicación</string>
-    <string name="version">Versión</string>
-    <string name="developer">Desarrollador</string>
+    <string name="configuration">Configuration</string>
+    <string name="back">Back</string>
+    <string name="emergency_contact">Emergency contact</string>
+    <string name="emergency_contact_desc">Configure the number where the SOS message will be sent</string>
+    <string name="phone_number">Phone number</string>
+    <string name="phone_example">Ex: +1234567890</string>
+    <string name="enter_emergency_number">Enter emergency number</string>
+    <string name="save_contact">Save contact</string>
+    <string name="contact_saved">Contact saved successfully</string>
+    <string name="sos_button_behavior">SOS button behavior</string>
+    <string name="sos_button_behavior_desc">Configure how the app responds when the emergency button is pressed</string>
+    <string name="vibration_on_sos">Vibration on SOS activation</string>
+    <string name="vibration_on_sos_desc">The device will vibrate briefly when the panic button is pressed</string>
+    <string name="privacy_and_history">Privacy and history</string>
+    <string name="privacy_and_history_desc">Manage how your emergency events are stored</string>
+    <string name="save_event_history">Save event history</string>
+    <string name="save_event_history_desc">Records date, time, and location of each SOS event for later consultation</string>
+    <string name="information">Information</string>
+    <string name="app_details">Application details</string>
+    <string name="version">Version</string>
+    <string name="developer">Developer</string>
     <string name="royal_shield_team">Royal Shield Team</string>
-    <string name="min_sdk">SDK mínimo</string>
+    <string name="min_sdk">Minimum SDK</string>
     <string name="api_26">API 26 (Android 8.0)</string>
-    <string name="security_note">Nota de seguridad</string>
-    <string name="security_note_desc">El botón SOS abre tu app de mensajes. Asegúrate de tener configurado un contacto de emergencia antes de usarlo.</string>
+    <string name="security_note">Security note</string>
+    <string name="security_note_desc">The SOS button opens your messaging app. Make sure you have configured an emergency contact before using it.</string>
 
     <!-- Security Activity -->
-    <string name="filter">FILTRAR</string>
-    <string name="report">DENUNCIAR</string>
-    <string name="protection_status">Estado de protección: %s</string>
+    <string name="filter">FILTER</string>
+    <string name="report">REPORT</string>
+    <string name="protection_status">Protection status: %s</string>
     <string name="status_ok">OK</string>
-    <string name="status_warning">ADVERTENCIA</string>
-    <string name="status_at_risk">EN RIESGO</string>
+    <string name="status_warning">WARNING</string>
+    <string name="status_at_risk">AT RISK</string>
     <string name="url_placeholder">https://example.com</string>
-    <string name="checking">Verificando…</string>
-    <string name="check_url">VERIFICAR URL</string>
-    <string name="enter_valid_url">Ingresa una URL válida</string>
-    <string name="url_result">RESULTADO URL</string>
-    <string name="safe">seguro</string>
-    <string name="malicious">malicioso</string>
-    <string name="scan_apps">Escanear Apps</string>
-    <string name="scan_progress">Escaneo %d%%</string>
-    <string name="scan_file">Escanear Archivo</string>
-    <string name="scan_completed">Escaneo completado: %s</string>
-    <string name="no_apps_to_scan">No se encontraron apps para escanear</string>
-    <string name="view_global_threat_map">Ver Mapa Global de Amenazas</string>
-    <string name="coming_soon">Próximamente</string>
-    <string name="security_label">Seguridad</string>
-    <string name="inspection">Inspección</string>
-    <string name="protection">Protección</string>
-    <string name="home">Inicio</string>
+    <string name="checking">Checking…</string>
+    <string name="check_url">VERIFY URL</string>
+    <string name="enter_valid_url">Enter a valid URL</string>
+    <string name="url_result">URL RESULT</string>
+    <string name="safe">safe</string>
+    <string name="malicious">malicious</string>
+    <string name="scan_apps">Scan Apps</string>
+    <string name="scan_progress">Scan %d%%</string>
+    <string name="scan_file">Scan File</string>
+    <string name="scan_completed">Scan completed: %s</string>
+    <string name="no_apps_to_scan">No apps found to scan</string>
+    <string name="view_global_threat_map">View Global Threat Map</string>
+    <string name="coming_soon">Coming Soon</string>
+    <string name="security_label">Security</string>
+    <string name="inspection">Inspection</string>
+    <string name="protection">Protection</string>
+    <string name="home">Home</string>
 
     <!-- VirusTotal API -->
-    <string name="configure_virustotal">Configurar VirusTotal</string>
-    <string name="enter_api_key">Ingresa tu API Key de VirusTotal para habilitar el escaneo real.</string>
+    <string name="configure_virustotal">Configure VirusTotal</string>
+    <string name="enter_api_key">Enter your VirusTotal API Key to enable real scanning.</string>
     <string name="api_key">API Key</string>
-    <string name="save">Guardar</string>
-    <string name="cancel">Cancelar</string>
-    <string name="api_key_saved">API Key guardada</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="api_key_saved">API Key saved</string>
 
     <!-- File Scan Activity -->
-    <string name="scan_file_title">Escanear archivo</string>
-    <string name="select_file">Seleccionar archivo</string>
-    <string name="scanning">Escaneando…</string>
-    <string name="threat_detected">Amenaza Detectada</string>
-    <string name="no_threat_detected">No se detectó amenaza.</string>
-    <string name="preview_not_available">Vista previa no disponible para esta pantalla</string>
+    <string name="scan_file_title">Scan file</string>
+    <string name="select_file">Select file</string>
+    <string name="scanning">Scanning…</string>
+    <string name="threat_detected">Threat Detected</string>
+    <string name="no_threat_detected">No threat detected.</string>
+    <string name="preview_not_available">Preview not available for this screen</string>
 
     <!-- Location Activity -->
-    <string name="live_location">Ubicación en Vivo</string>
-    <string name="my_location">Mi Ubicación</string>
-    <string name="latitude">Latitud</string>
-    <string name="longitude">Longitud</string>
-    <string name="contacts">Contactos</string>
-    <string name="add_contact">Agregar Contacto</string>
-    <string name="contact_name">Nombre del contacto</string>
-    <string name="contact_phone">Teléfono del contacto</string>
-    <string name="add">Agregar</string>
-    <string name="send_location">Enviar Ubicación</string>
-    <string name="delete">Eliminar</string>
-    <string name="contact_added">Contacto agregado</string>
-    <string name="contact_deleted">Contacto eliminado</string>
-    <string name="fill_all_fields">Por favor completa todos los campos</string>
-    <string name="select_contact">Selecciona un contacto primero</string>
-    <string name="location_sent_whatsapp">Ubicación enviada por WhatsApp</string>
-    <string name="whatsapp_not_installed">WhatsApp no está instalado</string>
+    <string name="live_location">Live Location</string>
+    <string name="my_location">My Location</string>
+    <string name="latitude">Latitude</string>
+    <string name="longitude">Longitude</string>
+    <string name="contacts">Contacts</string>
+    <string name="add_contact">Add Contact</string>
+    <string name="contact_name">Contact name</string>
+    <string name="contact_phone">Contact phone</string>
+    <string name="add">Add</string>
+    <string name="send_location">Send Location</string>
+    <string name="delete">Delete</string>
+    <string name="contact_added">Contact added</string>
+    <string name="contact_deleted">Contact deleted</string>
+    <string name="fill_all_fields">Please fill all fields</string>
+    <string name="select_contact">Select a contact first</string>
+    <string name="location_sent_whatsapp">Location sent via WhatsApp</string>
+    <string name="whatsapp_not_installed">WhatsApp is not installed</string>
 
     <!-- Subscription -->
     <string name="royal_shield_elite">Royal Shield Elite</string>
-    <string name="elite_description">Activa los protocolos más exclusivos con un diseño dorado y negro inspirado en los centros de mando de lujo.</string>
-    <string name="premium_features_active">Funciones Premium activadas</string>
+    <string name="elite_description">Activate the most exclusive protocols with a gold and black design inspired by luxury command centers.</string>
+    <string name="premium_features_active">Premium Features active</string>
     <string name="elite_black">Elite Black</string>
-    <string name="price_elite_black">USD 29.99 / mes</string>
+    <string name="price_elite_black">USD 29.99 / month</string>
     <string name="signature_gold">Signature Gold</string>
-    <string name="price_signature_gold">USD 14.99 / mes</string>
-    <string name="subscribe">Suscribirme</string>
-    <string name="unlock_vip_trial">Desbloquear prueba VIP</string>
-    <string name="welcome_elite">Bienvenido a Royal Shield Elite</string>
-    <string name="welcome_elite_desc">Obtén 7 días de monitoreo completo agregando tu método de pago premium.</string>
-    <string name="activate_now">Activar ahora</string>
-    <string name="later">Más tarde</string>
-    <string name="loyalty_promo">Promo de lealtad</string>
-    <string name="loyalty_promo_desc">Actualiza hoy y recibe monitoreo acústico y video AI ilimitado.</string>
-    <string name="accept_offer">Aceptar oferta</string>
+    <string name="price_signature_gold">USD 14.99 / month</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="unlock_vip_trial">Unlock VIP trial</string>
+    <string name="welcome_elite">Welcome to Royal Shield Elite</string>
+    <string name="welcome_elite_desc">Get 7 days of complete monitoring by adding your premium payment method.</string>
+    <string name="activate_now">Activate now</string>
+    <string name="later">Later</string>
+    <string name="loyalty_promo">Loyalty promo</string>
+    <string name="loyalty_promo_desc">Upgrade today and receive unlimited acoustic monitoring and AI video.</string>
+    <string name="accept_offer">Accept offer</string>
 
     <!-- Elite Perks -->
-    <string name="perk_predictive_intelligence">Inteligencia predictiva 24/7</string>
-    <string name="perk_direct_channel">Canal directo con analistas Royal Shield</string>
-    <string name="perk_biometric_unlock">Autodesbloqueo biométrico redundante</string>
-    <string name="perk_advanced_scan">Escaneo avanzado de enlaces y malware</string>
-    <string name="perk_safe_routes">Rutas seguras ilimitadas</string>
-    <string name="perk_encrypted_backup">Backup cifrado en nube soberana</string>
+    <string name="perk_predictive_intelligence">24/7 predictive intelligence</string>
+    <string name="perk_direct_channel">Direct channel with Royal Shield analysts</string>
+    <string name="perk_biometric_unlock">Redundant biometric auto-unlock</string>
+    <string name="perk_advanced_scan">Advanced link and malware scanning</string>
+    <string name="perk_safe_routes">Unlimited safe routes</string>
+    <string name="perk_encrypted_backup">Encrypted backup in sovereign cloud</string>
 
     <!-- Registration -->
-    <string name="register_with_google">Regístrate con Google</string>
-    <string name="register_desc">Conecta Firebase Authentication para vincular tus credenciales de Google y sincronizar tu perfil Royal Shield.</string>
-    <string name="connecting">Conectando…</string>
-    <string name="continue_with_google">Continuar con Google</string>
-    <string name="account_verified">Cuenta verificada: %s</string>
-    <string name="auth_error">Error de autenticación: %s</string>
-    <string name="google_signin_failed">No se pudo iniciar sesión con Google: %d</string>
+    <string name="register_with_google">Register with Google</string>
+    <string name="register_desc">Connect Firebase Authentication to link your Google credentials and sync your Royal Shield profile.</string>
+    <string name="connecting">Connecting…</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="account_verified">Account verified: %s</string>
+    <string name="auth_error">Authentication error: %s</string>
+    <string name="google_signin_failed">Google sign-in failed: %d</string>
 
     <!-- Features -->
-    <string name="current_features">Funciones Actuales</string>
-    <string name="realtime_location_sharing">Compartir ubicación en tiempo real</string>
-    <string name="realtime_location_desc">Comparte tu posición en vivo con contactos de emergencia.</string>
-    <string name="motion_aware_sos">S.O.S. sensible al movimiento</string>
-    <string name="motion_aware_sos_desc">Botón de pánico que puede activarse si el teléfono detecta riesgo.</string>
-    <string name="emergency_camera">Cámara de emergencia</string>
-    <string name="emergency_camera_desc">Captura y envía instantáneamente pruebas en foto o video.</string>
+    <string name="current_features">Current Features</string>
+    <string name="realtime_location_sharing">Real-time location sharing</string>
+    <string name="realtime_location_desc">Share your live position with emergency contacts.</string>
+    <string name="motion_aware_sos">Motion-aware S.O.S.</string>
+    <string name="motion_aware_sos_desc">Panic button that can be activated if the phone detects risk.</string>
+    <string name="emergency_camera">Emergency camera</string>
+    <string name="emergency_camera_desc">Instantly captures and sends photo or video evidence.</string>
 
     <!-- History Activity -->
-    <string name="sos_history">Historial SOS</string>
-    <string name="no_events">No hay eventos registrados</string>
-    <string name="event_with_location">Evento con ubicación</string>
-    <string name="event_without_location">Evento sin ubicación</string>
-    <string name="clear_history">Limpiar historial</string>
-    <string name="history_cleared">Historial eliminado</string>
-    <string name="confirm_clear_history">¿Estás seguro de que deseas eliminar todo el historial?</string>
-    <string name="confirm">Confirmar</string>
+    <string name="sos_history">SOS History</string>
+    <string name="no_events">No recorded events</string>
+    <string name="event_with_location">Event with location</string>
+    <string name="event_without_location">Event without location</string>
+    <string name="clear_history">Clear history</string>
+    <string name="history_cleared">History deleted</string>
+    <string name="confirm_clear_history">Are you sure you want to delete all history?</string>
+    <string name="confirm">Confirm</string>
 
     <!-- Common -->
     <string name="ok">OK</string>
     <string name="error">Error</string>
-    <string name="loading">Cargando…</string>
-    <string name="retry">Reintentar</string>
-    <string name="close">Cerrar</string>
+    <string name="loading">Loading…</string>
+    <string name="retry">Retry</string>
+    <string name="close">Close</string>
     
     <!-- Automation Laws -->
     <string name="automation_laws">Automation Laws</string>
-    <string name="automation_laws_desc">Reglas automáticas inteligentes</string>
-    <string name="automation_system">Sistema de Automatización</string>
-    <string name="automation_system_desc">Crea reglas inteligentes que se ejecutan automáticamente basadas en eventos, ubicación, horarios y más.</string>
-    <string name="total_laws">Laws Totales</string>
-    <string name="active_laws">Activas</string>
-    <string name="suggested_laws">Laws Sugeridas</string>
-    <string name="your_active_laws">Tus Laws Activas</string>
-    <string name="create_law">Crear Law</string>
-    <string name="delete_law">Eliminar Law</string>
-    <string name="law_deleted">Law eliminada</string>
-    <string name="confirm_delete_law">¿Estás seguro de que quieres eliminar esta automatización?</string>
-    <string name="law_name">Nombre de la Law</string>
-    <string name="trigger_when">Trigger (Cuando)</string>
-    <string name="action_do">Action (Hacer)</string>
-    <string name="law_executed">Law Ejecutada</string>
+    <string name="automation_laws_desc">Intelligent automatic rules</string>
+    <string name="automation_system">Automation System</string>
+    <string name="automation_system_desc">Create intelligent rules that execute automatically based on events, location, schedules, and more.</string>
+    <string name="total_laws">Total Laws</string>
+    <string name="active_laws">Active</string>
+    <string name="suggested_laws">Suggested Laws</string>
+    <string name="your_active_laws">Your Active Laws</string>
+    <string name="create_law">Create Law</string>
+    <string name="delete_law">Delete Law</string>
+    <string name="law_deleted">Law deleted</string>
+    <string name="confirm_delete_law">Are you sure you want to delete this automation?</string>
+    <string name="law_name">Law Name</string>
+    <string name="trigger_when">Trigger (When)</string>
+    <string name="action_do">Action (Do)</string>
+    <string name="law_executed">Law Executed</string>
     
     <!-- Law Triggers -->
-    <string name="trigger_time_schedule">Horario programado</string>
-    <string name="trigger_battery_low">Batería baja</string>
-    <string name="trigger_location_enter">Entrar a ubicación</string>
-    <string name="trigger_location_exit">Salir de ubicación</string>
-    <string name="trigger_device_connected">Dispositivo conectado a WiFi</string>
+    <string name="trigger_time_schedule">Scheduled time</string>
+    <string name="trigger_battery_low">Low battery</string>
+    <string name="trigger_location_enter">Enter location</string>
+    <string name="trigger_location_exit">Exit location</string>
+    <string name="trigger_device_connected">Device connected to WiFi</string>
     
     <!-- Law Actions -->
-    <string name="action_enable_night_mode">Activar modo nocturno</string>
-    <string name="action_disable_alarm">Desactivar alarma</string>
-    <string name="action_share_location">Compartir ubicación</string>
-    <string name="action_trigger_sos">Enviar SOS</string>
-    <string name="action_enable_alarm">Activar alarma</string>
+    <string name="action_enable_night_mode">Activate night mode</string>
+    <string name="action_disable_alarm">Deactivate alarm</string>
+    <string name="action_share_location">Share location</string>
+    <string name="action_trigger_sos">Send SOS</string>
+    <string name="action_enable_alarm">Activate alarm</string>
     
     <!-- Suggested Laws -->
-    <string name="law_auto_night_mode">Modo Nocturno Automático</string>
-    <string name="law_auto_night_mode_desc">Activa protección nocturna de 10 PM a 6 AM</string>
-    <string name="law_disable_at_home">Desactivar alarma al llegar a casa</string>
-    <string name="law_disable_at_home_desc">Desactiva la alarma cuando llegas a tu ubicación de casa</string>
-    <string name="law_battery_protocol">Protocolo Batería Baja</string>
-    <string name="law_battery_protocol_desc">Envía ubicación automáticamente cuando batería &lt; 15%</string>
+    <string name="law_auto_night_mode">Automatic Night Mode</string>
+    <string name="law_auto_night_mode_desc">Activates night protection from 10 PM to 6 AM</string>
+    <string name="law_disable_at_home">Disable alarm when arriving home</string>
+    <string name="law_disable_at_home_desc">Deactivates the alarm when you arrive at your home location</string>
+    <string name="law_battery_protocol">Low Battery Protocol</string>
+    <string name="law_battery_protocol_desc">Automatically sends location when battery &lt; 15%</string>
     
     <!-- Mapbox Configuration -->
     <string name="mapbox_access_token">pk.eyJ1IjoiZmFiaWFuYWx2YXJlejkyIiwiYSI6ImNtaXF3Y3ZhdTBmN2szZnB5MGc2ZzZ6eGMifQ.3biDeAcgBt2kbVjb_V8g-w</string>
 
-    <!-- Loyalty Program (Spanish Additions) -->
-    <string name="loyalty_program">Programa de Lealtad</string>
-    <string name="loyalty_title">Programa de Fidelidad Royal Shield</string>
-    <string name="loyalty_subtitle">Recompensamos tu confianza con beneficios reales, simples y acumulables.</string>
+    <!-- Loyalty Program -->
+    <string name="loyalty_program">Loyalty Program</string>
+    <string name="loyalty_title">Royal Shield Loyalty Program</string>
+    <string name="loyalty_subtitle">We reward your trust with real, simple, and cumulative benefits.</string>
     
-    <string name="loyalty_section_registry">Registro inicial</string>
-    <string name="loyalty_desc_registry">Al completar tu registro, recibes 10% de descuento en tu próxima suscripción.</string>
+    <string name="loyalty_section_registry">Initial Registration</string>
+    <string name="loyalty_desc_registry">By completing your registration, you receive a 10% discount on your next subscription.</string>
     
-    <string name="loyalty_section_renewal">Renovaciones mensuales</string>
-    <string name="loyalty_desc_renewal">Por cada renovación consecutiva, acumulas Puntos Royal que puedes canjear por descuentos adicionales o meses gratis.</string>
+    <string name="loyalty_section_renewal">Monthly Renewals</string>
+    <string name="loyalty_desc_renewal">For each consecutive renewal, you accumulate Royal Points that you can redeem for additional discounts or free months.</string>
     
-    <string name="loyalty_section_referral">Referidos</string>
-    <string name="loyalty_desc_referral">Invita a un amigo y ambos reciben 15% de descuento en la siguiente suscripción.</string>
+    <string name="loyalty_section_referral">Referrals</string>
+    <string name="loyalty_desc_referral">Invite a friend and both receive a 15% discount on the next subscription.</string>
     
-    <string name="loyalty_section_levels">Niveles de miembro</string>
-    <string name="loyalty_levels_intro">Mientras más tiempo proteges lo que importa, más ganas:</string>
+    <string name="loyalty_section_levels">Member Levels</string>
+    <string name="loyalty_levels_intro">The longer you protect what matters, the more you earn:</string>
     
-    <string name="level_bronze">Bronce</string>
-    <string name="criteria_bronze">3 meses consecutivos</string>
-    <string name="benefit_bronze">+5% adicional</string>
+    <string name="level_bronze">Bronze</string>
+    <string name="criteria_bronze">3 consecutive months</string>
+    <string name="benefit_bronze">+5% additional</string>
     
-    <string name="level_silver">Plata</string>
-    <string name="criteria_silver">6 meses consecutivos</string>
-    <string name="benefit_silver">+10% adicional</string>
+    <string name="level_silver">Silver</string>
+    <string name="criteria_silver">6 consecutive months</string>
+    <string name="benefit_silver">+10% additional</string>
     
-    <string name="level_gold">Oro</string>
-    <string name="criteria_gold">12 meses consecutivos</string>
-    <string name="benefit_gold">+20% adicional y acceso a funciones premium</string>
+    <string name="level_gold">Gold</string>
+    <string name="criteria_gold">12 consecutive months</string>
+    <string name="benefit_gold">+20% additional and access to premium features</string>
     
     <string name="compact_loyalty_title">Royal Shield Loyalty</string>
-    <string name="compact_bullet_1">10% en tu próxima suscripción al registrarte.</string>
-    <string name="compact_bullet_2">Gana Puntos Royal por renovaciones.</string>
-    <string name="compact_bullet_3">Refiere y gana 15% tú y tu amigo.</string>
-    <string name="compact_bullet_4">Niveles: Bronce, Plata, Oro (con beneficios premium).</string>
+    <string name="compact_bullet_1">10% off your next subscription when registering.</string>
+    <string name="compact_bullet_2">Earn Royal Points for renewals.</string>
+    <string name="compact_bullet_3">Refer and both you and your friend earn 15% off.</string>
+    <string name="compact_bullet_4">Levels: Bronze, Silver, Gold (with premium benefits).</string>
     
-    <string name="view_full">Ver Completo</string>
-    <string name="view_compact">Ver Compacto</string>
+    <string name="view_full">View Full</string>
+    <string name="view_compact">View Compact</string>
     
-    <string name="quick_terms">Términos rápidos</string>
-    <string name="term_1">Los descuentos no se apilan. Se aplica el mayor descuento disponible.</string>
-    <string name="term_2">Los puntos expiran a los 12 meses si no hay renovaciones.</string>
-    <string name="term_3">Descuento por referido aplicable tras la primera renovación del referido.</string>
-    <string name="term_4">Límite: 1 referido efectivo por mes por usuario.</string>
-    <string name="term_5">Evita auto-referidos de un mismo dispositivo o correo.</string>
-    <string name="term_6">Royal Shield puede ajustar beneficios para garantizar la sostenibilidad del programa.</string>
-
+    <string name="quick_terms">Quick Terms</string>
+    <string name="term_1">Discounts do not stack. The highest available discount applies.</string>
+    <string name="term_2">Points expire after 12 months if there are no renewals.</string>
+    <string name="term_3">Referral discount applicable after the referral\'s first renewal.</string>
+    <string name="term_4">Limit: 1 effective referral per month per user.</string>
+    <string name="term_5">Avoid self-referrals from the same device or email.</string>
+    <string name="term_6">Royal Shield may adjust benefits to ensure program sustainability.</string>
 
     <!-- Security Activity Updates -->
-    <string name="security_center_title">Centro de Seguridad</string>
-    <string name="view_threat_monitor">🌐 Ver Monitor de Amenazas (Estadísticas)</string>
-    <string name="check_url_label">CHECK URL (Analizar Enlace)</string>
-    <string name="suspicious_site_hint">https://sitio-sospechoso.com</string>
-    <string name="scan_local_file_label">Escanear Archivo Local</string>
-    <string name="scan_local_file_desc">Detecta malware en documentos y descargas</string>
-    <string name="learn_protection">📚 Aprende a protegerte (Guía)</string>
-    <string name="analyzing_apps">Analizando Apps %d%%</string>
-    <string name="analyze_installed_apps">Analizar Apps Instaladas</string>
-    <string name="apps_scan_complete">Análisis de apps completado. Sistema seguro.</string>
-    <string name="status_updated">Estado actualizado</string>
+    <string name="security_center_title">Security Center</string>
+    <string name="view_threat_monitor">🌐 View Threat Monitor (Statistics)</string>
+    <string name="check_url_label">CHECK URL (Analyze Link)</string>
+    <string name="suspicious_site_hint">https://suspicious-site.com</string>
+    <string name="scan_local_file_label">Scan Local File</string>
+    <string name="scan_local_file_desc">Detects malware in documents and downloads</string>
+    <string name="learn_protection">📚 Learn to protect yourself (Guide)</string>
+    <string name="analyzing_apps">Analyzing Apps %d%%</string>
+    <string name="analyze_installed_apps">Analyze Installed Apps</string>
+    <string name="apps_scan_complete">App analysis completed. System secure.</string>
+    <string name="status_updated">Status updated</string>
 </resources>

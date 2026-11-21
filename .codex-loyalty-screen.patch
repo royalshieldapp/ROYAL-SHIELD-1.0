@@ -1,0 +1,41 @@
+diff --git a/app/src/main/java/com/royalshield/app/ui/screens/LoyaltyProgramScreen.kt b/app/src/main/java/com/royalshield/app/ui/screens/LoyaltyProgramScreen.kt
+--- a/app/src/main/java/com/royalshield/app/ui/screens/LoyaltyProgramScreen.kt
++++ b/app/src/main/java/com/royalshield/app/ui/screens/LoyaltyProgramScreen.kt
+@@ -456,6 +456,7 @@ fun ReferralCard(gold: Color, obsidian: Color) {
+ }
+ 
+ data class LoyaltyReward(
++    val id: String,
+     val name: String,
+     val description: String,
+     val cost: Int,
+@@ -470,10 +471,10 @@ fun RewardShopSection(gold: Color, vm: LoyaltyViewModel) {
+     var showRedemptionResult by remember { mutableStateOf(false) }
+     
+     val rewards = listOf(
+-        LoyaltyReward("1 Month Premium VPN", "Unlimited high-speed secure tunnel access.", 200, Icons.Default.VpnLock),
+-        LoyaltyReward("Matrix Custom Theme", "Unlock the glowing matrix style UI completely.", 500, Icons.Default.Palette),
+-        LoyaltyReward("Priority AI Processing (24h)", "Your analysis requests skip the queue.", 800, Icons.Default.Bolt),
+-        LoyaltyReward("VIP Custom Avatar", "Exclusive digital agent animation presets.", 1500, Icons.Default.Face)
++        LoyaltyReward("vpn_30_days", "1 Month Premium VPN", "Unlimited high-speed secure tunnel access.", 200, Icons.Default.VpnLock),
++        LoyaltyReward("matrix_theme", "Matrix Custom Theme", "Unlock the glowing matrix style UI completely.", 500, Icons.Default.Palette),
++        LoyaltyReward("ai_priority_24h", "Priority AI Processing (24h)", "Your analysis requests skip the queue.", 800, Icons.Default.Bolt),
++        LoyaltyReward("vip_avatar", "VIP Custom Avatar", "Exclusive digital agent animation presets.", 1500, Icons.Default.Face)
+     )
+@@ -535,7 +536,8 @@ fun RewardShopSection(gold: Color, vm: LoyaltyViewModel) {
+                         
+                         Button(
+                             onClick = {
+-                                vm.redeemReward(reward.cost, reward.name) { success, message ->
++                                vm.redeemReward(reward.id, reward.name) { success, message ->
++                                    @Suppress("UNUSED_VARIABLE") val redemptionSucceeded = success
+                                     redemptionStatus = message
+                                     showRedemptionResult = true
+                                 }
+@@ -543,6 +545,7 @@ fun RewardShopSection(gold: Color, vm: LoyaltyViewModel) {
+                             colors = ButtonDefaults.buttonColors(
+                                 containerColor = if (state.points >= reward.cost) gold else Color.DarkGray
+                             ),
++                            enabled = state.points >= reward.cost && !state.isLoading,
+                             shape = RoundedCornerShape(12.dp),
+                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),

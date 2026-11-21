@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
+function getVirusTotalApiKey() {
+    return process.env.VIRUSTOTAL_API_KEY || process.env.VT_API_KEY;
+}
+
 /**
  * GET /api/system/status
  * Returns REAL service status — checks each service availability.
@@ -12,7 +16,8 @@ router.get('/status', async (req, res) => {
     const startTime = Date.now();
 
     // Check VirusTotal
-    checks.scanner = process.env.VIRUSTOTAL_API_KEY && process.env.VIRUSTOTAL_API_KEY !== 'your_virustotal_key_here'
+    const virusTotalApiKey = getVirusTotalApiKey();
+    checks.scanner = virusTotalApiKey && virusTotalApiKey !== 'your_virustotal_key_here'
         ? 'READY' : 'NOT_CONFIGURED';
 
     // Check Twilio
@@ -69,5 +74,38 @@ router.get('/status', async (req, res) => {
         version: '2.0.0'
     });
 });
+
+// Controlled payloads used by Android to measure the real device-to-backend path.
+router.get('/speed-test/ping', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.status(204).end();
+});
+
+router.get('/speed-test/download', (req, res) => {
+    const requestedBytes = Number.parseInt(req.query.bytes, 10);
+    const bytes = Number.isFinite(requestedBytes)
+        ? Math.min(Math.max(requestedBytes, 64 * 1024), 5 * 1024 * 1024)
+        : 2 * 1024 * 1024;
+
+    res.set({
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(bytes)
+    });
+    res.send(Buffer.alloc(bytes));
+});
+
+router.post(
+    '/speed-test/upload',
+    express.raw({ type: 'application/octet-stream', limit: '5mb' }),
+    (req, res) => {
+        const bytesReceived = Buffer.isBuffer(req.body) ? req.body.length : 0;
+        if (bytesReceived === 0) {
+            return res.status(400).json({ error: 'Binary payload is required' });
+        }
+        res.set('Cache-Control', 'no-store');
+        return res.json({ bytesReceived, receivedAt: new Date().toISOString() });
+    }
+);
 
 module.exports = router;

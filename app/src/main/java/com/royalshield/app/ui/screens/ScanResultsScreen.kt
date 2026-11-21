@@ -63,6 +63,27 @@ fun ScanResultsScreen(onBackPressed: () -> Unit) {
     }
 
     com.royalshield.app.ui.components.RoyalGradientBackground {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = R.drawable.img_scan_malware),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color.Black.copy(alpha = 0.62f),
+                            0.48f to Color.Black.copy(alpha = 0.78f),
+                            1.0f to Color.Black.copy(alpha = 0.94f)
+                        )
+                    )
+            )
+
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -280,6 +301,8 @@ fun ScanResultsScreen(onBackPressed: () -> Unit) {
     }
 }
 
+}
+
 @Composable
 fun MetricCard(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier = Modifier) {
     Card(
@@ -354,11 +377,12 @@ fun MalwareScanHeroCard(modifier: Modifier = Modifier) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Background Image — dashboard_card_malware.png
             Image(
-                painter = painterResource(id = R.drawable.dashboard_card_malware),
+                painter = painterResource(id = R.drawable.img_scan_malware),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(8.dp)
                     .clip(RoundedCornerShape(24.dp))
             )
 

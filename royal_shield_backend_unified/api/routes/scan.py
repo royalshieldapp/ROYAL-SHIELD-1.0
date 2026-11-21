@@ -2,12 +2,16 @@
 Security Scan API Routes
 Ported from Node.js backend - VirusTotal URL/file hash scanning
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, HttpUrl
 from typing import Optional, Dict
+from datetime import datetime, timezone
 import httpx
 import os
 import logging
+
+from services.data_ingestion.storage import store_cyber_threats
+from api.security.firebase_auth import require_firebase_uid
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ def _check_vt_key():
 # --- Request/Response Models ---
 
 class UrlScanRequest(BaseModel):
-    url: str = Field(..., description="URL to scan")
+    url: HttpUrl = Field(..., description="HTTP(S) URL to scan")
 
 
 class UrlScanResponse(BaseModel):
@@ -54,7 +58,11 @@ class ScanResultResponse(BaseModel):
 
 
 class FileHashRequest(BaseModel):
-    hash: str = Field(..., description="MD5, SHA1, or SHA256 hash")
+    hash: str = Field(
+        ...,
+        pattern=r"^(?:[A-Fa-f0-9]{32}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64})$",
+        description="MD5, SHA1, or SHA256 hash",
+    )
 
 
 class FileHashResponse(BaseModel):
@@ -73,7 +81,10 @@ class FileHashResponse(BaseModel):
 # --- Endpoints ---
 
 @router.post("/url", response_model=UrlScanResponse)
-async def scan_url(request: UrlScanRequest):
+async def scan_url(
+    request: UrlScanRequest,
+    _firebase_uid: str = Depends(require_firebase_uid),
+):
     """
     Submit a URL for VirusTotal scanning.
 
@@ -88,7 +99,7 @@ async def scan_url(request: UrlScanRequest):
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{VT_BASE}/urls",
-                data=f"url={request.url}",
+                data={"url": str(request.url)},
                 headers={
                     **_vt_headers(),
                     "Content-Type": "application/x-www-form-urlencoded"
@@ -105,7 +116,7 @@ async def scan_url(request: UrlScanRequest):
         )
 
     except httpx.HTTPStatusError as e:
-        logger.error(f"VirusTotal submit error: {e.response.text}")
+        logger.error("VirusTotal submit failed with HTTP %s", e.response.status_code)
         raise HTTPException(status_code=500, detail="Failed to scan URL via VirusTotal")
     except Exception as e:
         logger.error(f"VirusTotal submit error: {e}")
@@ -113,7 +124,10 @@ async def scan_url(request: UrlScanRequest):
 
 
 @router.get("/result/{analysis_id}", response_model=ScanResultResponse)
-async def get_scan_result(analysis_id: str):
+async def get_scan_result(
+    analysis_id: str,
+    _firebase_uid: str = Depends(require_firebase_uid),
+):
     """
     Poll VirusTotal for scan result of a previously submitted URL.
 
@@ -137,6 +151,22 @@ async def get_scan_result(analysis_id: str):
         positives = stats.get("malicious", 0) + stats.get("suspicious", 0)
         total = sum(stats.values())
 
+        if status == "completed" and positives > 0:
+            now = datetime.now(timezone.utc)
+            store_cyber_threats([{
+                "provider": "VIRUSTOTAL",
+                "external_id": analysis_id,
+                "indicator_type": "url_analysis",
+                "indicator_value": analysis_id,
+                "title": "Malicious or suspicious URL analysis",
+                "description": f"VirusTotal detections: {positives} of {total} engines.",
+                "severity": "critical" if positives >= 10 else "high",
+                "confidence": min(100, round((positives / max(total, 1)) * 100)),
+                "active": True,
+                "first_seen": now,
+                "last_seen": now,
+            }])
+
         return ScanResultResponse(
             success=True,
             analysisId=analysis_id,
@@ -148,7 +178,7 @@ async def get_scan_result(analysis_id: str):
         )
 
     except httpx.HTTPStatusError as e:
-        logger.error(f"VirusTotal poll error: {e.response.text}")
+        logger.error("VirusTotal poll failed with HTTP %s", e.response.status_code)
         raise HTTPException(status_code=500, detail="Failed to retrieve scan result")
     except Exception as e:
         logger.error(f"VirusTotal poll error: {e}")
@@ -190,6 +220,22 @@ async def check_file_hash(request: FileHashRequest):
         positives = stats.get("malicious", 0) + stats.get("suspicious", 0)
         total = sum(stats.values())
 
+        if positives > 0:
+            now = datetime.now(timezone.utc)
+            store_cyber_threats([{
+                "provider": "VIRUSTOTAL",
+                "external_id": request.hash,
+                "indicator_type": "file_hash",
+                "indicator_value": request.hash,
+                "title": attributes.get("meaningful_name", "Detected malicious file"),
+                "description": f"VirusTotal detections: {positives} of {total} engines.",
+                "severity": "critical" if positives >= 10 else "high",
+                "confidence": min(100, round((positives / max(total, 1)) * 100)),
+                "active": True,
+                "first_seen": now,
+                "last_seen": now,
+            }])
+
         return FileHashResponse(
             success=True,
             hash=request.hash,
@@ -202,7 +248,7 @@ async def check_file_hash(request: FileHashRequest):
         )
 
     except httpx.HTTPStatusError as e:
-        logger.error(f"VirusTotal hash error: {e.response.text}")
+        logger.error("VirusTotal hash lookup failed with HTTP %s", e.response.status_code)
         raise HTTPException(status_code=500, detail="Failed to look up file hash")
     except Exception as e:
         logger.error(f"VirusTotal hash error: {e}")

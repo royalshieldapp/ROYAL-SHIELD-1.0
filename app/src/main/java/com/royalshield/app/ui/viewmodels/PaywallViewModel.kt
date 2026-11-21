@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.royalshield.app.models.ProductInfo
 import com.royalshield.app.managers.BillingManager
 import com.royalshield.app.managers.PreferencesManager
+import com.royalshield.app.billing.BillingCatalogPolicy
+import com.royalshield.app.billing.BillingCatalogState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,62 +66,53 @@ class PaywallViewModel(
         // Load current pack from prefs
         _purchasedPack.value = PreferencesManager.getPurchasedPack()
     }
-    private fun applyDiscountToPriceString(priceStr: String): String {
-        val numberRegex = """\d+([.,]\d+)?""".toRegex()
-        val match = numberRegex.find(priceStr) ?: return priceStr
-        val numericStr = match.value.replace(",", ".")
-        val originalPrice = numericStr.toDoubleOrNull() ?: return priceStr
-        val discountedPrice = originalPrice * 0.90
-        val formattedPrice = String.format(java.util.Locale.US, "%.2f", discountedPrice)
-        return priceStr.replace(match.value, formattedPrice)
-    }
-
-    private fun applyDiscountIfEligible(product: ProductInfo?): ProductInfo? {
-        if (product == null) return null
-        if (!PreferencesManager.isDiscountApplied()) return product
-        val discountedPrice = applyDiscountToPriceString(product.price)
-        return product.copy(price = discountedPrice)
-    }
-
     private fun loadData() {
         _uiState.value = PaywallUiState.Loading
         viewModelScope.launch {
             try {
-                 // Use a timeout to prevent hanging on emulator if Billing Store is not responsive
-                 val products = kotlinx.coroutines.withTimeout(3000L) {
-                     billingManager.queryProducts()
+                 val products = billingManager.queryProducts()
+                 when (
+                     val catalogState = BillingCatalogPolicy.evaluate(
+                         isBillingReady = billingManager.billingConnectionReady.value,
+                         returnedProductIds = products.mapTo(mutableSetOf()) { it.id },
+                     )
+                 ) {
+                     BillingCatalogState.Ready -> {
+                         _cachedProducts = products
+                         val starter = products.find { it.id == BillingManager.PRODUCT_STARTER }
+                         val gold = products.find { it.id == BillingManager.PRODUCT_GOLD }
+                         val ultimate = products.find { it.id == BillingManager.PRODUCT_ULTIMATE }
+
+                         _uiState.value = PaywallUiState.ProductsReady(
+                             starter,
+                             gold,
+                             ultimate,
+                         )
+                         _selectedProductId.value = BillingManager.PRODUCT_GOLD
+                     }
+                     BillingCatalogState.WaitingForPlay -> {
+                         _cachedProducts = null
+                         _uiState.value = PaywallUiState.Error(
+                             "Google Play Billing is not ready. Check Play Store and try again.",
+                         )
+                     }
+                     is BillingCatalogState.Unavailable -> {
+                         _cachedProducts = null
+                         _uiState.value = PaywallUiState.Error(catalogState.message)
+                     }
                  }
-                 _cachedProducts = products
-                 
-                 val starter = products?.find { it.id == BillingManager.PRODUCT_STARTER }
-                 val gold = products?.find { it.id == BillingManager.PRODUCT_GOLD }
-                 val ultimate = products?.find { it.id == BillingManager.PRODUCT_ULTIMATE }
-                 
-                 _uiState.value = PaywallUiState.ProductsReady(
-                     applyDiscountIfEligible(starter),
-                     applyDiscountIfEligible(gold),
-                     applyDiscountIfEligible(ultimate)
-                 )
-                 
-                 // Default selection ID
-                 _selectedProductId.value = BillingManager.PRODUCT_GOLD
                  
             } catch (e: Exception) {
-                // Fallback for Emulator/Timeout
-                val starter = ProductInfo(BillingManager.PRODUCT_STARTER, "Starter Pack", "Basic Protection", "$9.99")
-                val gold = ProductInfo(BillingManager.PRODUCT_GOLD, "Gold Bundle", "Premium Features", "$19.99")
-                val ultimate = ProductInfo(BillingManager.PRODUCT_ULTIMATE, "Ultimate Pack", "All Access", "$39.49")
-                
-                val fallbackList = listOf(starter, gold, ultimate)
-                _cachedProducts = fallbackList
-                _uiState.value = PaywallUiState.ProductsReady(
-                    applyDiscountIfEligible(starter),
-                    applyDiscountIfEligible(gold),
-                    applyDiscountIfEligible(ultimate)
+                _cachedProducts = null
+                _uiState.value = PaywallUiState.Error(
+                    "Google Play plans could not be loaded. Check Play Store and try again.",
                 )
-                _selectedProductId.value = BillingManager.PRODUCT_GOLD
             }
         }
+    }
+
+    fun retryLoading() {
+        loadData()
     }
     fun selectProduct(productId: String) {
         _selectedProductId.value = productId
@@ -132,10 +125,9 @@ class PaywallViewModel(
         if (details != null) {
             billingManager.launchPurchaseFlow(activity, details)
         } else {
-             // Mock/Error flow - "Billing not ready or Product not found"
-             _uiState.value = PaywallUiState.Error("Product unavailable in Store (Dev Mode)")
-              // Optional: In strict dev mode, maybe simulate success?
-              // But preventing silent failure is better.
+             _uiState.value = PaywallUiState.Error(
+                 "This plan was not returned by Google Play. Install the internal-testing build and try again.",
+             )
         }
     }
 

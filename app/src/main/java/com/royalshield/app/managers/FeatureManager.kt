@@ -1,8 +1,11 @@
 package com.royalshield.app.managers
 
 import com.royalshield.app.managers.PreferencesManager
+import com.royalshield.app.subscription.EntitlementStore
+
 /**
  * Centralized Feature Gating Logic.
+ * When DEV_SUPERPOWERS is active, ALL features are unlocked.
  */
 object FeatureManager {
 
@@ -23,6 +26,9 @@ object FeatureManager {
     }
 
     fun isFeatureEnabled(feature: Feature): Boolean {
+        // SUPERPOWERS: All features unlocked
+        if (EntitlementStore.DEV_SUPERPOWERS) return true
+        
         val pack = getCurrentPack()
         
         // ULTIMATE HAS EVERYTHING
@@ -45,3 +51,4 @@ object FeatureManager {
         }
     }
 }
+

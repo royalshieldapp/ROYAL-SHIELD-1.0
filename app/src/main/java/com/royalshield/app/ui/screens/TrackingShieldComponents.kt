@@ -753,6 +753,7 @@ fun SafeZonesSheet(
     riskZones: List<com.royalshield.app.features.trackingshield.data.RiskZone>,
     onDeleteSafe: (String) -> Unit,
     onDeleteRisk: (String) -> Unit,
+    onClose: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     GlassmorphismSurface(
@@ -773,6 +774,12 @@ fun SafeZonesSheet(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp
             )
+            TextButton(
+                onClick = onClose,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Close", color = NeonGold, fontSize = 12.sp)
+            }
             Spacer(Modifier.height(8.dp))
             
             if (safeZones.isEmpty() && riskZones.isEmpty()) {

@@ -5,16 +5,33 @@ const axios = require('axios');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, './.env') });
 
+function envValue(...names) {
+    for (const name of names) {
+        const value = process.env[name];
+        if (value) return value;
+    }
+    return undefined;
+}
+
+const emailUser = envValue('OPENCLAW_EMAIL_USER');
+const emailPassword = envValue('OPENCLAW_EMAIL_PASSWORD', 'OPENCLAW_EMAIL_PASS');
+const smtpHost = envValue('OPENCLAW_SMTP_HOST', 'OPENCLAW_EMAIL_SMTP_HOST') || 'smtp.gmail.com';
+const smtpPort = parseInt(envValue('OPENCLAW_SMTP_PORT', 'OPENCLAW_EMAIL_SMTP_PORT') || '465');
+const smtpSecure = envValue('OPENCLAW_SMTP_SECURE', 'OPENCLAW_EMAIL_SMTP_SECURE');
+const imapHost = envValue('OPENCLAW_IMAP_HOST', 'OPENCLAW_EMAIL_IMAP_HOST') || 'imap.gmail.com';
+const imapPort = parseInt(envValue('OPENCLAW_IMAP_PORT', 'OPENCLAW_EMAIL_IMAP_PORT') || '993');
+const imapTls = envValue('OPENCLAW_IMAP_TLS', 'OPENCLAW_EMAIL_IMAP_TLS');
+
 /**
  * Configure SMTP Transporter for Sending Emails
  */
 const transporter = nodemailer.createTransport({
-    host: process.env.OPENCLAW_EMAIL_SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.OPENCLAW_EMAIL_SMTP_PORT || '465'),
-    secure: true,
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure ? smtpSecure === 'true' : smtpPort === 465,
     auth: {
-        user: process.env.OPENCLAW_EMAIL_USER,
-        pass: process.env.OPENCLAW_EMAIL_PASS
+        user: emailUser,
+        pass: emailPassword
     }
 });
 
@@ -24,7 +41,7 @@ const transporter = nodemailer.createTransport({
 async function sendEmailReport(to, subject, body, htmlContent = null) {
     try {
         const mailOptions = {
-            from: `"OpenClaw Shield" <${process.env.OPENCLAW_EMAIL_USER}>`,
+            from: `"OpenClaw Shield" <${emailUser}>`,
             to,
             subject,
             text: body,
@@ -44,11 +61,11 @@ async function sendEmailReport(to, subject, body, htmlContent = null) {
  */
 function startEmailCommandListener() {
     const imapConfig = {
-        user: process.env.OPENCLAW_EMAIL_USER,
-        password: process.env.OPENCLAW_EMAIL_PASS,
-        host: process.env.OPENCLAW_EMAIL_IMAP_HOST || 'imap.gmail.com',
-        port: parseInt(process.env.OPENCLAW_EMAIL_IMAP_PORT || '993'),
-        tls: true,
+        user: emailUser,
+        password: emailPassword,
+        host: imapHost,
+        port: imapPort,
+        tls: imapTls ? imapTls === 'true' : true,
         tlsOptions: { rejectUnauthorized: false }
     };
 

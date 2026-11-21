@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.android.billingclient.api.*
+import com.google.firebase.auth.FirebaseAuth
 import com.royalshield.app.subscription.SubscriptionTier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import kotlinx.coroutines.withContext
 
 class BillingRepository(
     private val context: Context,
+    private val billingVerifier: BillingVerifier = RenderBillingVerifier(),
     private val onTierUpgrade: (SubscriptionTier) -> Unit
 ) : PurchasesUpdatedListener {
 
@@ -83,6 +85,11 @@ class BillingRepository(
     }
 
     fun launchBillingFlow(activity: Activity, productDetails: ProductDetails) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _purchaseStatus.value = "Authentication required"
+            return
+        }
         val productDetailsParamsList = listOf(
             BillingFlowParams.ProductDetailsParams.newBuilder()
                 .setProductDetails(productDetails)
@@ -91,6 +98,7 @@ class BillingRepository(
 
         val billingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
+            .setObfuscatedAccountId(BillingVerificationDecision.obfuscatedAccountId(uid))
             .build()
 
         billingClient.launchBillingFlow(activity, billingFlowParams)
@@ -109,19 +117,35 @@ class BillingRepository(
     }
 
     private fun handlePurchase(purchase: Purchase) {
-        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            if (!purchase.isAcknowledged) {
+        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
+            _purchaseStatus.value = "Pending"
+            return
+        }
+
+        _purchaseStatus.value = "Verifying"
+        billingVerifier.verify(purchase) { result ->
+            when (result) {
+                is BillingVerificationResult.Rejected -> {
+                    _purchaseStatus.value = "Not verified: ${result.message}"
+                }
+                is BillingVerificationResult.Verified -> {
+                    if (!purchase.isAcknowledged && !result.acknowledged) {
                 val acknowledgePurchaseParams = AcknowledgePurchaseParams.newBuilder()
                     .setPurchaseToken(purchase.purchaseToken)
                     .build()
                 billingClient.acknowledgePurchase(acknowledgePurchaseParams) { billingResult ->
                     if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                         _purchaseStatus.value = "Success"
-                        checkEntitlements(listOf(purchase))
+                                onTierUpgrade(result.tier)
+                            } else {
+                                _purchaseStatus.value = "Verified, acknowledgement failed"
                     }
                 }
             } else {
-                checkEntitlements(listOf(purchase))
+                        _purchaseStatus.value = "Success"
+                        onTierUpgrade(result.tier)
+                    }
+                }
             }
         }
     }
@@ -133,26 +157,13 @@ class BillingRepository(
         
         billingClient.queryPurchasesAsync(params) { billingResult, purchasesList ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                 checkEntitlements(purchasesList)
+                if (purchasesList.isEmpty()) {
+                    _purchaseStatus.value = "No purchases to restore"
+                    onTierUpgrade(SubscriptionTier.FREE)
+                } else {
+                    purchasesList.forEach(::handlePurchase)
+                }
             }
-        }
-    }
-
-    private fun checkEntitlements(purchases: List<Purchase>) {
-        var highestTier = SubscriptionTier.FREE
-        
-        for (purchase in purchases) {
-            if (purchase.products.contains(PRODUCT_ULTIMATE)) {
-                highestTier = SubscriptionTier.ULTIMATE
-            } else if (purchase.products.contains(PRODUCT_GOLD) && highestTier.rank < SubscriptionTier.GOLD.rank) {
-                highestTier = SubscriptionTier.GOLD
-            } else if (purchase.products.contains(PRODUCT_STARTER) && highestTier.rank < SubscriptionTier.STARTER.rank) {
-                highestTier = SubscriptionTier.STARTER
-            }
-        }
-        
-        if (highestTier != SubscriptionTier.FREE) {
-            onTierUpgrade(highestTier)
         }
     }
 

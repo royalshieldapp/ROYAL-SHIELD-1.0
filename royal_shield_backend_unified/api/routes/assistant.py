@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import httpx
 import logging
+import time
 from config.settings import settings
 
 router = APIRouter(prefix="/api/assistant", tags=["Assistant"])
@@ -13,127 +14,221 @@ class ChatHistoryEntry(BaseModel):
     content: str
 
 class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
+    message: Optional[str] = None
+    prompt: Optional[str] = None  # Compatible with legacy Android AiManager
     history: Optional[List[ChatHistoryEntry]] = Field(default_factory=list)
-    model: str = "gemini-1.5-flash"
+    model: Optional[str] = None
 
 @router.post("/chat")
 async def chat_proxy(payload: ChatRequest):
-    apiKey = settings.gemini_api_key
+    # Support both "message" and "prompt" from Android clients
+    user_text = (payload.message or payload.prompt or "").strip()
+    if not user_text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "message or prompt is required", "code": "INVALID_REQUEST"}
+        )
 
-    if not apiKey or apiKey == "your_gemini_api_key_here":
+    provider = (settings.ai_provider or "nvidia").lower()
+
+    if provider == "nvidia":
+        return await _call_nvidia_qwen(user_text, payload.history, payload.model)
+    elif provider == "gemini":
+        return await _call_gemini_fallback(user_text, payload.history, payload.model)
+    else:
+        # Default fallback to NVIDIA Qwen
+        return await _call_nvidia_qwen(user_text, payload.history, payload.model)
+
+
+async def _call_nvidia_qwen(user_text: str, history: Optional[List[ChatHistoryEntry]], requested_model: Optional[str]):
+    apiKey = settings.nvidia_api_key
+    model_id = requested_model or settings.nvidia_model or "minimaxai/minimax-m3.1-flash"
+    timeout_sec = settings.ai_request_timeout_seconds or 30.0
+
+    if not apiKey or apiKey == "your_nvidia_api_key_here":
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "error": "AI service not configured",
                 "code": "AI_NOT_CONFIGURED",
-                "message": "Gemini API key not set on the server. Configure GEMINI_API_KEY in environment variables."
+                "message": "NVIDIA API key not configured on server. Set NVIDIA_API_KEY."
             }
         )
 
-    # Build conversation contents for Gemini
-    contents = []
-
-    # Add history if provided (keep last 10 messages)
-    history_slice = payload.history[-10:] if payload.history else []
-    for entry in history_slice:
-        contents.append({
-            "role": "model" if entry.role == "assistant" else "user",
-            "parts": [{"text": entry.content}]
-        })
-
-    # Add current message
-    contents.append({
-        "role": "user",
-        "parts": [{"text": payload.message}]
-    })
-
-    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{payload.model}:generateContent?key={apiKey}"
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                gemini_url,
-                json={
-                    "contents": contents,
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "topK": 40,
-                        "topP": 0.95,
-                        "maxOutputTokens": 2048
-                    },
-                    "safetySettings": [
-                        { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
-                        { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
-                        { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
-                        { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" }
-                    ]
-                },
-                headers={"Content-Type": "application/json"}
+    # Build standard OpenAI-compatible messages for NVIDIA NIM
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Royal Security Sentinel (RS-Sentinel), the core AI agent of the Royal Shield cybersecurity ecosystem. "
+                "Keep responses concise, technical, authoritative, and helpful."
             )
+        }
+    ]
 
-        if response.status_code == 429:
+    history_slice = history[-10:] if history else []
+    for entry in history_slice:
+        role = "assistant" if entry.role in ("assistant", "model") else "user"
+        messages.append({"role": role, "content": entry.content})
+
+    messages.append({"role": "user", "content": user_text})
+
+    nvidia_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {apiKey}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model_id,
+        "messages": messages,
+        "temperature": 0.6,
+        "top_p": 0.9,
+        "max_tokens": 1024
+    }
+
+    start_time = time.time()
+    try:
+        async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            response = await client.post(nvidia_url, json=payload, headers=headers)
+
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.info(f"AI_PROVIDER=nvidia AI_MODEL={model_id} AI_REQUEST_STATUS={response.status_code} AI_LATENCY_MS={latency_ms}")
+
+        if response.status_code in (401, 403):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": "NVIDIA authentication error", "code": "AI_AUTH_ERROR"}
+            )
+        elif response.status_code == 429:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail={"error": "AI rate limit exceeded", "code": "RATE_LIMITED", "retryAfter": 60}
+                detail={"error": "NVIDIA rate limit exceeded", "code": "RATE_LIMITED", "retryAfter": 60}
             )
         elif response.status_code == 400:
-            res_data = response.json()
-            err_msg = res_data.get("error", {}).get("message", "Invalid request to AI service")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Invalid request to AI service", "code": "INVALID_REQUEST", "details": err_msg}
+                detail={"error": "Invalid request to AI service", "code": "INVALID_REQUEST"}
+            )
+        elif response.status_code >= 500:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": "NVIDIA inference server error", "code": "AI_UNAVAILABLE"}
             )
         elif response.status_code != 200:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={"error": "AI service temporarily unavailable", "code": "AI_UNAVAILABLE"}
+                detail={"error": f"AI service returned {response.status_code}", "code": "AI_UNAVAILABLE"}
             )
 
         data = response.json()
-        candidates = data.get("candidates", [])
-        candidate = candidates[0] if candidates else {}
-        parts = candidate.get("content", {}).get("parts", [])
-        reply = parts[0].get("text") if parts else None
-
-        if not reply:
-            finish_reason = candidate.get("finishReason")
-            if finish_reason == "SAFETY":
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail={"error": "Response blocked by safety filters", "code": "SAFETY_BLOCKED"}
-                )
+        choices = data.get("choices", [])
+        if not choices:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": "AI returned empty response", "code": "EMPTY_RESPONSE"}
+                detail={"error": "AI returned empty choices", "code": "EMPTY_RESPONSE"}
             )
 
-        usage_metadata = data.get("usageMetadata", {})
+        reply = choices[0].get("message", {}).get("content", "").strip()
+        if not reply:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": "AI returned empty content", "code": "EMPTY_RESPONSE"}
+            )
+
+        usage = data.get("usage", {})
         return {
             "success": True,
             "reply": reply,
-            "model": payload.model,
+            "response": reply,   # Compatibility with legacy AiManager
+            "message": reply,    # Compatibility with legacy AiManager
+            "provider": "nvidia",
+            "model": model_id,
             "usage": {
-                "promptTokens": usage_metadata.get("promptTokenCount"),
-                "responseTokens": usage_metadata.get("candidatesTokenCount")
+                "promptTokens": usage.get("prompt_tokens"),
+                "responseTokens": usage.get("completion_tokens")
             }
         }
 
+    except httpx.TimeoutException:
+        logger.error(f"[AI] NVIDIA timeout after {timeout_sec}s")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail={"error": "AI service timeout", "code": "AI_TIMEOUT"}
+        )
     except httpx.HTTPError as exc:
-        logger.error(f"[AI] Gemini client error: {exc}")
+        logger.error(f"[AI] NVIDIA client connection error: {exc}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"error": "AI service communication error", "code": "AI_UNAVAILABLE"}
         )
 
+
+async def _call_gemini_fallback(user_text: str, history: Optional[List[ChatHistoryEntry]], requested_model: Optional[str]):
+    apiKey = settings.gemini_api_key
+    if not apiKey or apiKey == "your_gemini_api_key_here":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "Fallback AI service not configured", "code": "AI_NOT_CONFIGURED"}
+        )
+
+    model_name = requested_model or "gemini-1.5-flash"
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={apiKey}"
+
+    contents = []
+    for entry in (history[-10:] if history else []):
+        contents.append({
+            "role": "model" if entry.role in ("assistant", "model") else "user",
+            "parts": [{"text": entry.content}]
+        })
+    contents.append({"role": "user", "parts": [{"text": user_text}]})
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                gemini_url,
+                json={"contents": contents},
+                headers={"Content-Type": "application/json"}
+            )
+
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"error": "Fallback AI error", "code": "AI_UNAVAILABLE"}
+            )
+
+        data = resp.json()
+        candidates = data.get("candidates", [])
+        reply = candidates[0].get("content", {}).get("parts", [])[0].get("text", "") if candidates else ""
+
+        return {
+            "success": True,
+            "reply": reply,
+            "response": reply,
+            "message": reply,
+            "provider": "gemini",
+            "model": model_name
+        }
+    except Exception as e:
+        logger.error(f"[AI] Gemini fallback error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"error": "Fallback AI communication error", "code": "AI_UNAVAILABLE"}
+        )
+
+
 @router.get("/status")
 def get_status():
-    apiKey = settings.gemini_api_key
-    configured = apiKey is not None and apiKey != "your_gemini_api_key_here"
+    provider = (settings.ai_provider or "nvidia").lower()
+    if provider == "nvidia":
+        configured = bool(settings.nvidia_api_key and settings.nvidia_api_key != "your_nvidia_api_key_here")
+        model = settings.nvidia_model or "qwen/qwen2.5-72b-instruct"
+    else:
+        configured = bool(settings.gemini_api_key and settings.gemini_api_key != "your_gemini_api_key_here")
+        model = "gemini-1.5-flash"
 
     return {
         "service": "ai_assistant",
         "status": "available" if configured else "not_configured",
-        "model": "gemini-1.5-flash",
-        "provider": "google"
+        "model": model,
+        "provider": provider
     }

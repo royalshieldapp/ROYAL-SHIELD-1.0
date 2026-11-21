@@ -94,7 +94,7 @@ fun PhishingDetectorScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                "Pegue el mensaje sospechoso aquí:",
+                "Paste the suspicious message here:",
                 color = Color.Gray,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -227,7 +227,7 @@ fun PhishingDetectorScreen(onBack: () -> Unit) {
                     Column(Modifier.padding(16.dp)) {
                         Text("API Key Faltante", color = Color.White, fontWeight = FontWeight.Bold)
                         Text(
-                            "Para un análisis profundo de URLs por VirusTotal, configure su API Key en Ajustes.",
+                            "For deep URL analysis with VirusTotal, configure your API key in Settings.",
                             color = Color.LightGray,
                             fontSize = 12.sp
                         )
@@ -275,7 +275,7 @@ fun PhishingResultCard(result: PhishingResult) {
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text("Nivel de Riesgo", color = Color.Gray, fontSize = 12.sp)
+                    Text("Risk Level", color = Color.Gray, fontSize = 12.sp)
                     Text(
                         text = "${result.score}% ($riskLabel)",
                         color = riskColor,
@@ -320,7 +320,7 @@ fun PhishingResultCard(result: PhishingResult) {
                 }
             }
 
-            Text("Análisis de IA:", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("AI Analysis:", color = Color.White, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
 
             result.reasons.forEach { reason ->

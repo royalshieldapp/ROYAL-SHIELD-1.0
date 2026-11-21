@@ -121,7 +121,7 @@ fun SecurityCameraScreen(
                     letterSpacing = 2.sp
                 )
                 Text(
-                    text = "SISTEMA DE CÁMARAS",
+                    text = "CAMERA SYSTEM",
                     color = Color.Gray,
                     fontSize = 10.sp,
                     letterSpacing = 1.sp
@@ -165,24 +165,24 @@ fun SecurityCameraScreen(
                 ) {
                     if (!hasCameraPermission) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Se requieren permisos de cámara.", color = Color.Gray)
+                            Text("Camera permissions are required.", color = Color.Gray)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                                 colors = ButtonDefaults.buttonColors(containerColor = GoldColor)
                             ) {
-                                Text("Otorgar Permiso", color = Color.Black)
+                                Text("Grant Permission", color = Color.Black)
                             }
                         }
                     } else if (!state.isStreaming) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Cámara pausada.", color = Color.Gray)
+                            Text("Camera paused.", color = Color.Gray)
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = { viewModel.toggleStreaming() },
                                 colors = ButtonDefaults.buttonColors(containerColor = GoldColor)
                             ) {
-                                Text("Activar Cámara", color = Color.Black)
+                                Text("Activate Camera", color = Color.Black)
                             }
                         }
                     } else {
@@ -231,7 +231,7 @@ fun SecurityCameraScreen(
                         }
                         
                         Text(
-                            text = "CAM 02 - LOBBY (Tú)",
+                            text = "CAM 02 - LOBBY (You)",
                             color = Color.White,
                             fontSize = 12.sp,
                             modifier = Modifier.align(Alignment.TopStart).padding(16.dp)

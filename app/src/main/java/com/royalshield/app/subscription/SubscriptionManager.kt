@@ -10,18 +10,9 @@ class SubscriptionManager(context: Context) {
 
     private val entitlementStore = EntitlementStore(context)
     
-    // Pass a callback to Billing Repo so it can update the store when a purchase happens
+    // Persist only tiers returned by the authenticated Render verification flow.
     private val billingRepository = BillingRepository(context) { newTier ->
-        // Only update if the new tier is higher than the old one (or simply update)
-        // EntitlementStore logic will handle it, but for simplicity here we just pass it on.
-        // We typically want to respect the highest tier purchased.
-        val current = entitlementStore.tier.value
-        if (newTier.rank > current.rank) {
-            entitlementStore.updateTier(newTier)
-        } else if (newTier.rank == current.rank) {
-             // Re-verify
-             entitlementStore.updateTier(newTier)
-        }
+        entitlementStore.updateVerifiedTier(newTier)
     }
 
     val currentTier: StateFlow<SubscriptionTier> = entitlementStore.tier

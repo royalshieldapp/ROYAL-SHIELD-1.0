@@ -30,7 +30,13 @@ else:
     )
 
 # SQLAlchemy engine
-engine = create_engine(database_url, **engine_kwargs)
+try:
+    engine = create_engine(database_url, **engine_kwargs)
+except (ImportError, ModuleNotFoundError) as err:
+    logger.warning("Database driver for %s not available (%s). Falling back to SQLite.", database_url, err)
+    database_url = "sqlite:///./dev.db"
+    engine_kwargs = {"connect_args": {"check_same_thread": False}, "pool_pre_ping": True}
+    engine = create_engine(database_url, **engine_kwargs)
 
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -79,6 +85,11 @@ def get_db_context() -> Generator[Session, None, None]:
 
 def init_db():
     """Initialize database (create tables if not exist)"""
+    from api.routes import billing as _billing_models  # noqa: F401
+    from api.routes import threat_map as _threat_map_models  # noqa: F401
+    from services.data_ingestion import storage as _forecast_storage  # noqa: F401
+    from services.forecast import models as _forecast_models  # noqa: F401
+    from services.loyalty import models as _loyalty_models  # noqa: F401
     logger.info("Initializing database at host: %s", settings.database_host)
     Base.metadata.create_all(bind=engine)
     logger.info("Database initialized successfully")

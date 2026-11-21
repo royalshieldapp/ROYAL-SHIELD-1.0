@@ -3,18 +3,30 @@ package com.royalshield.app.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.royalshield.app.ui.components.BottomNavItem
+import com.royalshield.app.ui.components.FeatureAvailabilityGate
 import com.royalshield.app.ui.screens.*
+import com.royalshield.app.ui.viewmodels.FeatureAvailabilityViewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.royalshield.app.securitysetup.EncryptedSecuritySetupStore
 
 @Composable
 fun RoyalShieldNavGraph(
     navController: NavHostController,
     billingManager: com.royalshield.app.managers.BillingManager,
+    showAds: Boolean,
     onTriggerSOS: () -> Unit
 ) {
+    val featureAvailabilityViewModel: FeatureAvailabilityViewModel = viewModel()
+    val featureAvailability by featureAvailabilityViewModel.availability.collectAsState()
+
     NavHost(
         navController = navController,
         startDestination = BottomNavItem.Home.route
@@ -22,6 +34,7 @@ fun RoyalShieldNavGraph(
         composable(BottomNavItem.Home.route) {
             DashboardScreen(
                 onNavigateToSettings = { navController.navigate(BottomNavItem.Settings.route) },
+                onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToSystemStatus = { navController.navigate("system_status") },
                 onNavigateToSOS = onTriggerSOS,
                 onNavigateToAutomation = { navController.navigate(BottomNavItem.Automation.route) },
@@ -40,6 +53,7 @@ fun RoyalShieldNavGraph(
                 onNavigateToSoundDetection = { navController.navigate("sound_detection") },
                 onNavigateToSecurityCamera = { navController.navigate("security_camera") },
                 onNavigateToSolutionEngine = { navController.navigate("solution_engine") },
+                onReviewSecuritySetup = { navController.navigate("security_agent_setup") },
                 billingManager = billingManager
             )
         }
@@ -49,27 +63,46 @@ fun RoyalShieldNavGraph(
         }
 
         composable(BottomNavItem.GlobalMap.route) {
-            GlobalMapScreen(onBack = { navController.popBackStack() })
+            RoyalMapScreen(
+                onBack = { navController.popBackStack() },
+                forecastAvailability = featureAvailability.forecast,
+                threatMapAvailability = featureAvailability.threatMap,
+            )
         }
 
         composable(BottomNavItem.CyberMap.route) {
             CyberHomeScreen(
+                showAds = showAds,
                 onBack = { navController.popBackStack() },
                 onNavigateToMap = { navController.navigate(BottomNavItem.GlobalMap.route) },
                 onNavigateToCourses = { navController.navigate("courses") },
                 onNavigateToVoiceScam = { navController.navigate("voice_scam") },
                 onNavigateToXdr = { navController.navigate("xdr_dashboard") },
-                onNavigateToIntel = { navController.navigate("intel_hub") }
+                onNavigateToIntel = { navController.navigate("intel_hub") },
+                onNavigateToNetworkToolkit = { navController.navigate("network_toolkit") },
+                threatMapAvailability = featureAvailability.threatMap,
+                onRefreshAvailability = featureAvailabilityViewModel::refresh,
             )
+        }
+
+        composable("network_toolkit") {
+            NetworkToolkitScreen(onBack = { navController.popBackStack() })
         }
 
 
 
         composable(BottomNavItem.Automation.route) {
-            AutomationScreen(
+            FeatureAvailabilityGate(
+                moduleName = "Automations",
+                state = featureAvailability.automations,
                 onBack = { navController.popBackStack() },
-                onBusinessClick = { navController.navigate("business") }
-            )
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                AutomationScreen(
+                    onBack = { navController.popBackStack() },
+                    onBusinessClick = { navController.navigate("business") }
+                )
+            }
         }
 
         composable(BottomNavItem.Settings.route) {
@@ -81,6 +114,18 @@ fun RoyalShieldNavGraph(
                 onNavigateToFundamentals = { navController.navigate("courses") },
                 onNavigateToReferral = { navController.navigate("referral") },
                 onBackPressed = { navController.popBackStack() }
+            )
+        }
+
+        composable("profile") {
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(BottomNavItem.Settings.route) },
+                onSignedOut = {
+                    navController.navigate(BottomNavItem.Home.route) {
+                        popUpTo(BottomNavItem.Home.route) { inclusive = true }
+                    }
+                }
             )
         }
 
@@ -122,13 +167,11 @@ fun RoyalShieldNavGraph(
         }
 
         composable("ai_neural_hub") {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            AiNeuralHubScreen(
+            AiHubScreen(
                 onBack = { navController.popBackStack() },
-                onTriggerSos = onTriggerSOS,
-                onCheckUrl = { url ->
-                    android.widget.Toast.makeText(context, "Scanning URL: $url", android.widget.Toast.LENGTH_SHORT).show()
-                }
+                billingManager = billingManager,
+                onNavigateToPremium = { navController.navigate("subscription") },
+                onNavigateToScriptLab = { navController.navigate("ai_script_lab") }
             )
         }
         composable("ai_script_lab") { AiScriptLabScreen(onBack = { navController.popBackStack() }) }
@@ -146,10 +189,44 @@ fun RoyalShieldNavGraph(
                 onNavigateToIntelHub = { navController.navigate("intel_hub") }
             )
         }
-        composable("reports_center") { ReportsCenterScreen(onBack = { navController.popBackStack() }) }
+        composable("reports_center") {
+            FeatureAvailabilityGate(
+                moduleName = "Reports",
+                state = featureAvailability.reports,
+                onBack = { navController.popBackStack() },
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                ReportsCenterScreen(onBack = { navController.popBackStack() })
+            }
+        }
+
+        composable("security_agent_setup") {
+            val context = LocalContext.current
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+            if (uid == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                val setupStore = remember(context) { EncryptedSecuritySetupStore(context) }
+                SecuritySetupScreen(
+                    uid = uid,
+                    store = setupStore,
+                    reviewExisting = true,
+                    onComplete = { navController.popBackStack() },
+                )
+            }
+        }
         composable("compliance_monitor") { ComplianceMonitorScreen(onBack = { navController.popBackStack() }) }
         composable("audit_logs") { AuditLogsScreen(onBack = { navController.popBackStack() }) }
-        composable("policy_manager") { PolicyManagerScreen(onBack = { navController.popBackStack() }) }
+        composable("policy_manager") {
+            FeatureAvailabilityGate(
+                moduleName = "Policies",
+                state = featureAvailability.policies,
+                onBack = { navController.popBackStack() },
+                onRetry = featureAvailabilityViewModel::refresh,
+            ) {
+                PolicyManagerScreen(onBack = { navController.popBackStack() })
+            }
+        }
 
         composable("xdr_dashboard") {
              XdrScreen(onBack = { navController.popBackStack() })
@@ -168,7 +245,11 @@ fun RoyalShieldNavGraph(
         }
 
         composable("tracking_shield") {
-            TrackingShieldScreen(onBack = { navController.popBackStack() })
+            RoyalMapScreen(
+                onBack = { navController.popBackStack() },
+                forecastAvailability = featureAvailability.forecast,
+                threatMapAvailability = featureAvailability.threatMap,
+            )
         }
 
         composable("timeline") {
@@ -188,6 +269,19 @@ fun RoyalShieldNavGraph(
         }
 
         composable("solution_engine") {
+            SolutionEngineResolutionScreen(
+                onBack = { navController.popBackStack() },
+                onHistory = { navController.navigate("audit_logs") },
+                onOpenFileScan = { navController.navigate("file_scan") },
+                onOpenPhishing = { navController.navigate("phishing_detector") },
+                onOpenVpn = { navController.navigate("vpn") },
+                onOpenTracking = { navController.navigate("tracking_shield") },
+                onOpenAutomation = { navController.navigate(BottomNavItem.Automation.route) },
+                onOpenGrid = { navController.navigate("solution_engine_grid") }
+            )
+        }
+
+        composable("solution_engine_grid") {
             SolutionEngineScreen(onBack = { navController.popBackStack() })
         }
 

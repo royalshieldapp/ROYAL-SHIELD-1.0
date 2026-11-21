@@ -5,6 +5,7 @@ import android.util.Log
 import com.royalshield.app.SosManager
 import com.royalshield.app.data.db.ActionType
 import com.royalshield.app.data.db.AutomationRule
+import com.royalshield.app.data.db.Routine
 import com.royalshield.app.data.db.TriggerType
 import com.royalshield.app.util.NotificationUtils
 
@@ -30,6 +31,29 @@ object AutomationEvaluator {
 
         if (shouldTrigger) {
             executeAction(context, rule)
+        }
+    }
+
+    /**
+     * Evaluates a routine without executing Android side effects.
+     *
+     * Keeping the predicate pure makes it safe for unit tests and lets callers
+     * decide when and where the routine actions should run.
+     */
+    fun evaluateRoutine(routine: Routine, currentData: Map<String, Any>): Boolean {
+        if (!routine.isEnabled) return false
+
+        return when (routine.triggerType) {
+            TriggerType.BATTERY_LOW -> {
+                val battery = currentData["battery"] as? Int ?: return false
+                val threshold = routine.triggerParams.toIntOrNull() ?: 15
+                battery <= threshold
+            }
+            TriggerType.WIFI_CONNECT -> {
+                val currentSsid = currentData["wifi_ssid"] as? String ?: return false
+                routine.triggerParams.isNotBlank() && currentSsid == routine.triggerParams
+            }
+            else -> false
         }
     }
 

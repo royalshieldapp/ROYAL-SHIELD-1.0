@@ -1,5 +1,15 @@
 package com.royalshield.app.ui.screens
 
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -11,6 +21,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,12 +33,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -34,10 +49,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.royalshield.app.ui.components.CyberButtonRect
 import com.royalshield.app.ui.theme.RoyalGold
+import com.royalshield.app.ui.components.RoyalEliteBadge
+import com.royalshield.app.ui.components.RoyalEliteBadgeMode
 import com.royalshield.app.ui.theme.CyberCyan
 import com.royalshield.app.managers.PreferencesManager
 import android.widget.Toast
 import com.royalshield.app.SosManager
+
+private enum class SettingsContentWindow(val title: String, val assetName: String? = null) {
+    ContactSupport("Contact Support"),
+    PrivacyPolicy("Privacy Policy", "privacy_policy_embed.html"),
+    TermsAndConditions("Terms & Conditions", "terms_embed.html")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +81,7 @@ fun SettingsScreen(
 
     var vibrationEnabled by remember { mutableStateOf(PreferencesManager.isVibrationEnabled()) }
     var historyEnabled by remember { mutableStateOf(PreferencesManager.isHistoryEnabled()) }
+    var activeContentWindow by remember { mutableStateOf<SettingsContentWindow?>(null) }
 
 
 
@@ -153,11 +177,14 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Diamond, "Elite", tint = Color(0xFFFFD700))
+                                RoyalEliteBadge(
+                                    mode = RoyalEliteBadgeMode.PROMOTIONAL,
+                                    modifier = Modifier.size(42.dp)
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text("Royal Shield Elite", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
-                                    Text("Manage subscription", color = Color.Gray, fontSize = 12.sp)
+                                    Text("Royal Elite preview", color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)
+                                    Text("Explore subscription benefits", color = Color.Gray, fontSize = 12.sp)
                                 }
                             }
                             androidx.compose.foundation.Image(
@@ -380,7 +407,7 @@ fun SettingsScreen(
                             icon = Icons.Default.Security,
                             color = CyberCyan,
                             onClick = {
-                                Toast.makeText(context, "Opening Privacy Policy...", Toast.LENGTH_SHORT).show()
+                                activeContentWindow = SettingsContentWindow.PrivacyPolicy
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -389,27 +416,50 @@ fun SettingsScreen(
                             icon = Icons.Default.Description,
                             color = RoyalGold,
                             onClick = {
-                                Toast.makeText(context, "Opening Terms & Conditions...", Toast.LENGTH_SHORT).show()
+                                activeContentWindow = SettingsContentWindow.TermsAndConditions
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
 
-                // 8. Support & Contact Section
+                // 8. Support & Feedback Section
                 SettingsSection(
-                    title = "📧 Support & Contact",
-                    description = "Get in touch with Royal Shield"
+                    title = "Support & Feedback",
+                    description = "Contact Royal Shield or share your experience"
                 ) {
-                    CyberButtonRect(
-                        text = "Contact Support",
-                        icon = Icons.Default.Email,
-                        color = CyberCyan,
-                        onClick = {
-                            Toast.makeText(context, "Opening Email Client...", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CyberButtonRect(
+                            text = "Contact Support",
+                            icon = Icons.Default.Email,
+                            color = CyberCyan,
+                            onClick = {
+                                activeContentWindow = SettingsContentWindow.ContactSupport
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        GooglePlayFeedbackButton(
+                            onClick = {
+                                val appId = context.packageName
+                                val playStoreIntent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("market://details?id=$appId")
+                                )
+                                try {
+                                    context.startActivity(playStoreIntent)
+                                } catch (_: Exception) {
+                                    context.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("https://play.google.com/store/apps/details?id=$appId")
+                                        )
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
 
                 // 9. Social Section (Placeholder)
@@ -421,9 +471,9 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        CyberButtonRect(
+                        SocialActionButton(
                             text = "Instagram",
-                            icon = Icons.Default.CameraAlt,
+                            iconRes = com.royalshield.app.R.drawable.ic_social_instagram,
                             color = Color(0xFFE1306C),
                             onClick = {
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://instagram.com/royalshieldapp"))
@@ -431,9 +481,9 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        CyberButtonRect(
+                        SocialActionButton(
                             text = "Facebook",
-                            icon = Icons.Default.ThumbUp,
+                            iconRes = com.royalshield.app.R.drawable.ic_social_facebook,
                             color = Color(0xFF1877F2),
                             onClick = {
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.facebook.com/profile.php?id=61573434707140"))
@@ -441,11 +491,14 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        CyberButtonRect(
+                        SocialActionButton(
                             text = "YouTube",
-                            icon = Icons.Default.PlayArrow,
+                            iconRes = com.royalshield.app.R.drawable.ic_social_youtube,
                             color = Color(0xFFFF0000),
-                            onClick = { Toast.makeText(context, "Opening YouTube...", Toast.LENGTH_SHORT).show() },
+                            onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://youtube.com/@royalshield"))
+                                context.startActivity(intent)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -479,8 +532,245 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+
+        activeContentWindow?.let { window ->
+            if (window.assetName != null) {
+                LegalDocumentDialog(
+                    title = window.title,
+                    assetName = window.assetName,
+                    onDismiss = { activeContentWindow = null }
+                )
+            } else {
+                EmptySettingsContentDialog(
+                    title = window.title,
+                    onDismiss = { activeContentWindow = null }
+                )
+            }
+        }
     }
 }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun LegalDocumentDialog(
+    title: String,
+    assetName: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    BackHandler(onBack = onDismiss)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(12.dp)
+                .background(Color(0xFF080808), RoundedCornerShape(22.dp))
+                .border(1.5.dp, RoyalGold, RoundedCornerShape(22.dp))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = title,
+                    color = RoyalGold,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close $title",
+                        tint = RoyalGold
+                    )
+                }
+            }
+
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(start = 6.dp, end = 6.dp, bottom = 6.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, RoyalGold.copy(alpha = 0.38f), RoundedCornerShape(16.dp)),
+                factory = { webViewContext ->
+                    WebView(webViewContext).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        settings.javaScriptEnabled = false
+                        settings.domStorageEnabled = false
+                        settings.databaseEnabled = false
+                        settings.allowContentAccess = false
+                        settings.allowFileAccess = true
+                        settings.allowFileAccessFromFileURLs = false
+                        settings.allowUniversalAccessFromFileURLs = false
+                        settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val uri = request?.url ?: return true
+                                if (uri.scheme == "https" || uri.scheme == "mailto") {
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri.toString())))
+                                    }
+                                }
+                                return true
+                            }
+                        }
+                        loadUrl("file:///android_asset/$assetName")
+                    }
+                },
+                update = { webView ->
+                    val expectedUrl = "file:///android_asset/$assetName"
+                    if (webView.url != expectedUrl) webView.loadUrl(expectedUrl)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptySettingsContentDialog(
+    title: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = RoyalGold)
+            }
+        },
+        title = {
+            Text(
+                text = title,
+                color = RoyalGold,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .background(Color(0xFF101014), RoundedCornerShape(12.dp))
+            )
+        },
+        containerColor = Color(0xFF151515),
+        titleContentColor = RoyalGold,
+        textContentColor = Color.White
+    )
+}
+
+@Composable
+private fun SocialActionButton(
+    text: String,
+    iconRes: Int,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier
+            .height(56.dp)
+            .border(BorderStroke(1.dp, color.copy(alpha = 0.65f)), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = Color(0xFF151515).copy(alpha = 0.95f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = iconRes),
+                contentDescription = text,
+                modifier = Modifier.size(30.dp),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit
+            )
+            Text(
+                text = text.uppercase(),
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun GooglePlayFeedbackButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier
+            .height(72.dp)
+            .border(BorderStroke(1.dp, RoyalGold.copy(alpha = 0.8f)), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = Color(0xFF151515).copy(alpha = 0.97f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(
+                    id = com.royalshield.app.R.drawable.ic_google_play_feedback
+                ),
+                contentDescription = "Google Play Store",
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "RATE US ON GOOGLE PLAY",
+                    color = RoyalGold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = "Share feedback and support Royal Shield",
+                    color = Color.White.copy(alpha = 0.68f),
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
 }
 
 
