@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -170,6 +173,10 @@ class Settings(BaseSettings):
     # =============================================================================
     # UNIFIED INTEGRATIONS
     # =============================================================================
+    ai_provider: str = Field(default="nvidia", alias="AI_PROVIDER")
+    nvidia_api_key: Optional[str] = Field(default=None, alias="NVIDIA_API_KEY")
+    nvidia_model: str = Field(default="minimaxai/minimax-m3.1-flash", alias="NVIDIA_MODEL")
+    ai_request_timeout_seconds: float = Field(default=30.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
     gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
     google_play_service_account_json: Optional[str] = Field(default=None, alias="GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
     openclaw_base_url: Optional[str] = Field(default=None, alias="OPENCLAW_BASE_URL")

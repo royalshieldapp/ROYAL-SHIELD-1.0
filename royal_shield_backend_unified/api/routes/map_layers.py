@@ -63,8 +63,6 @@ async def get_map_layers(
             if osm_points:
                 sources.append(f"osm:{layer_name}")
 
-    points.extend(_forecast_seed_layers(requested, bbox_min_lat, bbox_min_lng, bbox_max_lat, bbox_max_lng))
-
     return MapLayersResponse(
         layers=points[:250],
         total_count=min(len(points), 250),
@@ -76,7 +74,7 @@ async def get_map_layers(
                 "max_lng": bbox_max_lng,
             },
             "requested_layers": sorted(requested),
-            "sources": sources + ["forecast_seed"],
+            "sources": sources,
             "generated_at": datetime.utcnow().isoformat(),
         },
     )
@@ -121,31 +119,6 @@ async def _fetch_osm_layer(layer_name: str, bbox: str, osm_filter: str) -> List[
             )
         )
     return points
-
-
-def _forecast_seed_layers(requested: set, min_lat: float, min_lng: float, max_lat: float, max_lng: float) -> List[MapLayerPoint]:
-    center_lat = (min_lat + max_lat) / 2
-    center_lng = (min_lng + max_lng) / 2
-    seeds = [
-        ("protest", "Forecast Protest", "News and OSINT watch area", center_lat + 0.006, center_lng - 0.006, "MEDIUM"),
-        ("theft", "Theft Hotspot", "Crime forecast watch area", center_lat - 0.005, center_lng + 0.007, "HIGH"),
-        ("cyber", "Cyber Threat", "Threat intelligence signal", center_lat + 0.003, center_lng + 0.009, "MEDIUM"),
-    ]
-    return [
-        MapLayerPoint(
-            id=f"forecast-{layer_type}-seed",
-            type=layer_type,
-            title=title,
-            snippet=snippet,
-            lat=lat,
-            lng=lng,
-            severity=severity,
-            source="forecast_engine",
-            updated_at=datetime.utcnow().isoformat(),
-        )
-        for layer_type, title, snippet, lat, lng, severity in seeds
-        if layer_type in requested
-    ]
 
 
 def _android_type(layer_name: str) -> str:

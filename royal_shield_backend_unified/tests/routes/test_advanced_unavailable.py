@@ -1,11 +1,28 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from api.routes import hotspots, predictions, risk_maps, threats
+from services.geospatial.database.connection import Base, get_db
 
 
 def make_client() -> TestClient:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def _override_get_db():
+        with session_factory() as s:
+            yield s
+
     app = FastAPI()
+    app.dependency_overrides[get_db] = _override_get_db
     app.include_router(predictions.router)
     app.include_router(threats.router)
     app.include_router(hotspots.router)
