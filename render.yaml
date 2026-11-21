@@ -4,7 +4,7 @@ services:
     runtime: python
     region: ohio
     plan: free
-    branch: main
+    branch: royalshield-v1.0.2-unified
     buildCommand: pip install -r royal_shield_backend_unified/requirements-render.txt
     startCommand: cd royal_shield_backend_unified && uvicorn api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -46,6 +46,12 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: AI_PROVIDER
+        value: nvidia
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_MODEL
+        value: minimaxai/minimax-m3.1-flash
       - key: DID_API_KEY
         sync: false
       - key: NUMVERIFY_API_KEY
