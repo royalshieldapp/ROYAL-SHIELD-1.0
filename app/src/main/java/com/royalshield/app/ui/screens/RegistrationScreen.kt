@@ -1,5 +1,6 @@
 package com.royalshield.app.ui.screens
 
+import android.app.Activity
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -7,9 +8,24 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.provider.Settings
 import android.widget.Toast
+import com.royalshield.app.auth.AuthProfileRepository
+import com.royalshield.app.auth.OAuthAuthHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -212,6 +228,38 @@ fun RegistrationScreen(
         }
     }
 
+    val activity = context as? Activity
+    val profileRepository = remember { AuthProfileRepository() }
+    val oAuthHandler = remember(auth) {
+        auth?.let { OAuthAuthHandler(auth = it, profileRepository = profileRepository) }
+    }
+
+    // Check for pending OAuth results after activity recreation (e.g. browser return)
+    LaunchedEffect(activity, oAuthHandler) {
+        if (activity != null && oAuthHandler != null) {
+            oAuthHandler.checkPendingAuthResult(
+                activity = activity,
+                onSuccess = { user ->
+                    val displayName = user.displayName ?: "User"
+                    Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
+                    isLoading = false
+                    onRegistrationSuccess()
+                },
+                onError = { errorMsg ->
+                    isLoading = false
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+    }
+
+    // Auto-advance if already authenticated
+    LaunchedEffect(auth?.currentUser) {
+        if (auth?.currentUser != null && !isLoading) {
+            onRegistrationSuccess()
+        }
+    }
+
     // Google Sign-In configuration
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -233,11 +281,21 @@ fun RegistrationScreen(
                 coroutineScope.launch {
                     try {
                         val credential = GoogleAuthProvider.getCredential(idToken, null)
-                        auth.signInWithCredential(credential).await()
-                        val displayName = auth.currentUser?.displayName ?: "User"
-                        Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
-                        isLoading = false
-                        onRegistrationSuccess()
+                        val authResult = auth.signInWithCredential(credential).await()
+                        val user = authResult.user
+                        if (user != null) {
+                            runCatching { profileRepository.ensureProfile(user) }
+                                .onFailure {
+                                    android.util.Log.w("RegistrationScreen", "Profile sync warning: ${it.message}")
+                                }
+                            val displayName = user.displayName ?: "User"
+                            Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
+                            isLoading = false
+                            onRegistrationSuccess()
+                        } else {
+                            isLoading = false
+                            Toast.makeText(context, "Google Sign-In: no user received", Toast.LENGTH_LONG).show()
+                        }
                     } catch (e: Exception) {
                         isLoading = false
                         val errorCode = (e as? FirebaseAuthException)?.errorCode
@@ -264,7 +322,9 @@ fun RegistrationScreen(
         } catch (e: ApiException) {
             isLoading = false
             android.util.Log.w("RegistrationScreen", "Google sign-in failed, code=${e.statusCode}", e)
-            Toast.makeText(context, "Google Sign-In failed (${e.statusCode})", Toast.LENGTH_LONG).show()
+            if (e.statusCode != 12501) {
+                Toast.makeText(context, "Google Sign-In failed (${e.statusCode})", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -349,6 +409,7 @@ fun RegistrationScreen(
                 color = RoyalGold,
                 textColor = Color.Black,
                 enabled = RegistrationProvider.PHONE.isAvailable,
+                iconSize = 36.dp,
             ) {
                 onNavigateToPhoneAuth()
             }
@@ -358,10 +419,11 @@ fun RegistrationScreen(
             // Real Google Sign-In button
             SocialLoginButton(
                 text = "Continue with Google",
-                iconRes = R.drawable.ic_registration_google_play,
+                iconRes = R.drawable.ic_registration_google_gold,
                 color = Color.White,
                 textColor = Color.Black,
                 enabled = RegistrationProvider.GOOGLE.isAvailable,
+                iconSize = 36.dp,
             ) {
                 isLoading = true
                 // Sign out first to always show the account picker
@@ -371,7 +433,22 @@ fun RegistrationScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(
+                onClick = { onRegistrationSuccess() },
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            ) {
+                Text(
+                    text = "EXPLORE AS GUEST • FULL ACCESS",
+                    color = RoyalGold,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = "COMING SOON",
@@ -389,15 +466,53 @@ fun RegistrationScreen(
             ) {
                 ComingSoonProviderChip(
                     text = "Apple — COMING SOON",
-                    iconRes = R.drawable.ic_registration_apple,
+                    iconRes = R.drawable.ic_registration_apple_gold,
                     enabled = RegistrationProvider.APPLE.isAvailable,
                     modifier = Modifier.weight(1f),
+                    onClick = {
+                        activity?.let { act ->
+                            oAuthHandler?.signInWithOAuth(
+                                activity = act,
+                                provider = RegistrationProvider.APPLE,
+                                onStart = { isLoading = true },
+                                onSuccess = { user ->
+                                    val displayName = user.displayName ?: "User"
+                                    Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
+                                    isLoading = false
+                                    onRegistrationSuccess()
+                                },
+                                onError = { message ->
+                                    isLoading = false
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        }
+                    }
                 )
                 ComingSoonProviderChip(
                     text = "GitHub — COMING SOON",
                     iconRes = R.drawable.ic_registration_git_gold,
                     enabled = RegistrationProvider.GITHUB.isAvailable,
                     modifier = Modifier.weight(1f),
+                    onClick = {
+                        activity?.let { act ->
+                            oAuthHandler?.signInWithOAuth(
+                                activity = act,
+                                provider = RegistrationProvider.GITHUB,
+                                onStart = { isLoading = true },
+                                onSuccess = { user ->
+                                    val displayName = user.displayName ?: "User"
+                                    Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
+                                    isLoading = false
+                                    onRegistrationSuccess()
+                                },
+                                onError = { message ->
+                                    isLoading = false
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        }
+                    }
                 )
             }
 
@@ -412,12 +527,32 @@ fun RegistrationScreen(
                     iconRes = R.drawable.ic_registration_facebook_gold,
                     enabled = RegistrationProvider.FACEBOOK.isAvailable,
                     modifier = Modifier.weight(1f),
+                    onClick = {
+                        activity?.let { act ->
+                            oAuthHandler?.signInWithOAuth(
+                                activity = act,
+                                provider = RegistrationProvider.FACEBOOK,
+                                onStart = { isLoading = true },
+                                onSuccess = { user ->
+                                    val displayName = user.displayName ?: "User"
+                                    Toast.makeText(context, "Welcome, $displayName!", Toast.LENGTH_SHORT).show()
+                                    isLoading = false
+                                    onRegistrationSuccess()
+                                },
+                                onError = { message ->
+                                    isLoading = false
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        }
+                    }
                 )
                 ComingSoonProviderChip(
                     text = "Email — COMING SOON",
                     iconRes = R.drawable.ic_registration_email_gold,
                     enabled = RegistrationProvider.EMAIL.isAvailable,
                     modifier = Modifier.weight(1f),
+                    onClick = {}
                 )
             }
 
@@ -474,7 +609,12 @@ private fun LuxuryRegistrationPanel(
                 clip = false
             }
             .background(Color.Black.copy(alpha = 0.24f), RoundedCornerShape(30.dp))
-            .border(1.5.dp, Color(0xFFFFD86A), RoundedCornerShape(30.dp))
+            .neonSweepBorder(
+                strokeWidth = 1.8.dp,
+                shape = RoundedCornerShape(30.dp),
+                glowAlpha = 0.90f,
+                durationMillis = 3600,
+            )
             .padding(5.dp)
     ) {
         Column(
@@ -499,12 +639,13 @@ private fun ComingSoonProviderChip(
     iconRes: Int,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     Surface(
-        onClick = {},
+        onClick = onClick,
         enabled = enabled,
         modifier = modifier
-            .heightIn(min = 48.dp)
+            .heightIn(min = 54.dp)
             .semantics {
                 contentDescription = "$text provider, disabled"
             },
@@ -517,28 +658,28 @@ private fun ComingSoonProviderChip(
         ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
+            Image(
                 painter = painterResource(iconRes),
                 contentDescription = null,
-                tint = Color.Unspecified,
-                modifier = Modifier.size(22.dp),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(36.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = text.substringBefore(" —"),
-                    color = Color.White.copy(alpha = 0.66f),
-                    fontSize = 10.sp,
+                    text = text.split("—", "–", "-").first().trim(),
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
                 Text(
                     text = "COMING SOON",
-                    color = RoyalGold.copy(alpha = 0.54f),
-                    fontSize = 8.sp,
+                    color = RoyalGold.copy(alpha = 0.62f),
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                 )
@@ -555,9 +696,11 @@ fun SocialLoginButton(
     color: Color,
     textColor: Color,
     enabled: Boolean = true,
+    iconSize: Dp? = null,
     onClick: () -> Unit
 ) {
     val layout = registrationSocialButtonLayout()
+    val actualIconSize = iconSize ?: layout.iconSizeDp.dp
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -610,14 +753,14 @@ fun SocialLoginButton(
                             painter = painterResource(id = iconRes),
                             contentDescription = "$text icon",
                             tint = Color.Unspecified,
-                            modifier = Modifier.size(layout.iconSizeDp.dp),
+                            modifier = Modifier.size(actualIconSize),
                         )
                     } else if (icon != null) {
                         Icon(
                             icon,
                             contentDescription = "$text icon",
                             tint = Color.Black,
-                            modifier = Modifier.size(layout.iconSizeDp.dp),
+                            modifier = Modifier.size(actualIconSize),
                         )
                     }
                 }
@@ -629,6 +772,72 @@ fun SocialLoginButton(
                     contentAlignment = Alignment.CenterEnd,
                 ) {}
             }
+        }
+    }
+}
+
+@Composable
+internal fun Modifier.neonSweepBorder(
+    strokeWidth: Dp = 1.8.dp,
+    shape: CornerBasedShape = RoundedCornerShape(30.dp),
+    glowAlpha: Float = 0.85f,
+    durationMillis: Int = 3600,
+): Modifier {
+    val infiniteTransition = rememberInfiniteTransition(label = "neon_sweep")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "neon_sweep_angle",
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "neon_pulse_alpha",
+    )
+
+    return this.drawWithCache {
+        val rad = Math.toRadians(angle.toDouble())
+        val cos = kotlin.math.cos(rad).toFloat()
+        val sin = kotlin.math.sin(rad).toFloat()
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val cy = h / 2f
+        val rx = w * 0.7f
+        val ry = h * 0.7f
+
+        val startX = cx - cos * rx
+        val startY = cy - sin * ry
+        val endX = cx + cos * rx
+        val endY = cy + sin * ry
+
+        val neonBrush = Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFFFD86A).copy(alpha = 0.20f),
+                Color(0xFFFFC43B).copy(alpha = 0.50f),
+                Color(0xFFFFF7DC).copy(alpha = glowAlpha * pulseAlpha),
+                Color(0xFFFFB300).copy(alpha = 0.70f),
+                Color(0xFFFFD86A).copy(alpha = 0.20f),
+            ),
+            start = Offset(startX, startY),
+            end = Offset(endX, endY),
+        )
+
+        onDrawWithContent {
+            drawContent()
+            drawOutline(
+                outline = shape.createOutline(size, layoutDirection, this),
+                brush = neonBrush,
+                style = Stroke(width = strokeWidth.toPx()),
+            )
         }
     }
 }

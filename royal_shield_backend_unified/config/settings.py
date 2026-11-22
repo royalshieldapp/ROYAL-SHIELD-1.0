@@ -175,7 +175,7 @@ class Settings(BaseSettings):
     # =============================================================================
     ai_provider: str = Field(default="nvidia", alias="AI_PROVIDER")
     nvidia_api_key: Optional[str] = Field(default=None, alias="NVIDIA_API_KEY")
-    nvidia_model: str = Field(default="minimaxai/minimax-m3.1-flash", alias="NVIDIA_MODEL")
+    nvidia_model: str = Field(default="nvidia/nemotron-3.5-lightning-30b-a3b", alias="NVIDIA_MODEL")
     ai_request_timeout_seconds: float = Field(default=30.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
     gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
     google_play_service_account_json: Optional[str] = Field(default=None, alias="GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")

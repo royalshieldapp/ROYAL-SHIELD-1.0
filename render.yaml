@@ -51,7 +51,7 @@ services:
       - key: NVIDIA_API_KEY
         sync: false
       - key: NVIDIA_MODEL
-        value: minimaxai/minimax-m3.1-flash
+        value: nvidia/nemotron-3.5-lightning-30b-a3b
       - key: DID_API_KEY
         sync: false
       - key: NUMVERIFY_API_KEY

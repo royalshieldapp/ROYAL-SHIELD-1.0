@@ -42,7 +42,7 @@ async def chat_proxy(payload: ChatRequest):
 
 async def _call_nvidia_qwen(user_text: str, history: Optional[List[ChatHistoryEntry]], requested_model: Optional[str]):
     apiKey = settings.nvidia_api_key
-    model_id = requested_model or settings.nvidia_model or "minimaxai/minimax-m3.1-flash"
+    model_id = requested_model or settings.nvidia_model or "nvidia/nemotron-3.5-lightning-30b-a3b"
     timeout_sec = settings.ai_request_timeout_seconds or 30.0
 
     if not apiKey or apiKey == "your_nvidia_api_key_here":

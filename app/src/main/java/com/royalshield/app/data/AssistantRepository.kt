@@ -31,33 +31,45 @@ class AssistantRepository(
         .writeTimeout(12, TimeUnit.SECONDS)
         .build()
 ) {
-    private val endpoint = "${com.royalshield.app.BuildConfig.API_BASE_URL.trimEnd('/')}/api/assistant/chat"
+    private val endpoint = if (com.royalshield.app.subscription.EntitlementStore.DEV_SUPERPOWERS) {
+        "http://10.0.2.2:8000/api/assistant/chat"
+    } else {
+        "${com.royalshield.app.BuildConfig.API_BASE_URL.trimEnd('/')}/api/assistant/chat"
+    }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     suspend fun sendMessage(
         message: String,
         history: List<AssistantHistoryEntry>
+    ): AssistantRepositoryResult = sendMessage(message, history, null)
+
+    suspend fun sendMessage(
+        message: String,
+        history: List<AssistantHistoryEntry>,
+        systemInstruction: String?
     ): AssistantRepositoryResult = withContext(Dispatchers.IO) {
         val normalizedMessage = message.trim()
         if (normalizedMessage.isEmpty() || normalizedMessage.length > MAX_MESSAGE_LENGTH) {
             return@withContext AssistantRepositoryResult.Error(
-                "El mensaje debe tener entre 1 y $MAX_MESSAGE_LENGTH caracteres."
+                "Message must be between 1 and $MAX_MESSAGE_LENGTH characters."
             )
         }
 
         val user = auth.currentUser
-            ?: return@withContext AssistantRepositoryResult.Error(
-                "Inicia sesión para usar Royal Agent."
-            )
-
-        val token = try {
-            user.getIdToken(false).await().token
-        } catch (_: Exception) {
-            null
-        }
-        if (token.isNullOrBlank()) {
+        val token = user?.let {
+            try {
+                it.getIdToken(false).await().token
+            } catch (_: Exception) {
+                null
+            }
+        } ?: if (com.royalshield.app.subscription.EntitlementStore.DEV_SUPERPOWERS) "dev-superpowers-token" else {
             return@withContext AssistantRepositoryResult.Error(
-                "No se pudo validar tu sesión. Vuelve a iniciar sesión."
+                "Sign in to use Royal Agent."
+            )
+        }
+        if (token.isBlank()) {
+            return@withContext AssistantRepositoryResult.Error(
+                "Unable to validate session. Please sign in again."
             )
         }
 
@@ -76,6 +88,10 @@ class AssistantRepository(
                 }
             )
 
+        if (!systemInstruction.isNullOrBlank()) {
+            payload.put("systemInstruction", systemInstruction)
+        }
+
         val request = Request.Builder()
             .url(endpoint)
             .header("Authorization", "Bearer $token")
@@ -91,7 +107,7 @@ class AssistantRepository(
                     if (reply.isNotEmpty()) {
                         AssistantRepositoryResult.Success(reply)
                     } else {
-                        AssistantRepositoryResult.Error("El asistente devolvió una respuesta vacía.")
+                        AssistantRepositoryResult.Error("The assistant returned an empty response.")
                     }
                 } else {
                     AssistantRepositoryResult.Error(userFacingError(response.code, json))
@@ -99,7 +115,7 @@ class AssistantRepository(
             }
         } catch (_: IOException) {
             AssistantRepositoryResult.Error(
-                "No se pudo conectar con Royal Agent. Revisa tu conexión e inténtalo de nuevo."
+                "Unable to connect to Royal Agent. Please check your connection and try again."
             )
         }
     }
@@ -113,11 +129,11 @@ class AssistantRepository(
         }.trim()
 
         return when (statusCode) {
-            401 -> "Tu sesión expiró. Vuelve a iniciar sesión."
-            422 -> serverMessage.ifBlank { "El mensaje no pudo procesarse." }
-            429 -> "Has alcanzado el límite temporal del asistente. Inténtalo en un minuto."
-            503 -> serverMessage.ifBlank { "El servicio de IA todavía no está configurado." }
-            else -> "Royal Agent no está disponible temporalmente ($statusCode)."
+            401 -> "Your session has expired. Please sign in again."
+            422 -> serverMessage.ifBlank { "The message could not be processed." }
+            429 -> "You have reached the temporary rate limit. Please try again in a minute."
+            503 -> serverMessage.ifBlank { "The AI service is not yet configured." }
+            else -> "Royal Agent is temporarily unavailable ($statusCode)."
         }
     }
 

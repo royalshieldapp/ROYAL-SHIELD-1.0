@@ -137,7 +137,8 @@ fun AppMainFlow() {
     DisposableEffect(Unit) {
         val auth = FirebaseAuth.getInstance()
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
-            if (firebaseAuth.currentUser == null &&
+            if (!com.royalshield.app.subscription.EntitlementStore.DEV_SUPERPOWERS &&
+                firebaseAuth.currentUser == null &&
                 currentState != AppState.SPLASH &&
                 currentState != AppState.REGISTRATION &&
                 currentState != AppState.PHONE_AUTH
@@ -163,7 +164,7 @@ fun AppMainFlow() {
     Crossfade(targetState = currentState, label = "AppFlow") { state ->
         when (state) {
             AppState.SPLASH -> SplashScreen {
-                currentState = AppState.REGISTRATION
+                currentState = if (com.royalshield.app.subscription.EntitlementStore.DEV_SUPERPOWERS) AppState.MAIN else AppState.REGISTRATION
             }
             AppState.PREMIUM_PROMO -> PremiumEliteScreen(
                 billingManager = billingManager,
